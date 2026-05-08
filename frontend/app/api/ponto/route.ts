@@ -136,7 +136,7 @@ export async function GET(request: Request) {
         ROUND(SUM(p.falta_injustificada + p.atestado), 2) AS total_ausencia,
         ROUND(AVG(p.falta_injustificada + p.atestado), 2) AS media_ausencia
        FROM ponto_mensal p
-       LEFT JOIN colaboradores c ON p.cpf = c.cpf
+       LEFT JOIN colaboradores c ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
        WHERE p.mes = ? AND c.gestor IS NOT NULL AND c.gestor != '' AND c.status = 'Ativo'
        GROUP BY c.gestor
        HAVING total_ausencia > 0
