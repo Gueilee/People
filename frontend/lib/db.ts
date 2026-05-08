@@ -34,10 +34,7 @@ export class Database {
 }
 
 export async function getDb(): Promise<Database> {
-  const wasmPath = path.join(
-    path.dirname(require.resolve('sql.js')),
-    'dist/sql-wasm.wasm'
-  );
+  const wasmPath = path.resolve(process.cwd(), 'lib/sql-wasm.wasm');
   const wasmBinary = fs.readFileSync(wasmPath);
   const SQL = await initSqlJs({ wasmBinary });
   const dbPath = path.resolve(process.cwd(), 'database/vendemmia_people.db');

@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
-    '/api/dashboard':     ['./database/**', './node_modules/sql.js/dist/**'],
-    '/api/carreira':      ['./database/**', './node_modules/sql.js/dist/**'],
-    '/api/alertas':       ['./database/**', './node_modules/sql.js/dist/**'],
-    '/api/colaboradores': ['./database/**', './node_modules/sql.js/dist/**'],
+    '/api/dashboard':     ['./database/**', './lib/sql-wasm.wasm'],
+    '/api/carreira':      ['./database/**', './lib/sql-wasm.wasm'],
+    '/api/alertas':       ['./database/**', './lib/sql-wasm.wasm'],
+    '/api/colaboradores': ['./database/**', './lib/sql-wasm.wasm'],
   },
 };
 
