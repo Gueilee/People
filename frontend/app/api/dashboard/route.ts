@@ -23,7 +23,7 @@ type Colab = {
 };
 
 async function getDb() {
-  const p = path.resolve(process.cwd(), '../database/vendemmia_people.db');
+  const p = path.resolve(process.cwd(), 'database/vendemmia_people.db');
   return open({ filename: p, driver: sqlite3.Database });
 }
 
