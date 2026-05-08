@@ -2,8 +2,7 @@
 *.xlsx
 *.xls
 *.csv
-database/*.db
-database/*.sqlite
+# database/*.db  ← habilitado para testes com o time de RH
 
 # Python
 backend/venv/
