@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { getDb } from '@/lib/db';
+
+function gravatarHash(email: string | null | undefined): string {
+  return crypto.createHash('md5').update((email || '').toLowerCase().trim()).digest('hex');
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -40,38 +45,42 @@ export async function GET(request: Request) {
       );
 
       // Organograma: subordinados diretos
-      const diretos = await db.all(
-        `SELECT id_colaborador, nome, cargo, departamento, unidade, status
+      const diretosRaw = await db.all(
+        `SELECT id_colaborador, nome, cargo, departamento, unidade, status, email
          FROM colaboradores WHERE gestor = ? ORDER BY cargo, nome`,
         [colab.nome as string]
       );
+      const diretos = diretosRaw.map((d: any) => ({ ...d, gravatar_hash: gravatarHash(d.email) }));
       const totalDiretos = diretos.length;
 
       // Gestor do colaborador (busca por nome)
-      const gestorInfo = colab.gestor ? await db.get(
-        `SELECT id_colaborador, nome, cargo, departamento, unidade, status, gestor
+      const gestorRaw = colab.gestor ? await db.get(
+        `SELECT id_colaborador, nome, cargo, departamento, unidade, status, gestor, email
          FROM colaboradores WHERE nome = ? LIMIT 1`,
         [colab.gestor as string]
       ) ?? null : null;
+      const gestorInfo = gestorRaw ? { ...(gestorRaw as any), gravatar_hash: gravatarHash((gestorRaw as any).email) } : null;
 
       // Gestor do gestor
-      const gestorDoGestor = (gestorInfo as any)?.gestor ? await db.get(
-        `SELECT id_colaborador, nome, cargo, unidade, status
+      const gestorDoGestorRaw = (gestorInfo as any)?.gestor ? await db.get(
+        `SELECT id_colaborador, nome, cargo, unidade, status, email
          FROM colaboradores WHERE nome = ? LIMIT 1`,
         [(gestorInfo as any).gestor as string]
       ) ?? null : null;
+      const gestorDoGestor = gestorDoGestorRaw ? { ...(gestorDoGestorRaw as any), gravatar_hash: gravatarHash((gestorDoGestorRaw as any).email) } : null;
 
       // Colegas de equipe (mesmo gestor)
-      const irmaos = colab.gestor ? await db.all(
-        `SELECT id_colaborador, nome, cargo, unidade, status
+      const irmaoRaw = colab.gestor ? await db.all(
+        `SELECT id_colaborador, nome, cargo, unidade, status, email
          FROM colaboradores WHERE gestor = ? AND nome != ? AND status = 'Ativo'
          ORDER BY cargo, nome LIMIT 8`,
         [colab.gestor as string, colab.nome as string]
       ) : [];
+      const irmaos = irmaoRaw.map((d: any) => ({ ...d, gravatar_hash: gravatarHash(d.email) }));
 
       await db.close();
       return NextResponse.json({
-        colaborador: colab,
+        colaborador: { ...(colab as any), gravatar_hash: gravatarHash((colab as any).email) },
         historico,
         organograma: { diretos: diretos.slice(0, 8), totalDiretos, gestorInfo, gestorDoGestor, irmaos },
       });

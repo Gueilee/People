@@ -24,6 +24,7 @@ type Colab = {
   tipo_desligamento: string | null; status: string;
   vinculo?: string | null; birth_date?: string | null;
   gender?: string | null; etnia?: string | null;
+  gravatar_hash?: string;
 };
 
 type Evento = {
@@ -37,6 +38,7 @@ type Evento = {
 type OrgPessoa = {
   id_colaborador?: string; nome: string; cargo: string;
   unidade?: string; departamento?: string; status?: string; gestor?: string;
+  gravatar_hash?: string;
 };
 
 type Organograma = {
@@ -114,6 +116,38 @@ function InfoRow({ label, value }: { label: string; value: string }) {
    ORGANOGRAMA
 ══════════════════════════════════════════════════════ */
 
+function GravatarAvatar({ hash, size, nome, destaque }: {
+  hash?: string; size: number; nome: string; destaque: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const baseStyle = {
+    width: size, height: size, borderRadius: '50%', flexShrink: 0,
+    border: destaque ? '2px solid rgba(255,255,255,0.4)' : '2px solid #fff',
+    boxShadow: destaque ? '0 2px 8px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.12)',
+  };
+  if (hash && !failed) {
+    return (
+      <img
+        src={`https://www.gravatar.com/avatar/${hash}?s=${size * 2}&d=404`}
+        width={size} height={size}
+        style={{ ...baseStyle, objectFit: 'cover' }}
+        onError={() => setFailed(true)}
+        alt={nome}
+      />
+    );
+  }
+  return (
+    <div style={{
+      ...baseStyle,
+      background: destaque ? 'rgba(255,255,255,0.25)' : GRAD,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.38, fontWeight: 900, color: '#fff',
+    }}>
+      {iniciais(nome)}
+    </div>
+  );
+}
+
 function OrgCard({
   pessoa, destaque = false, tamanho = 'md', faded = false,
 }: {
@@ -135,17 +169,7 @@ function OrgCard({
       flexShrink: 0,
     }}>
       {/* Avatar */}
-      <div style={{
-        width: sz.av, height: sz.av, borderRadius: '50%',
-        background: destaque ? 'rgba(255,255,255,0.25)' : GRAD,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: sz.av * 0.38, fontWeight: 900, color: '#fff',
-        border: destaque ? '2px solid rgba(255,255,255,0.4)' : '2px solid #fff',
-        boxShadow: destaque ? '0 2px 8px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.12)',
-        flexShrink: 0,
-      }}>
-        {iniciais(pessoa.nome)}
-      </div>
+      <GravatarAvatar hash={pessoa.gravatar_hash} size={sz.av} nome={pessoa.nome} destaque={destaque} />
       {/* Texto */}
       <div style={{ textAlign: 'center', width: '100%' }}>
         <p style={{
@@ -204,6 +228,7 @@ function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
     id_colaborador: colab.id_colaborador,
     nome: colab.nome, cargo: colab.cargo,
     unidade: colab.unidade, status: colab.status,
+    gravatar_hash: colab.gravatar_hash,
   };
 
   return (
