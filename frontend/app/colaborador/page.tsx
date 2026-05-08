@@ -405,8 +405,13 @@ export default function ColaboradorPage() {
 
   const ativo = colab?.status === 'Ativo';
 
+  // Só cria evento sintético de admissão se o histórico não tiver um real
+  const historicoTemAdmissao = historico.some(h =>
+    (h.tipo_evento || '').toLowerCase().includes('admiss')
+  );
+
   const eventosTimeline: (Evento & { _tipo: string })[] = [
-    ...(colab ? [{
+    ...(colab && !historicoTemAdmissao ? [{
       id: -1, nome: colab.nome, cpf: '', vinculo: colab.vinculo || '',
       cargo: colab.cargo, departamento: colab.departamento, area: '',
       unidade: colab.unidade, centro_custo: '', motivo: 'Entrada na empresa',
