@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
   const session  = request.cookies.get(SESSION_COOKIE)?.value;
   const { pathname } = request.nextUrl;
 
-  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/carreira') || pathname.startsWith('/colaborador');
+  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/carreira') || pathname.startsWith('/colaborador') || pathname.startsWith('/ponto');
   const isLogin     = pathname === '/login';
 
   if (isProtected && session !== SESSION_TOKEN) {
@@ -27,5 +27,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/carreira/:path*', '/colaborador/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/carreira/:path*', '/colaborador/:path*', '/ponto/:path*', '/login'],
 };

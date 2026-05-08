@@ -411,6 +411,11 @@ export default function DashboardRH() {
               style={{ borderColor: C.purple, color: C.purple }}>
               Consulta Colaborador →
             </Link>
+            <Link href="/ponto"
+              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
+              style={{ borderColor: '#F59E0B', color: '#F59E0B' }}>
+              Jornada & Ponto →
+            </Link>
 
             {/* Filtro por unidade */}
             <select
