@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VENDEMMIA PEOPLE",
   description: "Sistema de Gestão de Pessoas — Indicadores de RH e Turnover",
+  icons: { icon: '/favicon.png' },
 };
 
 export default function RootLayout({
