@@ -39,8 +39,42 @@ export async function GET(request: Request) {
         [colab.nome as string]
       );
 
+      // Organograma: subordinados diretos
+      const diretos = await db.all(
+        `SELECT id_colaborador, nome, cargo, departamento, unidade, status
+         FROM colaboradores WHERE gestor = ? ORDER BY cargo, nome`,
+        [colab.nome as string]
+      );
+      const totalDiretos = diretos.length;
+
+      // Gestor do colaborador (busca por nome)
+      const gestorInfo = colab.gestor ? await db.get(
+        `SELECT id_colaborador, nome, cargo, departamento, unidade, status, gestor
+         FROM colaboradores WHERE nome = ? LIMIT 1`,
+        [colab.gestor as string]
+      ) ?? null : null;
+
+      // Gestor do gestor
+      const gestorDoGestor = (gestorInfo as any)?.gestor ? await db.get(
+        `SELECT id_colaborador, nome, cargo, unidade, status
+         FROM colaboradores WHERE nome = ? LIMIT 1`,
+        [(gestorInfo as any).gestor as string]
+      ) ?? null : null;
+
+      // Colegas de equipe (mesmo gestor)
+      const irmaos = colab.gestor ? await db.all(
+        `SELECT id_colaborador, nome, cargo, unidade, status
+         FROM colaboradores WHERE gestor = ? AND nome != ? AND status = 'Ativo'
+         ORDER BY cargo, nome LIMIT 8`,
+        [colab.gestor as string, colab.nome as string]
+      ) : [];
+
       await db.close();
-      return NextResponse.json({ colaborador: colab, historico });
+      return NextResponse.json({
+        colaborador: colab,
+        historico,
+        organograma: { diretos: diretos.slice(0, 8), totalDiretos, gestorInfo, gestorDoGestor, irmaos },
+      });
     }
 
     await db.close();
