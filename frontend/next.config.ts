@@ -1,13 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/dashboard':    ['./database/**', './node_modules/sql.js/dist/**'],
-      '/api/carreira':     ['./database/**', './node_modules/sql.js/dist/**'],
-      '/api/alertas':      ['./database/**', './node_modules/sql.js/dist/**'],
-      '/api/colaboradores':['./database/**', './node_modules/sql.js/dist/**'],
-    },
+  outputFileTracingIncludes: {
+    '/api/dashboard':     ['./database/**', './node_modules/sql.js/dist/**'],
+    '/api/carreira':      ['./database/**', './node_modules/sql.js/dist/**'],
+    '/api/alertas':       ['./database/**', './node_modules/sql.js/dist/**'],
+    '/api/colaboradores': ['./database/**', './node_modules/sql.js/dist/**'],
   },
 };
 
