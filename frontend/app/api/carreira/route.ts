@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import path from 'path';
+import { getDb } from '@/lib/db';
 
 type Historico = {
   id: number;
@@ -20,11 +18,6 @@ type Historico = {
   is_current: number;
   duracao_dias: number | null;
 };
-
-async function getDb() {
-  const p = path.resolve(process.cwd(), 'database/vendemmia_people.db');
-  return open({ filename: p, driver: sqlite3.Database });
-}
 
 function subMonths(d: Date, m: number) {
   const r = new Date(d);

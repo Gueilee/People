@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import path from 'path';
-
-async function getDb() {
-  const p = path.resolve(process.cwd(), 'database/vendemmia_people.db');
-  return open({ filename: p, driver: sqlite3.Database });
-}
+import { getDb } from '@/lib/db';
 
 function subMonths(d: Date, m: number) {
   const r = new Date(d); r.setMonth(r.getMonth() - m); return r;
