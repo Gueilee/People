@@ -38,7 +38,7 @@ type Evento = {
 type OrgPessoa = {
   id_colaborador?: string; nome: string; cargo: string;
   unidade?: string; departamento?: string; status?: string; gestor?: string;
-  gravatar_hash?: string;
+  gravatar_hash?: string; email?: string;
 };
 
 type Organograma = {
@@ -118,32 +118,51 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 type CardRole = 'ancestor' | 'manager' | 'self' | 'report' | 'peer';
 
-function OrgAvatar({ nome, role, size }: { nome: string; role: CardRole; size: number }) {
-  const [failed, setFailed] = useState(false);
+type AvatarStage = 'ms365' | 'uiavatar' | 'initials';
+
+function OrgAvatar({ nome, email, role, size }: {
+  nome: string; email?: string; role: CardRole; size: number;
+}) {
+  const [stage, setStage] = useState<AvatarStage>(email ? 'ms365' : 'uiavatar');
+
+  const borderColor = role === 'self' ? 'rgba(255,255,255,0.5)' : role === 'ancestor' ? '#e5e7eb' : '#fff';
+  const shadow      = role === 'self' ? '0 4px 16px rgba(0,0,0,0.25)' : '0 1px 6px rgba(0,0,0,0.1)';
+  const baseImg     = {
+    width: size, height: size, borderRadius: '50%', objectFit: 'cover' as const,
+    flexShrink: 0 as const, border: `2px solid ${borderColor}`, boxShadow: shadow,
+  };
+
+  function nextStage() {
+    setStage(s => s === 'ms365' ? 'uiavatar' : 'initials');
+  }
+
+  if (stage === 'initials') {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        background: role === 'self' ? 'rgba(255,255,255,0.2)' : GRAD,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.36, fontWeight: 900,
+        color: role === 'self' ? C.purple : '#fff',
+        border: `2px solid ${borderColor}`, boxShadow: shadow,
+      }}>
+        {iniciais(nome)}
+      </div>
+    );
+  }
+
   const bg  = role === 'ancestor' ? 'adb5bd' : role === 'self' ? 'ffffff' : '422c76';
   const fg  = role === 'self' ? '422c76' : 'ffffff';
-  const url = `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=${bg}&color=${fg}&bold=true&size=${size * 2}&format=png&rounded=true`;
-  const borderColor = role === 'self' ? 'rgba(255,255,255,0.5)' : role === 'ancestor' ? '#e5e7eb' : '#fff';
+  const src = stage === 'ms365'
+    ? `/api/foto?email=${encodeURIComponent(email ?? '')}`
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=${bg}&color=${fg}&bold=true&size=${size * 2}&format=png&rounded=true`;
 
-  return failed ? (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: role === 'self' ? 'rgba(255,255,255,0.2)' : GRAD,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.36, fontWeight: 900, color: role === 'self' ? C.purple : '#fff',
-      border: `2px solid ${borderColor}`,
-    }}>
-      {iniciais(nome)}
-    </div>
-  ) : (
+  return (
     <img
-      src={url} width={size} height={size} alt={nome}
-      style={{
-        width: size, height: size, borderRadius: '50%', objectFit: 'cover',
-        flexShrink: 0, border: `2px solid ${borderColor}`,
-        boxShadow: role === 'self' ? '0 4px 16px rgba(0,0,0,0.25)' : '0 1px 6px rgba(0,0,0,0.1)',
-      }}
-      onError={() => setFailed(true)}
+      key={stage}
+      src={src} width={size} height={size} alt={nome}
+      style={baseImg}
+      onError={nextStage}
     />
   );
 }
@@ -175,7 +194,7 @@ function OrgCard({ pessoa, role = 'report' }: { pessoa: OrgPessoa; role?: CardRo
           whiteSpace: 'nowrap',
         }}>★ SELECIONADO</div>
       )}
-      <OrgAvatar nome={pessoa.nome} role={role} size={avatarSz} />
+      <OrgAvatar nome={pessoa.nome} email={pessoa.email} role={role} size={avatarSz} />
       <div style={{ textAlign: 'center', width: '100%' }}>
         <p style={{
           fontSize: isSelf ? 13 : 11, fontWeight: 700, lineHeight: 1.3, margin: 0,
@@ -231,6 +250,7 @@ function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
     id_colaborador: colab.id_colaborador,
     nome: colab.nome, cargo: colab.cargo,
     unidade: colab.unidade, status: colab.status,
+    email: colab.email,
   };
 
   return (
