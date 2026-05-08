@@ -376,6 +376,11 @@ export default function DashboardRH() {
               style={{ borderColor: '#0D9488', color: '#0D9488' }}>
               Carreira & Dev →
             </Link>
+            <Link href="/colaborador"
+              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
+              style={{ borderColor: C.purple, color: C.purple }}>
+              Consulta Colaborador →
+            </Link>
 
             {/* Filtro por unidade */}
             <select

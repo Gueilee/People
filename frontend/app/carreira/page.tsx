@@ -259,6 +259,11 @@ export default function CarreiraPage() {
               style={{ borderColor: C.gray, color: C.gray }}>
               ← Dashboard RH
             </Link>
+            <Link href="/colaborador"
+              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
+              style={{ borderColor: C.purple, color: C.purple }}>
+              Consulta Colaborador →
+            </Link>
             <span className="text-xs text-gray-500">Período:</span>
             {[6, 12, 24].map(m => (
               <button key={m} onClick={() => setPeriodo(m)}
