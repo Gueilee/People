@@ -1,0 +1,29 @@
+# Dados sensíveis — nunca subir ao repositório
+*.xlsx
+*.xls
+*.csv
+database/*.db
+database/*.sqlite
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+**/__pycache__/
+**/*.pyc
+
+# Next.js (complementa frontend/.gitignore)
+frontend/.next/
+frontend/node_modules/
+frontend/.env*
+
+# Imagens na raiz do projeto (as usadas pelo app estão em frontend/public/)
+/login_v1.jpeg
+/logo-vendemmia.png
+/logo.png
+/login.jpeg
+/logo.jpeg
+
+# OS
+.DS_Store
+Thumbs.db
