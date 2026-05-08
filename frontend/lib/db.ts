@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 type Params = (string | number | null | undefined)[];
-type Row = Record<string, string | number | null | Uint8Array>;
+type Row = Record<string, string | number | null>;
 
 export class Database {
   private _db: initSqlJs.Database;
