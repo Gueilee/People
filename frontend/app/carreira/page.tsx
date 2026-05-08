@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
+import { NavHeader, PeriodButtons, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -244,55 +244,10 @@ export default function CarreiraPage() {
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b-4" style={{ borderColor: C.purple }}>
-        <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="Vendemmia People" className="h-16 w-auto" />
-            <span className="text-xs font-semibold px-3 py-1 rounded-full text-white" style={{ backgroundColor: C.teal }}>
-              CARREIRA & DESENVOLVIMENTO
-            </span>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/dashboard"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.gray, color: C.gray }}>
-              ← Dashboard RH
-            </Link>
-            <Link href="/colaborador"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.purple, color: C.purple }}>
-              Consulta Colaborador →
-            </Link>
-            <span className="text-xs text-gray-500">Período:</span>
-            {[6, 12, 24].map(m => (
-              <button key={m} onClick={() => setPeriodo(m)}
-                className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-                style={{
-                  borderColor: periodo === m ? C.purple : '#D1D5DB',
-                  backgroundColor: periodo === m ? C.purple : 'transparent',
-                  color: periodo === m ? 'white' : C.gray,
-                }}>
-                {m} meses
-              </button>
-            ))}
-            {atualizado && <span className="text-[10px] text-gray-400">Atualizado: {atualizado}</span>}
-
-            {/* Logout */}
-            <button
-              onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST' });
-                window.location.href = '/login';
-              }}
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: '#9CA3AF', color: '#6B7280' }}
-              title="Sair do sistema"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
+      <NavHeader>
+        <PeriodButtons value={periodo} onChange={setPeriodo} options={[6, 12, 24]} color={C.teal} />
+        {atualizado && <SyncBadge label={`Atualizado: ${atualizado}`} />}
+      </NavHeader>
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
 

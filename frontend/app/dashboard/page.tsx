@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import Link from 'next/link';
+import { NavHeader, FilterSelect, PeriodButtons, SyncBadge, FilterTag } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -40,8 +40,8 @@ type RiscoColab = {
 type DashData = {
   periodo: number;
   atualizadoEm: string;
-  filtros: { unidade: string; area: string };
-  opcoesFiltro: { unidades: string[]; areas: string[] };
+  filtros: { unidade: string; area: string; gestor: string; mes: string };
+  opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[]; meses: string[] };
   kpis: KPIs;
   turnoverPorUnidade: TurnoverUnidade[];
   turnoverPorArea: TurnoverArea[];
@@ -336,6 +336,8 @@ export default function DashboardRH() {
   const [periodo, setPeriodo] = useState(12);
   const [filtroUnidade, setFiltroUnidade] = useState('');
   const [filtroArea,    setFiltroArea]    = useState('');
+  const [filtroGestor,  setFiltroGestor]  = useState('');
+  const [filtroMes,     setFiltroMes]     = useState('');
 
   // Alertas
   const [alertaOpen,      setAlertaOpen]      = useState(false);
@@ -369,11 +371,13 @@ export default function DashboardRH() {
       .catch(() => setAlertaStatus({ tipo: 'erro', msg: 'Erro ao enviar email' }));
   }, [alertaEmail, alertaThreshold, periodo]);
 
-  const carregar = useCallback((meses: number, unidade: string, area: string) => {
+  const carregar = useCallback((meses: number, unidade: string, area: string, gestor: string, mes: string) => {
     setLoading(true);
     const params = new URLSearchParams({ meses: String(meses) });
     if (unidade) params.set('unidade', unidade);
     if (area)    params.set('area',    area);
+    if (gestor)  params.set('gestor',  gestor);
+    if (mes)     params.set('mes',     mes);
     fetch(`/api/dashboard?${params}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -384,7 +388,9 @@ export default function DashboardRH() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { carregar(periodo, filtroUnidade, filtroArea); }, [periodo, filtroUnidade, filtroArea, carregar]);
+  useEffect(() => {
+    carregar(periodo, filtroUnidade, filtroArea, filtroGestor, filtroMes);
+  }, [periodo, filtroUnidade, filtroArea, filtroGestor, filtroMes, carregar]);
 
   const kpis = data?.kpis;
   const atualizado = data?.atualizadoEm
@@ -394,106 +400,60 @@ export default function DashboardRH() {
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b-4" style={{ borderColor: C.purple }}>
-        <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center">
-            <img src="/logo.png" alt="Vendemmia People" className="h-20 w-auto" />
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/carreira"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: '#0D9488', color: '#0D9488' }}>
-              Carreira & Dev →
-            </Link>
-            <Link href="/colaborador"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.purple, color: C.purple }}>
-              Consulta Colaborador →
-            </Link>
-            <Link href="/ponto"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: '#F59E0B', color: '#F59E0B' }}>
-              Jornada & Ponto →
-            </Link>
+      <NavHeader>
+        {/* Mês específico */}
+        <FilterSelect
+          value={filtroMes}
+          onChange={setFiltroMes}
+          label="Todos os meses"
+          options={data?.opcoesFiltro.meses ?? []}
+          color={C.purple}
+          labelFn={(m) => {
+            const [y, mo] = m.split('-');
+            const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            return `${nomes[parseInt(mo,10)-1]}/${y}`;
+          }}
+        />
 
-            {/* Filtro por unidade */}
-            <select
-              value={filtroUnidade}
-              onChange={e => setFiltroUnidade(e.target.value)}
-              className="text-xs border-2 rounded-full px-3 py-1 outline-none transition-all cursor-pointer"
-              style={{ borderColor: filtroUnidade ? C.purple : '#D1D5DB', color: filtroUnidade ? C.purple : C.gray, fontWeight: filtroUnidade ? 700 : 400 }}
-            >
-              <option value="">Todas as unidades</option>
-              {(data?.opcoesFiltro.unidades ?? []).map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
+        {/* Período (desabilitado quando mês específico ativo) */}
+        {!filtroMes && (
+          <PeriodButtons value={periodo} onChange={setPeriodo} color={C.purple} />
+        )}
 
-            {/* Filtro por área */}
-            <select
-              value={filtroArea}
-              onChange={e => setFiltroArea(e.target.value)}
-              className="text-xs border-2 rounded-full px-3 py-1 outline-none transition-all cursor-pointer"
-              style={{ borderColor: filtroArea ? C.purple : '#D1D5DB', color: filtroArea ? C.purple : C.gray, fontWeight: filtroArea ? 700 : 400 }}
-            >
-              <option value="">Todas as áreas</option>
-              {(data?.opcoesFiltro.areas ?? []).map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+        {/* Divisor */}
+        <span className="w-px h-5 bg-gray-200" />
 
-            {(filtroUnidade || filtroArea) && (
-              <button onClick={() => { setFiltroUnidade(''); setFiltroArea(''); }}
-                className="text-xs font-bold px-2 py-1 rounded-full border-2 transition-all cursor-pointer"
-                style={{ borderColor: C.pink, color: C.pink }}>
-                ✕ limpar
-              </button>
-            )}
+        <FilterSelect value={filtroUnidade} onChange={setFiltroUnidade} label="Todas as unidades"
+          options={data?.opcoesFiltro.unidades ?? []} color={C.purple} />
+        <FilterSelect value={filtroArea}    onChange={setFiltroArea}    label="Todas as áreas"
+          options={data?.opcoesFiltro.areas ?? []} color={C.purple} />
+        <FilterSelect value={filtroGestor}  onChange={setFiltroGestor}  label="Todos os gestores"
+          options={data?.opcoesFiltro.gestores ?? []} color={C.purple} />
 
-            <span className="text-xs text-gray-500">Período:</span>
-            {[3, 6, 12].map(m => (
-              <button
-                key={m}
-                onClick={() => setPeriodo(m)}
-                className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-                style={{
-                  borderColor: periodo === m ? C.purple : '#D1D5DB',
-                  backgroundColor: periodo === m ? C.purple : 'transparent',
-                  color: periodo === m ? 'white' : C.gray,
-                }}
-              >
-                {m}m
-              </button>
-            ))}
-            {atualizado && (
-              <span className="text-[10px] text-gray-400">Atualizado: {atualizado}</span>
-            )}
+        {/* Tags de filtros ativos */}
+        {filtroMes && (
+          <FilterTag label={filtroMes} onClear={() => setFiltroMes('')} />
+        )}
+        {(filtroUnidade || filtroArea || filtroGestor) && (
+          <FilterTag label="limpar filtros"
+            onClear={() => { setFiltroUnidade(''); setFiltroArea(''); setFiltroGestor(''); }} />
+        )}
 
-            {/* Botão de alertas */}
-            <button
-              onClick={() => { setAlertaOpen(o => !o); if (!alertaInfo) verificarAlerta(); }}
-              className="relative text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.amber, color: C.amber }}
-              title="Configurar alertas por email"
-            >
-              🔔 Alertas
-              {alertaInfo?.emAlerta && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border border-white" />
-              )}
-            </button>
+        {/* Alertas */}
+        <button
+          onClick={() => { setAlertaOpen(o => !o); if (!alertaInfo) verificarAlerta(); }}
+          className="relative text-[11px] font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
+          style={{ borderColor: C.amber, color: C.amber }}
+          title="Configurar alertas por email"
+        >
+          🔔 Alertas
+          {alertaInfo?.emAlerta && (
+            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border border-white" />
+          )}
+        </button>
 
-            {/* Logout */}
-            <button
-              onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST' });
-                window.location.href = '/login';
-              }}
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: '#9CA3AF', color: '#6B7280' }}
-              title="Sair do sistema"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
+        {atualizado && <SyncBadge label={`Sync: ${atualizado}`} />}
+      </NavHeader>
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
 

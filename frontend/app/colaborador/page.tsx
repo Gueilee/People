@@ -1,7 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { NavHeader } from '@/components/NavHeader';
 
 const C = {
   purple: '#422c76', dark: '#2d1f52', light: '#ede9f6',
@@ -401,7 +400,6 @@ function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════════════════ */
 export default function ColaboradorPage() {
-  const router = useRouter();
   const [query, setQuery]           = useState('');
   const [sugestoes, setSugestoes]   = useState<Sugestao[]>([]);
   const [showDrop, setShowDrop]     = useState(false);
@@ -446,11 +444,6 @@ export default function ColaboradorPage() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-  }
-
   useEffect(() => {
     const fn = (e: MouseEvent) => {
       if (!(e.target as Element).closest('#search-wrap')) setShowDrop(false);
@@ -487,31 +480,7 @@ export default function ColaboradorPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b-4" style={{ borderColor: C.purple }}>
-        <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center">
-            <img src="/logo.png" alt="Vendemmia People" className="h-20 w-auto" />
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/dashboard"
-              className="text-xs font-semibold px-4 py-2 rounded-full border-2 cursor-pointer transition-all hover:opacity-80"
-              style={{ borderColor: C.purple, color: C.purple }}>
-              Dashboard →
-            </Link>
-            <Link href="/carreira"
-              className="text-xs font-semibold px-4 py-2 rounded-full border-2 cursor-pointer transition-all hover:opacity-80"
-              style={{ borderColor: C.purple, color: C.purple }}>
-              Carreira & Dev →
-            </Link>
-            <button onClick={handleLogout}
-              className="text-xs font-semibold px-4 py-2 rounded-full border-2 cursor-pointer transition-all hover:opacity-80"
-              style={{ borderColor: C.border, color: C.gray }}>
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
+      <NavHeader />
 
       <main className="max-w-screen-xl mx-auto px-6 py-8">
 

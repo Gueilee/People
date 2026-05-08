@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
+import { NavHeader, FilterSelect, FilterTag, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -308,66 +308,25 @@ export default function PontoPage() {
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b-4" style={{ borderColor: C.purple }}>
-        <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center">
-            <img src="/logo.png" alt="Vendemmia People" className="h-20 w-auto" />
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/dashboard"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.purple, color: C.purple }}>
-              ← Dashboard RH
-            </Link>
-            <Link href="/carreira"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.teal, color: C.teal }}>
-              Carreira & Dev →
-            </Link>
-            <Link href="/colaborador"
-              className="text-xs font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
-              style={{ borderColor: C.indigo, color: C.indigo }}>
-              Consulta Colaborador →
-            </Link>
-
-            {/* Filtro mês */}
-            <select
-              value={mes}
-              onChange={e => setMes(e.target.value)}
-              className="text-xs border-2 rounded-full px-3 py-1 outline-none cursor-pointer"
-              style={{ borderColor: C.purple, color: C.purple, fontWeight: 700 }}
-            >
-              {(data?.mesesDisponiveis ?? (mes ? [mes] : [])).map(m => (
-                <option key={m} value={m}>{fmtMes(m)} ({m})</option>
-              ))}
-            </select>
-
-            {/* Filtro filial */}
-            <select
-              value={filial}
-              onChange={e => setFilial(e.target.value)}
-              className="text-xs border-2 rounded-full px-3 py-1 outline-none cursor-pointer"
-              style={{ borderColor: filial ? C.amber : '#D1D5DB', color: filial ? C.amber : C.gray, fontWeight: filial ? 700 : 400 }}
-            >
-              <option value="">Todas as filiais</option>
-              {filiais.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-
-            {filial && (
-              <button onClick={() => setFilial('')}
-                className="text-xs font-bold px-2 py-1 rounded-full border-2 transition-all cursor-pointer"
-                style={{ borderColor: C.pink, color: C.pink }}>
-                ✕ limpar
-              </button>
-            )}
-
-            {syncedAt && (
-              <span className="text-[10px] text-gray-400">Sync: {syncedAt}</span>
-            )}
-          </div>
-        </div>
-      </header>
+      <NavHeader>
+        <FilterSelect
+          value={mes}
+          onChange={setMes}
+          label="Selecione o mês"
+          options={data?.mesesDisponiveis ?? (mes ? [mes] : [])}
+          color={C.amber}
+          labelFn={fmtMes}
+        />
+        <FilterSelect
+          value={filial}
+          onChange={setFilial}
+          label="Todas as filiais"
+          options={filiais}
+          color={C.amber}
+        />
+        {filial && <FilterTag label={filial} onClear={() => setFilial('')} />}
+        {syncedAt && <SyncBadge label={`Sync: ${syncedAt}`} />}
+      </NavHeader>
 
       {/* ── Conteúdo ── */}
       <main className="max-w-screen-2xl mx-auto px-6 py-6 space-y-8">

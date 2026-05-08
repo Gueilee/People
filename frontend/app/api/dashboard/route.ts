@@ -93,6 +93,8 @@ export async function GET(request: Request) {
     const meses         = parseInt(searchParams.get('meses')   || '12', 10);
     const filtroUnidade = (searchParams.get('unidade') || '').trim();
     const filtroArea    = (searchParams.get('area')    || '').trim();
+    const filtroGestor  = (searchParams.get('gestor')  || '').trim();
+    const filtroMes     = (searchParams.get('mes')     || '').trim(); // ex: "2026-04"
 
     const db = await getDb();
 
@@ -100,20 +102,43 @@ export async function GET(request: Request) {
     const todosAll: Colab[] = await db.all('SELECT * FROM colaboradores');
     const unidadesOpcoes = [...new Set(todosAll.map(c => c.unidade))].filter(Boolean).sort();
     const areasOpcoes    = [...new Set(todosAll.map(c => c.departamento))].filter(Boolean).sort();
+    const gestoresOpcoes = [...new Set(
+      todosAll.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
+    )].sort();
+
+    // Meses disponíveis derivados dos dados (adm + desl)
+    const todasDatas = [
+      ...todosAll.map(c => c.data_admissao),
+      ...todosAll.filter(c => c.data_desligamento).map(c => c.data_desligamento!),
+    ];
+    const mesesDisponiveis = [...new Set(
+      todasDatas.filter(Boolean).map(d => d.substring(0, 7))
+    )].sort().reverse();
 
     // Dataset com filtros aplicados
     const whereParts: string[] = [];
     const whereParams: string[] = [];
     if (filtroUnidade) { whereParts.push('unidade = ?');      whereParams.push(filtroUnidade); }
     if (filtroArea)    { whereParts.push('departamento = ?'); whereParams.push(filtroArea);    }
+    if (filtroGestor)  { whereParts.push('gestor = ?');       whereParams.push(filtroGestor);  }
     const whereSQL = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
     const todos: Colab[] = await db.all(`SELECT * FROM colaboradores ${whereSQL}`, whereParams);
 
     await db.close();
 
-    const hoje         = new Date();
-    const inicio       = subMonths(hoje, meses);
-    const anoAtual     = hoje.getFullYear();
+    const hoje     = new Date();
+    const anoAtual = hoje.getFullYear();
+
+    // Período: mês específico OU janela deslizante
+    let inicio: Date, fim: Date;
+    if (filtroMes) {
+      const [y, m] = filtroMes.split('-').map(Number);
+      inicio = new Date(y, m - 1, 1);
+      fim    = new Date(y, m, 0);      // último dia do mês
+    } else {
+      inicio = subMonths(hoje, meses);
+      fim    = hoje;
+    }
 
     const ativos        = todos.filter(c => !c.data_desligamento);
     const todosDesl     = todos.filter(c => !!c.data_desligamento);
@@ -376,8 +401,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       periodo: meses,
       atualizadoEm: hoje.toISOString(),
-      filtros: { unidade: filtroUnidade, area: filtroArea },
-      opcoesFiltro: { unidades: unidadesOpcoes, areas: areasOpcoes },
+      filtros: { unidade: filtroUnidade, area: filtroArea, gestor: filtroGestor, mes: filtroMes },
+      opcoesFiltro: { unidades: unidadesOpcoes, areas: areasOpcoes, gestores: gestoresOpcoes, meses: mesesDisponiveis },
 
       // Indicadores existentes
       kpis: {
