@@ -4,10 +4,10 @@ import { usePathname } from 'next/navigation';
 import React from 'react';
 
 const NAV = [
-  { href: '/dashboard',   label: 'Dashboard RH',         color: '#422c76' },
+  { href: '/dashboard',   label: 'People Analytics',     color: '#422c76' },
   { href: '/ponto',       label: 'Jornada & Ponto',      color: '#F59E0B' },
-  { href: '/carreira',    label: 'Carreira & Dev',        color: '#0D9488' },
-  { href: '/colaborador', label: 'Consulta Colaborador',  color: '#6366F1' },
+  { href: '/carreira',    label: 'Carreira',             color: '#0D9488' },
+  { href: '/colaborador', label: 'Consulta Colaborador', color: '#6366F1' },
 ];
 
 // ─── Controles de filtro reutilizáveis ────────────────────────────────────────
