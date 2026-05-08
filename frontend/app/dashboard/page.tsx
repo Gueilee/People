@@ -153,34 +153,64 @@ function DataLabel({ x, y, val, color, above }: { x:number; y:number; val:number
 }
 
 function LineChart({ data }: { data: Tendencia[] }) {
-  const W = 560, H = 165, padL = 18, padR = 18, padT = 30, padB = 28;
+  const W = 560, H = 200, padL = 20, padR = 20, padT = 32, padB = 56;
   const n = data.length;
-  const maxVal = Math.max(...data.flatMap(d => [d.admissoes, d.desligamentos]), 1);
+  if (n === 0) return null;
 
-  const getX = (i: number) => padL + (i / (n - 1)) * (W - padL - padR);
-  const getY = (v: number) => padT + (1 - v / maxVal) * (H - padT - padB);
+  const maxVal = Math.max(...data.flatMap(d => [d.admissoes, d.desligamentos]), 1);
+  const getX   = (i: number) => padL + (i / Math.max(n - 1, 1)) * (W - padL - padR);
+  const getY   = (v: number) => padT + (1 - v / maxVal) * (H - padT - padB);
+  const axisY  = H - padB;
 
   const ptsAdm:  [number, number][] = data.map((d, i) => [getX(i), getY(d.admissoes)]);
   const ptsDesl: [number, number][] = data.map((d, i) => [getX(i), getY(d.desligamentos)]);
 
+  // "jun. de 25" → "jun/25"
+  function shortMes(mes: string) {
+    const parts = mes.trim().split(/\s+/);
+    const m = parts[0].replace(/\.$/, '');
+    const y = parts[parts.length - 1];
+    return parts.length === 1 ? mes : `${m}/${y}`;
+  }
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+      {/* Grade vertical pontilhada por mês */}
+      {data.map((_, i) => (
+        <line key={`g${i}`}
+          x1={getX(i)} y1={padT} x2={getX(i)} y2={axisY}
+          stroke="#f0f0f0" strokeWidth="1" strokeDasharray="3 3" />
+      ))}
+
+      {/* Linha do eixo X */}
+      <line x1={padL} y1={axisY} x2={W - padR} y2={axisY} stroke="#e5e7eb" strokeWidth="1" />
+
+      {/* Linhas do gráfico */}
       <path d={smoothPath(ptsAdm)}  fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" />
       <path d={smoothPath(ptsDesl)} fill="none" stroke={C.pink}  strokeWidth="2.5" strokeLinecap="round" />
+
+      {/* Pontos + rótulos de dados + ticks + labels do eixo */}
       {data.map((d, i) => {
         const [ax, ay] = ptsAdm[i];
         const [dx, dy] = ptsDesl[i];
-        // ponto com menor Y (mais alto na tela) recebe rótulo acima; o outro, abaixo
         const admAbove = ay <= dy;
         return (
           <g key={i}>
-            <DataLabel x={ax} y={ay} val={d.admissoes}    color={C.green} above={admAbove} />
+            {/* Rótulos dos valores */}
+            <DataLabel x={ax} y={ay} val={d.admissoes}     color={C.green} above={admAbove} />
             <DataLabel x={dx} y={dy} val={d.desligamentos} color={C.pink}  above={!admAbove} />
+
+            {/* Pontos */}
             <circle cx={ax} cy={ay} r="4" fill="white" stroke={C.green} strokeWidth="2" />
             <circle cx={dx} cy={dy} r="4" fill="white" stroke={C.pink}  strokeWidth="2" />
-            {i % 2 === 0 && (
-              <text x={getX(i)} y={H - 6} textAnchor="middle" fontSize="8" fill={C.gray}>{d.mes}</text>
-            )}
+
+            {/* Tick + label do mês rotacionado -40° — todos os meses */}
+            <line x1={getX(i)} y1={axisY} x2={getX(i)} y2={axisY + 5} stroke="#d1d5db" strokeWidth="1" />
+            <g transform={`translate(${getX(i)}, ${axisY + 7})`}>
+              <text textAnchor="end" fontSize="7.5" fontWeight="600" fill={C.gray} transform="rotate(-38)">
+                {shortMes(d.mes)}
+              </text>
+            </g>
           </g>
         );
       })}
