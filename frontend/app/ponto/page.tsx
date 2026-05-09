@@ -175,20 +175,23 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 
 // ─── Gráfico de linha histórico ───────────────────────────────────────────────
 function TendenciaChart({ data }: { data: Tendencia[] }) {
-  const W = 560, H = 200, padL = 20, padR = 20, padT = 28, padB = 56;
+  const W = 560, H = 148, padL = 24, padR = 20, padT = 20, padB = 44;
   const n = data.length;
   if (n === 0) return <div className="text-xs text-gray-400 text-center py-8">Sem dados históricos</div>;
 
-  const maxHE  = Math.max(...data.map(d => d.he_total), 1);
-  const maxAbs = Math.max(...data.map(d => d.ausencias), 1);
-  const maxAll = Math.max(maxHE, maxAbs, 1);
+  const maxAll = Math.max(...data.flatMap(d => [d.he_total, d.ausencias, d.atrasos]), 1);
+  const getX   = (i: number) => padL + (i / Math.max(n - 1, 1)) * (W - padL - padR);
+  const getY   = (v: number) => padT + (1 - v / maxAll) * (H - padT - padB);
+  const axisY  = H - padB;
 
-  const getX = (i: number) => padL + (i / Math.max(n - 1, 1)) * (W - padL - padR);
-  const getY = (v: number, mx: number) => padT + (1 - v / mx) * (H - padT - padB);
-  const axisY = H - padB;
+  const SERIES = [
+    { key: 'he',  vals: data.map(d => d.he_total),  color: C.amber, name: 'HE total' },
+    { key: 'abs', vals: data.map(d => d.ausencias), color: C.pink,  name: 'Ausências' },
+    { key: 'atr', vals: data.map(d => d.atrasos),   color: C.blue,  name: 'Atrasos' },
+  ];
 
-  function path(vals: number[], mx: number): string {
-    const pts: [number, number][] = vals.map((v, i) => [getX(i), getY(v, mx)]);
+  function smooth(vals: number[]): string {
+    const pts: [number, number][] = vals.map((v, i) => [getX(i), getY(v)]);
     if (pts.length < 2) return '';
     let d = `M ${pts[0][0]},${pts[0][1]}`;
     for (let i = 1; i < pts.length; i++) {
@@ -199,37 +202,135 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
     return d;
   }
 
+  function area(vals: number[]): string {
+    const s = smooth(vals);
+    if (!s) return '';
+    const last = getX(vals.length - 1);
+    const first = getX(0);
+    return `${s} L ${last},${axisY} L ${first},${axisY} Z`;
+  }
+
+  // Rótulos sem sobreposição: posiciona cada série relativa às outras no mesmo x
+  function labelsAt(i: number) {
+    const pts = SERIES.map(s => ({ y: getY(s.vals[i]), val: s.vals[i], color: s.color }))
+      .sort((a, b) => a.y - b.y); // topo (menor y) → base (maior y)
+    // topo → label acima; base → label abaixo; meio → acima se gap ok, senão omite
+    const GAP = 13;
+    return pts.map((p, rank) => {
+      if (p.val === 0) return null;
+      let above: boolean;
+      if (rank === 0)                              above = true;   // topo: acima
+      else if (rank === pts.length - 1)            above = false;  // base: abaixo
+      else {
+        const gapUp   = p.y - pts[rank - 1].y;
+        const gapDown = pts[rank + 1].y - p.y;
+        if (gapUp < GAP && gapDown < GAP) return null; // sem espaço: omite
+        above = gapDown >= gapUp;
+      }
+      return { ...p, above };
+    });
+  }
+
+  // Formato compacto para rótulo no gráfico
+  function lbl(v: number): string {
+    const hh = Math.floor(v);
+    const mm = Math.round((v - hh) * 60);
+    return mm > 0 ? `${hh.toLocaleString('pt-BR')}h${mm.toString().padStart(2,'0')}` : `${hh.toLocaleString('pt-BR')}h`;
+  }
+
   return (
     <div>
-      <div className="flex items-center gap-4 mb-2 text-xs">
-        <span className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ backgroundColor: C.amber }} />HE total</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ backgroundColor: C.pink }} />Ausências</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ backgroundColor: C.blue }} />Atrasos</span>
+      {/* Legenda */}
+      <div className="flex items-center gap-5 mb-3">
+        {SERIES.map(s => (
+          <span key={s.key} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
+            <span className="inline-block w-5 h-[2px] rounded-full" style={{ backgroundColor: s.color }} />
+            {s.name}
+          </span>
+        ))}
       </div>
+
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+        <defs>
+          {SERIES.map(s => (
+            <linearGradient key={s.key} id={`tg-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={s.color} stopOpacity="0.10" />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0"    />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {/* Grade horizontal suave */}
+        {[0.25, 0.5, 0.75].map(f => (
+          <line key={f}
+            x1={padL} y1={padT + (1 - f) * (H - padT - padB)}
+            x2={W - padR} y2={padT + (1 - f) * (H - padT - padB)}
+            stroke="#f3f4f6" strokeWidth="0.75" />
+        ))}
+
+        {/* Grade vertical pontilhada */}
         {data.map((_, i) => (
-          <line key={`g${i}`} x1={getX(i)} y1={padT} x2={getX(i)} y2={axisY}
-                stroke="#f0f0f0" strokeWidth="1" strokeDasharray="3 3" />
+          <line key={i} x1={getX(i)} y1={padT} x2={getX(i)} y2={axisY}
+                stroke="#f5f5f5" strokeWidth="0.75" strokeDasharray="2 3" />
         ))}
-        <line x1={padL} y1={axisY} x2={W - padR} y2={axisY} stroke="#e5e7eb" strokeWidth="1" />
 
-        <path d={path(data.map(d => d.he_total),  maxAll)} fill="none" stroke={C.amber} strokeWidth="2.5" strokeLinecap="round" />
-        <path d={path(data.map(d => d.ausencias), maxAll)} fill="none" stroke={C.pink}  strokeWidth="2.5" strokeLinecap="round" />
-        <path d={path(data.map(d => d.atrasos),   maxAll)} fill="none" stroke={C.blue}  strokeWidth="2.5" strokeLinecap="round" />
+        {/* Eixo X */}
+        <line x1={padL} y1={axisY} x2={W - padR} y2={axisY} stroke="#e9eaec" strokeWidth="0.75" />
 
-        {data.map((d, i) => (
-          <g key={i}>
-            <circle cx={getX(i)} cy={getY(d.he_total,  maxAll)} r="3" fill="white" stroke={C.amber} strokeWidth="2" />
-            <circle cx={getX(i)} cy={getY(d.ausencias, maxAll)} r="3" fill="white" stroke={C.pink}  strokeWidth="2" />
-            <circle cx={getX(i)} cy={getY(d.atrasos,   maxAll)} r="3" fill="white" stroke={C.blue}  strokeWidth="2" />
-            <line x1={getX(i)} y1={axisY} x2={getX(i)} y2={axisY + 5} stroke="#d1d5db" strokeWidth="1" />
-            <g transform={`translate(${getX(i)}, ${axisY + 7})`}>
-              <text textAnchor="end" fontSize="7.5" fontWeight="600" fill={C.gray} transform="rotate(-38)">
-                {fmtMes(d.mes)}
-              </text>
+        {/* Áreas com gradiente */}
+        {SERIES.map(s => (
+          <path key={s.key} d={area(s.vals)} fill={`url(#tg-${s.key})`} />
+        ))}
+
+        {/* Linhas */}
+        {SERIES.map(s => (
+          <path key={s.key} d={smooth(s.vals)} fill="none" stroke={s.color}
+                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        ))}
+
+        {/* Pontos + rótulos */}
+        {data.map((_, i) => {
+          const labels = labelsAt(i);
+          return (
+            <g key={i}>
+              {/* Dots */}
+              {SERIES.map(s => (
+                <circle key={s.key}
+                  cx={getX(i)} cy={getY(s.vals[i])} r="2.2"
+                  fill="white" stroke={s.color} strokeWidth="1.5" />
+              ))}
+
+              {/* Rótulos de dados (anti-sobreposição) */}
+              {labels.map((lb, li) => {
+                if (!lb) return null;
+                const cx = getX(i);
+                const txt = lbl(lb.val);
+                const tw = txt.length * 4.2 + 7;
+                const th = 9;
+                const ly = lb.above ? lb.y - th - 3 : lb.y + 3;
+                return (
+                  <g key={li}>
+                    <rect x={cx - tw / 2} y={ly} width={tw} height={th} rx={2.5}
+                          fill={lb.color} opacity={0.88} />
+                    <text x={cx} y={ly + th - 2} textAnchor="middle"
+                          fontSize="5.5" fontWeight="700" fill="white">
+                      {txt}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Tick + label do mês */}
+              <line x1={getX(i)} y1={axisY} x2={getX(i)} y2={axisY + 3}
+                    stroke="#d1d5db" strokeWidth="0.75" />
+              <g transform={`translate(${getX(i)}, ${axisY + 5})`}>
+                <text textAnchor="end" fontSize="6.5" fontWeight="600" fill="#9CA3AF" transform="rotate(-38)">
+                  {fmtMes(_.mes)}
+                </text>
+              </g>
             </g>
-          </g>
-        ))}
+          );
+        })}
       </svg>
     </div>
   );
