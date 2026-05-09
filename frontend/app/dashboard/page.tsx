@@ -393,6 +393,15 @@ export default function DashboardRH() {
   }, [periodo, filtroUnidade, filtroArea, filtroGestor, filtroMes, carregar]);
 
   const kpis = data?.kpis;
+
+  const periodoLabel = filtroMes
+    ? (() => {
+        const [y, mo] = filtroMes.split('-');
+        const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        return `${nomes[parseInt(mo,10)-1]}/${y}`;
+      })()
+    : `${periodo}m`;
+
   const atualizado = data?.atualizadoEm
     ? new Date(data.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
@@ -468,8 +477,8 @@ export default function DashboardRH() {
           {[
             { label: 'Headcount Ativo',      value: kpis?.headcountAtivo,       color: C.purple, icon: '👥', suffix: '' },
             { label: 'Headcount Total',       value: kpis?.headcountTotal,       color: C.dark,   icon: '🏢', suffix: '' },
-            { label: `Desligamentos (${periodo}m)`, value: kpis?.desligamentosPeriodo, color: C.pink,   icon: '📉', suffix: '' },
-            { label: `Admissões (${periodo}m)`,     value: kpis?.admissoesPeriodo,     color: C.green,  icon: '📈', suffix: '' },
+            { label: `Desligamentos (${periodoLabel})`, value: kpis?.desligamentosPeriodo, color: C.pink,   icon: '📉', suffix: '' },
+            { label: `Admissões (${periodoLabel})`,     value: kpis?.admissoesPeriodo,     color: C.green,  icon: '📈', suffix: '' },
             { label: 'Taxa de Turnover',      value: kpis?.turnoverRate,         color: C.amber,  icon: '🔄', suffix: '%' },
             { label: 'Tempo Médio de Casa',   value: kpis ? fmtMeses(kpis.tempoMedioMeses) : null, color: C.blue, icon: '📅', suffix: '', raw: true },
           ].map(({ label, value, color, icon, suffix, raw }) => (
@@ -492,7 +501,7 @@ export default function DashboardRH() {
           {/* Tendência Mensal */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Tendência Mensal (12m)</h2>
+              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Tendência Mensal ({periodoLabel})</h2>
               <div className="flex gap-4 text-xs">
                 <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.green }} /> Admissões</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.pink }} /> Desligamentos</span>
@@ -508,7 +517,7 @@ export default function DashboardRH() {
 
           {/* Tipos de Desligamento */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Tipos de Desligamento ({periodo}m)</h2>
+            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Tipos de Desligamento ({periodoLabel})</h2>
             {loading
               ? <Skeleton className="h-36 w-full" />
               : data?.tiposDesligamento.length
@@ -522,7 +531,7 @@ export default function DashboardRH() {
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Unidade ({periodo}m)</h2>
+            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Unidade ({periodoLabel})</h2>
             {loading
               ? <Skeleton className="h-48 w-full" />
               : (() => {
@@ -569,7 +578,7 @@ export default function DashboardRH() {
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Área ({periodo}m)</h2>
+            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Área ({periodoLabel})</h2>
             {loading
               ? <Skeleton className="h-48 w-full" />
               : (() => {
@@ -591,7 +600,7 @@ export default function DashboardRH() {
           {/* Ranking Gestores */}
           <div className="bg-white rounded-2xl shadow-sm p-5 overflow-auto">
             <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>
-              Ranking de Gestores — Desligamentos ({periodo}m) — TOP 20
+              Ranking de Gestores — Desligamentos ({periodoLabel}) — TOP 20
             </h2>
             {loading
               ? <Skeleton className="h-48 w-full" />
@@ -795,7 +804,7 @@ export default function DashboardRH() {
             {/* Mortalidade infantil */}
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <h3 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>
-                Mortalidade Infantil ({periodo}m)
+                Mortalidade Infantil ({periodoLabel})
               </h3>
               {loading
                 ? <Skeleton className="h-44 w-full" />
