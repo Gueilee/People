@@ -176,7 +176,8 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 
 // ─── Gráfico de linha histórico ───────────────────────────────────────────────
 function TendenciaChart({ data }: { data: Tendencia[] }) {
-  const W = 560, H = 148, padL = 24, padR = 20, padT = 20, padB = 44;
+  // W grande → proporção ~6.5:1 → em tela 1200px a altura fica ~185px (proporcional)
+  const W = 1000, H = 155, padL = 32, padR = 20, padT = 30, padB = 36;
   const n = data.length;
   if (n === 0) return <div className="text-xs text-gray-400 text-center py-8">Sem dados históricos</div>;
 
@@ -206,79 +207,86 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
   function area(vals: number[]): string {
     const s = smooth(vals);
     if (!s) return '';
-    const last = getX(vals.length - 1);
-    const first = getX(0);
-    return `${s} L ${last},${axisY} L ${first},${axisY} Z`;
+    return `${s} L ${getX(vals.length - 1)},${axisY} L ${getX(0)},${axisY} Z`;
   }
 
-  // Rótulos sem sobreposição: posiciona cada série relativa às outras no mesmo x
+  // Rótulos sem sobreposição por posição X
   function labelsAt(i: number) {
     const pts = SERIES.map(s => ({ y: getY(s.vals[i]), val: s.vals[i], color: s.color }))
-      .sort((a, b) => a.y - b.y); // topo (menor y) → base (maior y)
-    // topo → label acima; base → label abaixo; meio → acima se gap ok, senão omite
-    const GAP = 13;
+      .sort((a, b) => a.y - b.y);
+    const GAP = 12;
     return pts.map((p, rank) => {
       if (p.val === 0) return null;
       let above: boolean;
-      if (rank === 0)                              above = true;   // topo: acima
-      else if (rank === pts.length - 1)            above = false;  // base: abaixo
+      if (rank === 0)                    above = true;
+      else if (rank === pts.length - 1)  above = false;
       else {
         const gapUp   = p.y - pts[rank - 1].y;
         const gapDown = pts[rank + 1].y - p.y;
-        if (gapUp < GAP && gapDown < GAP) return null; // sem espaço: omite
+        if (gapUp < GAP && gapDown < GAP) return null;
         above = gapDown >= gapUp;
       }
       return { ...p, above };
     });
   }
 
-  // Formato compacto para rótulo no gráfico
+  // Formato compacto: omite minutos se zero, usa separador pt-BR
   function lbl(v: number): string {
     const hh = Math.floor(v);
     const mm = Math.round((v - hh) * 60);
-    return mm > 0 ? `${hh.toLocaleString('pt-BR')}h${mm.toString().padStart(2,'0')}` : `${hh.toLocaleString('pt-BR')}h`;
+    return mm > 0
+      ? `${hh.toLocaleString('pt-BR')}h${mm.toString().padStart(2, '0')}`
+      : `${hh.toLocaleString('pt-BR')}h`;
+  }
+
+  // Mês abreviado sem rotação: "Set/25"
+  function mesShort(mes: string): string {
+    const [y, m] = mes.split('-');
+    const n = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return `${n[parseInt(m, 10) - 1]}/${y.slice(2)}`;
   }
 
   return (
     <div>
       {/* Legenda */}
-      <div className="flex items-center gap-5 mb-3">
+      <div className="flex items-center gap-5 mb-2">
         {SERIES.map(s => (
-          <span key={s.key} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
-            <span className="inline-block w-5 h-[2px] rounded-full" style={{ backgroundColor: s.color }} />
+          <span key={s.key} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+            <span className="inline-block w-4 h-[1.5px] rounded-full" style={{ backgroundColor: s.color }} />
             {s.name}
           </span>
         ))}
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+      {/* overflow:hidden — todos os elementos estão dentro do viewBox */}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'hidden', display: 'block' }}>
         <defs>
           {SERIES.map(s => (
             <linearGradient key={s.key} id={`tg-${s.key}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={s.color} stopOpacity="0.10" />
+              <stop offset="0%"   stopColor={s.color} stopOpacity="0.12" />
               <stop offset="100%" stopColor={s.color} stopOpacity="0"    />
             </linearGradient>
           ))}
         </defs>
 
-        {/* Grade horizontal suave */}
+        {/* Grade horizontal */}
         {[0.25, 0.5, 0.75].map(f => (
           <line key={f}
             x1={padL} y1={padT + (1 - f) * (H - padT - padB)}
             x2={W - padR} y2={padT + (1 - f) * (H - padT - padB)}
-            stroke="#f3f4f6" strokeWidth="0.75" />
+            stroke="#f3f4f6" strokeWidth="0.6" />
         ))}
 
         {/* Grade vertical pontilhada */}
         {data.map((_, i) => (
           <line key={i} x1={getX(i)} y1={padT} x2={getX(i)} y2={axisY}
-                stroke="#f5f5f5" strokeWidth="0.75" strokeDasharray="2 3" />
+                stroke="#f5f5f5" strokeWidth="0.6" strokeDasharray="2 3" />
         ))}
 
         {/* Eixo X */}
-        <line x1={padL} y1={axisY} x2={W - padR} y2={axisY} stroke="#e9eaec" strokeWidth="0.75" />
+        <line x1={padL} y1={axisY} x2={W - padR} y2={axisY} stroke="#e9eaec" strokeWidth="0.6" />
 
-        {/* Áreas com gradiente */}
+        {/* Áreas */}
         {SERIES.map(s => (
           <path key={s.key} d={area(s.vals)} fill={`url(#tg-${s.key})`} />
         ))}
@@ -289,16 +297,16 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
                 strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         ))}
 
-        {/* Pontos + rótulos */}
-        {data.map((_, i) => {
+        {/* Pontos + rótulos + labels do eixo */}
+        {data.map((d, i) => {
           const labels = labelsAt(i);
           return (
             <g key={i}>
               {/* Dots */}
               {SERIES.map(s => (
                 <circle key={s.key}
-                  cx={getX(i)} cy={getY(s.vals[i])} r="2.2"
-                  fill="white" stroke={s.color} strokeWidth="1.5" />
+                  cx={getX(i)} cy={getY(s.vals[i])} r="2"
+                  fill="white" stroke={s.color} strokeWidth="1.4" />
               ))}
 
               {/* Rótulos de dados (anti-sobreposição) */}
@@ -306,29 +314,28 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
                 if (!lb) return null;
                 const cx = getX(i);
                 const txt = lbl(lb.val);
-                const tw = txt.length * 4.2 + 7;
-                const th = 9;
+                const tw = txt.length * 3.9 + 6;
+                const th = 8;
                 const ly = lb.above ? lb.y - th - 3 : lb.y + 3;
                 return (
                   <g key={li}>
-                    <rect x={cx - tw / 2} y={ly} width={tw} height={th} rx={2.5}
-                          fill={lb.color} opacity={0.88} />
-                    <text x={cx} y={ly + th - 2} textAnchor="middle"
-                          fontSize="5.5" fontWeight="700" fill="white">
+                    <rect x={cx - tw / 2} y={ly} width={tw} height={th} rx={2}
+                          fill={lb.color} opacity={0.9} />
+                    <text x={cx} y={ly + th - 1.5} textAnchor="middle"
+                          fontSize="5" fontWeight="700" fill="white">
                       {txt}
                     </text>
                   </g>
                 );
               })}
 
-              {/* Tick + label do mês */}
+              {/* Label do mês — horizontal, sem rotação */}
               <line x1={getX(i)} y1={axisY} x2={getX(i)} y2={axisY + 3}
-                    stroke="#d1d5db" strokeWidth="0.75" />
-              <g transform={`translate(${getX(i)}, ${axisY + 5})`}>
-                <text textAnchor="end" fontSize="6.5" fontWeight="600" fill="#9CA3AF" transform="rotate(-38)">
-                  {fmtMes(_.mes)}
-                </text>
-              </g>
+                    stroke="#d1d5db" strokeWidth="0.6" />
+              <text x={getX(i)} y={axisY + 13}
+                    textAnchor="middle" fontSize="6.5" fontWeight="600" fill="#9CA3AF">
+                {mesShort(d.mes)}
+              </text>
             </g>
           );
         })}
