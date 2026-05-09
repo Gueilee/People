@@ -94,7 +94,8 @@ function fmtH(h: number): string {
   const abs  = Math.abs(h);
   const hh   = Math.floor(abs);
   const mm   = Math.round((abs - hh) * 60);
-  const base = mm > 0 ? `${hh}h${mm.toString().padStart(2, '0')}` : `${hh}h`;
+  const hhStr = hh.toLocaleString('pt-BR'); // adiciona separador de milhares
+  const base = mm > 0 ? `${hhStr}h${mm.toString().padStart(2, '0')}` : `${hhStr}h`;
   return neg ? `-${base}` : base;
 }
 
