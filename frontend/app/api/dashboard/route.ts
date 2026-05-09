@@ -90,11 +90,11 @@ function bucket<T>(items: T[], fn: (i: T) => string, keys: string[]): Record<str
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const meses         = parseInt(searchParams.get('meses')   || '12', 10);
-    const filtroUnidade = (searchParams.get('unidade') || '').trim();
-    const filtroArea    = (searchParams.get('area')    || '').trim();
-    const filtroGestor  = (searchParams.get('gestor')  || '').trim();
-    const filtroMes     = (searchParams.get('mes')     || '').trim(); // ex: "2026-04"
+    const meses          = parseInt(searchParams.get('meses') || '12', 10);
+    const filtroUnidades = (searchParams.get('unidade') || '').split(',').filter(Boolean);
+    const filtroAreas    = (searchParams.get('area')    || '').split(',').filter(Boolean);
+    const filtroGestores = (searchParams.get('gestor')  || '').split(',').filter(Boolean);
+    const filtroMeses    = (searchParams.get('mes')     || '').split(',').filter(Boolean);
 
     const db = await getDb();
 
@@ -115,12 +115,21 @@ export async function GET(request: Request) {
       todasDatas.filter(Boolean).map(d => d.substring(0, 7))
     )].sort().reverse();
 
-    // Dataset com filtros aplicados
+    // Dataset com filtros aplicados (suporta múltipla seleção via IN)
     const whereParts: string[] = [];
     const whereParams: string[] = [];
-    if (filtroUnidade) { whereParts.push('unidade = ?');      whereParams.push(filtroUnidade); }
-    if (filtroArea)    { whereParts.push('departamento = ?'); whereParams.push(filtroArea);    }
-    if (filtroGestor)  { whereParts.push('gestor = ?');       whereParams.push(filtroGestor);  }
+    if (filtroUnidades.length) {
+      whereParts.push(`unidade IN (${filtroUnidades.map(() => '?').join(',')})`);
+      whereParams.push(...filtroUnidades);
+    }
+    if (filtroAreas.length) {
+      whereParts.push(`departamento IN (${filtroAreas.map(() => '?').join(',')})`);
+      whereParams.push(...filtroAreas);
+    }
+    if (filtroGestores.length) {
+      whereParts.push(`gestor IN (${filtroGestores.map(() => '?').join(',')})`);
+      whereParams.push(...filtroGestores);
+    }
     const whereSQL = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
     const todos: Colab[] = await db.all(`SELECT * FROM colaboradores ${whereSQL}`, whereParams);
 
@@ -129,27 +138,28 @@ export async function GET(request: Request) {
     const hoje     = new Date();
     const anoAtual = hoje.getFullYear();
 
-    // Período: mês específico OU janela deslizante
-    let inicio: Date, fim: Date;
-    if (filtroMes) {
-      const [y, m] = filtroMes.split('-').map(Number);
-      inicio = new Date(y, m - 1, 1);
-      fim    = new Date(y, m, 0);      // último dia do mês
-    } else {
-      inicio = subMonths(hoje, meses);
-      fim    = hoje;
-    }
+    const ativos    = todos.filter(c => !c.data_desligamento);
+    const todosDesl = todos.filter(c => !!c.data_desligamento);
 
-    const ativos        = todos.filter(c => !c.data_desligamento);
-    const todosDesl     = todos.filter(c => !!c.data_desligamento);
-    const deslPeriodo   = todosDesl.filter(c => {
-      const d = new Date(c.data_desligamento!);
-      return d >= inicio && d <= hoje;
-    });
-    const admPeriodo    = todos.filter(c => {
-      const d = new Date(c.data_admissao);
-      return d >= inicio && d <= hoje;
-    });
+    // Período: meses específicos (múltiplos) OU janela deslizante
+    let deslPeriodo: Colab[];
+    let admPeriodo: Colab[];
+
+    if (filtroMeses.length > 0) {
+      const mesesSet = new Set(filtroMeses);
+      deslPeriodo = todosDesl.filter(c => mesesSet.has(c.data_desligamento!.substring(0, 7)));
+      admPeriodo  = todos.filter(c => mesesSet.has(c.data_admissao.substring(0, 7)));
+    } else {
+      const inicio = subMonths(hoje, meses);
+      deslPeriodo = todosDesl.filter(c => {
+        const d = new Date(c.data_desligamento!);
+        return d >= inicio && d <= hoje;
+      });
+      admPeriodo = todos.filter(c => {
+        const d = new Date(c.data_admissao);
+        return d >= inicio && d <= hoje;
+      });
+    }
 
     // ── KPIs ──────────────────────────────────────────────────────────────────
     const hMedia      = Math.max((ativos.length + deslPeriodo.length) / 2, 1);
@@ -385,7 +395,7 @@ export async function GET(request: Request) {
     const txGestMap: Record<string, number> = {};
     rankingGestores.forEach(g => { txGestMap[g.gestor] = g.taxa; });
     // Calcular também sobre todosAll se filtro ativo (contexto completo)
-    const ativosRisco = filtroUnidade || filtroArea
+    const ativosRisco = (filtroUnidades.length > 0 || filtroAreas.length > 0)
       ? todosAll.filter(c => !c.data_desligamento)
       : ativos;
 
@@ -401,7 +411,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       periodo: meses,
       atualizadoEm: hoje.toISOString(),
-      filtros: { unidade: filtroUnidade, area: filtroArea, gestor: filtroGestor, mes: filtroMes },
+      filtros: { unidades: filtroUnidades, areas: filtroAreas, gestores: filtroGestores, meses: filtroMeses },
       opcoesFiltro: { unidades: unidadesOpcoes, areas: areasOpcoes, gestores: gestoresOpcoes, meses: mesesDisponiveis },
 
       // Indicadores existentes

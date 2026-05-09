@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { NavHeader, FilterSelect, PeriodButtons, SyncBadge, FilterTag } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, PeriodButtons, SyncBadge, FilterTag } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -40,7 +40,7 @@ type RiscoColab = {
 type DashData = {
   periodo: number;
   atualizadoEm: string;
-  filtros: { unidade: string; area: string; gestor: string; mes: string };
+  filtros: { unidades: string[]; areas: string[]; gestores: string[]; meses: string[] };
   opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[]; meses: string[] };
   kpis: KPIs;
   turnoverPorUnidade: TurnoverUnidade[];
@@ -333,11 +333,11 @@ export default function DashboardRH() {
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState('');
-  const [periodo, setPeriodo] = useState(12);
-  const [filtroUnidade, setFiltroUnidade] = useState('');
-  const [filtroArea,    setFiltroArea]    = useState('');
-  const [filtroGestor,  setFiltroGestor]  = useState('');
-  const [filtroMes,     setFiltroMes]     = useState('');
+  const [periodo, setPeriodo]           = useState(12);
+  const [filtrosMes,     setFiltrosMes]     = useState<string[]>([]);
+  const [filtrosUnidade, setFiltrosUnidade] = useState<string[]>([]);
+  const [filtrosArea,    setFiltrosArea]    = useState<string[]>([]);
+  const [filtrosGestor,  setFiltrosGestor]  = useState<string[]>([]);
 
   // Alertas
   const [alertaOpen,      setAlertaOpen]      = useState(false);
@@ -371,13 +371,13 @@ export default function DashboardRH() {
       .catch(() => setAlertaStatus({ tipo: 'erro', msg: 'Erro ao enviar email' }));
   }, [alertaEmail, alertaThreshold, periodo]);
 
-  const carregar = useCallback((meses: number, unidade: string, area: string, gestor: string, mes: string) => {
+  const carregar = useCallback((meses: number, unidades: string[], areas: string[], gestores: string[], mesesFiltro: string[]) => {
     setLoading(true);
     const params = new URLSearchParams({ meses: String(meses) });
-    if (unidade) params.set('unidade', unidade);
-    if (area)    params.set('area',    area);
-    if (gestor)  params.set('gestor',  gestor);
-    if (mes)     params.set('mes',     mes);
+    if (unidades.length)    params.set('unidade', unidades.join(','));
+    if (areas.length)       params.set('area',    areas.join(','));
+    if (gestores.length)    params.set('gestor',  gestores.join(','));
+    if (mesesFiltro.length) params.set('mes',     mesesFiltro.join(','));
     fetch(`/api/dashboard?${params}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -389,17 +389,21 @@ export default function DashboardRH() {
   }, []);
 
   useEffect(() => {
-    carregar(periodo, filtroUnidade, filtroArea, filtroGestor, filtroMes);
-  }, [periodo, filtroUnidade, filtroArea, filtroGestor, filtroMes, carregar]);
+    carregar(periodo, filtrosUnidade, filtrosArea, filtrosGestor, filtrosMes);
+  }, [periodo, filtrosUnidade, filtrosArea, filtrosGestor, filtrosMes, carregar]);
 
   const kpis = data?.kpis;
 
-  const periodoLabel = filtroMes
-    ? (() => {
-        const [y, mo] = filtroMes.split('-');
-        const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-        return `${nomes[parseInt(mo,10)-1]}/${y}`;
-      })()
+  function fmtMesLabel(m: string) {
+    const [y, mo] = m.split('-');
+    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return `${nomes[parseInt(mo,10)-1]}/${y}`;
+  }
+
+  const periodoLabel = filtrosMes.length > 0
+    ? filtrosMes.length === 1
+      ? fmtMesLabel(filtrosMes[0])
+      : `${filtrosMes.length} meses`
     : `${periodo}m`;
 
   const atualizado = data?.atualizadoEm
@@ -410,42 +414,36 @@ export default function DashboardRH() {
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
       <NavHeader>
-        {/* Mês específico */}
-        <FilterSelect
-          value={filtroMes}
-          onChange={setFiltroMes}
+        {/* Meses (múltipla seleção) */}
+        <MultiFilterSelect
+          values={filtrosMes}
+          onChange={setFiltrosMes}
           label="Todos os meses"
           options={data?.opcoesFiltro.meses ?? []}
           color={C.purple}
-          labelFn={(m) => {
-            const [y, mo] = m.split('-');
-            const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-            return `${nomes[parseInt(mo,10)-1]}/${y}`;
-          }}
+          labelFn={fmtMesLabel}
         />
 
-        {/* Período (desabilitado quando mês específico ativo) */}
-        {!filtroMes && (
+        {/* Período — visível só quando nenhum mês específico selecionado */}
+        {filtrosMes.length === 0 && (
           <PeriodButtons value={periodo} onChange={setPeriodo} color={C.purple} />
         )}
 
         {/* Divisor */}
         <span className="w-px h-5 bg-gray-200" />
 
-        <FilterSelect value={filtroUnidade} onChange={setFiltroUnidade} label="Todas as unidades"
+        <MultiFilterSelect values={filtrosUnidade} onChange={setFiltrosUnidade} label="Todas as unidades"
           options={data?.opcoesFiltro.unidades ?? []} color={C.purple} />
-        <FilterSelect value={filtroArea}    onChange={setFiltroArea}    label="Todas as áreas"
+        <MultiFilterSelect values={filtrosArea}    onChange={setFiltrosArea}    label="Todas as áreas"
           options={data?.opcoesFiltro.areas ?? []} color={C.purple} />
-        <FilterSelect value={filtroGestor}  onChange={setFiltroGestor}  label="Todos os gestores"
+        <MultiFilterSelect values={filtrosGestor}  onChange={setFiltrosGestor}  label="Todos os gestores"
           options={data?.opcoesFiltro.gestores ?? []} color={C.purple} />
 
-        {/* Tags de filtros ativos */}
-        {filtroMes && (
-          <FilterTag label={filtroMes} onClear={() => setFiltroMes('')} />
-        )}
-        {(filtroUnidade || filtroArea || filtroGestor) && (
-          <FilterTag label="limpar filtros"
-            onClear={() => { setFiltroUnidade(''); setFiltroArea(''); setFiltroGestor(''); }} />
+        {/* Tag "limpar tudo" quando qualquer filtro ativo */}
+        {(filtrosMes.length > 0 || filtrosUnidade.length > 0 || filtrosArea.length > 0 || filtrosGestor.length > 0) && (
+          <FilterTag label="limpar filtros" onClear={() => {
+            setFiltrosMes([]); setFiltrosUnidade([]); setFiltrosArea([]); setFiltrosGestor([]);
+          }} />
         )}
 
         {/* Alertas */}
