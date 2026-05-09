@@ -78,11 +78,25 @@ export async function GET(request: Request) {
       ) : [];
       const irmaos = irmaoRaw.map((d: any) => ({ ...d, gravatar_hash: gravatarHash(d.email) }));
 
+      // Histórico de ponto (TiqueTaque) — join por nome
+      const ponto = await db.all(
+        `SELECT mes, horas_normais, total, banco_horas,
+                extra_50, extra_60, extra_100,
+                atraso, falta_injustificada, atestado, abono,
+                ferias, afastamento_nao_rem, adicional_noturno,
+                hora_noturna_reduzida, dsr, dispensa_legal, synced_at
+         FROM ponto_mensal
+         WHERE UPPER(TRIM(nome)) = UPPER(TRIM(?))
+         ORDER BY mes DESC`,
+        [colab.nome as string]
+      );
+
       await db.close();
       return NextResponse.json({
         colaborador: { ...(colab as any), gravatar_hash: gravatarHash((colab as any).email) },
         historico,
         organograma: { diretos: diretos.slice(0, 8), totalDiretos, gestorInfo, gestorDoGestor, irmaos },
+        ponto,
       });
     }
 

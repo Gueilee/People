@@ -48,7 +48,45 @@ type Organograma = {
   irmaos: OrgPessoa[];
 };
 
+type PontoMes = {
+  mes: string;
+  horas_normais: number;
+  total: number;
+  banco_horas: number;
+  extra_50: number;
+  extra_60: number;
+  extra_100: number;
+  atraso: number;
+  falta_injustificada: number;
+  atestado: number;
+  abono: number;
+  ferias: number;
+  afastamento_nao_rem: number;
+  adicional_noturno: number;
+  hora_noturna_reduzida: number;
+  dsr: number;
+  dispensa_legal: number;
+};
+
 /* ── Helpers ── */
+function fmtH(h: number): string {
+  if (!h || h === 0) return '0h';
+  const neg = h < 0;
+  const abs = Math.abs(h);
+  const hh  = Math.floor(abs);
+  const mm  = Math.round((abs - hh) * 60);
+  const hhStr = hh.toLocaleString('pt-BR');
+  const base  = mm > 0 ? `${hhStr}h${mm.toString().padStart(2, '0')}` : `${hhStr}h`;
+  return neg ? `-${base}` : base;
+}
+
+function fmtMesPonto(mes: string): string {
+  if (!mes) return '';
+  const [y, m] = mes.split('-');
+  const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return `${nomes[parseInt(m, 10) - 1]}/${y.slice(2)}`;
+}
+
 function iniciais(nome: string) {
   const p = nome.trim().split(' ');
   return (p[0][0] + (p[p.length - 1][0] || '')).toUpperCase();
@@ -408,6 +446,7 @@ export default function ColaboradorPage() {
   const [colab, setColab]           = useState<Colab | null>(null);
   const [historico, setHistorico]   = useState<Evento[]>([]);
   const [organograma, setOrganograma] = useState<Organograma | null>(null);
+  const [ponto, setPonto]           = useState<PontoMes[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -435,11 +474,12 @@ export default function ColaboradorPage() {
       setColab(d.colaborador);
       setHistorico(d.historico || []);
       setOrganograma(d.organograma || null);
+      setPonto(d.ponto || []);
     } finally { setLoadingProf(false); }
   }
 
   function limpar() {
-    setColab(null); setHistorico([]); setOrganograma(null);
+    setColab(null); setHistorico([]); setOrganograma(null); setPonto([]);
     setQuery(''); setSugestoes([]); setShowDrop(false);
     setTimeout(() => inputRef.current?.focus(), 50);
   }
@@ -752,6 +792,124 @@ export default function ColaboradorPage() {
                 )}
               </div>
             </div>
+
+            {/* ── Jornada & Ponto ── */}
+            {ponto.length > 0 && (() => {
+              const total_he   = ponto.reduce((s, p) => s + p.extra_50 + p.extra_60 + p.extra_100, 0);
+              const total_abs  = ponto.reduce((s, p) => s + p.falta_injustificada + p.atestado, 0);
+              const total_fat  = ponto.reduce((s, p) => s + p.falta_injustificada, 0);
+              const total_atr  = ponto.reduce((s, p) => s + p.atraso, 0);
+              const total_not  = ponto.reduce((s, p) => s + p.adicional_noturno, 0);
+              const total_fer  = ponto.reduce((s, p) => s + p.ferias, 0);
+              const banco_atual = ponto[0]?.banco_horas ?? 0; // mês mais recente
+              const AMBER = '#F59E0B';
+
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: C.border }}>
+                  {/* Cabeçalho */}
+                  <div className="px-6 py-4 flex items-center justify-between flex-wrap gap-2"
+                    style={{ borderBottom: `3px solid ${AMBER}` }}>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-widest" style={{ color: AMBER }}>
+                        Jornada & Ponto
+                      </h3>
+                      <p className="text-[11px] mt-0.5" style={{ color: C.gray }}>
+                        {ponto.length} {ponto.length === 1 ? 'mês' : 'meses'} · {fmtMesPonto(ponto[ponto.length-1]?.mes)} → {fmtMesPonto(ponto[0]?.mes)} · Fonte: TiqueTaque
+                      </p>
+                    </div>
+                    <a href="/ponto" className="text-[11px] font-bold px-3 py-1 rounded-full border-2 transition-all"
+                      style={{ borderColor: AMBER, color: AMBER }}>
+                      Ver dashboard completo →
+                    </a>
+                  </div>
+
+                  {/* KPI strip */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-x divide-gray-100 border-b" style={{ borderColor: C.border }}>
+                    {[
+                      { label: 'HE Total',      value: fmtH(total_he),   color: AMBER,    sub: 'no período' },
+                      { label: 'Ausências',      value: fmtH(total_abs),  color: '#ff2f69', sub: 'faltas + atestados' },
+                      { label: 'Faltas',         value: fmtH(total_fat),  color: '#EF4444', sub: 'injustificadas' },
+                      { label: 'Atrasos',        value: fmtH(total_atr),  color: '#F97316', sub: 'total acumulado' },
+                      { label: 'Adic. Noturno',  value: fmtH(total_not),  color: '#6366F1', sub: 'horas noturnas' },
+                      { label: 'Férias',         value: fmtH(total_fer),  color: '#0D9488', sub: 'gozadas' },
+                      { label: 'Banco Atual',    value: fmtH(banco_atual), color: banco_atual >= 0 ? '#0D9488' : '#ff2f69', sub: `mês ${fmtMesPonto(ponto[0]?.mes)}` },
+                    ].map(k => (
+                      <div key={k.label} className="flex flex-col items-center justify-center py-4 px-2 text-center">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: C.gray }}>{k.label}</div>
+                        <div className="text-lg font-black tabular-nums" style={{ color: k.color }}>{k.value}</div>
+                        <div className="text-[10px] mt-0.5" style={{ color: C.gray }}>{k.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tabela mensal */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ background: '#fafaf9' }}>
+                          <th className="text-left px-4 py-3 font-bold text-gray-500 whitespace-nowrap">Mês</th>
+                          <th className="text-right px-3 py-3 font-bold text-gray-500 whitespace-nowrap">Horas Norm.</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: AMBER }}>HE 50%</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: AMBER }}>HE 60%</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: AMBER }}>HE 100%</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: '#ff2f69' }}>Falta</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: '#3B82F6' }}>Atestado</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: '#F97316' }}>Atraso</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: '#6366F1' }}>Not.</th>
+                          <th className="text-right px-3 py-3 font-bold whitespace-nowrap" style={{ color: '#0D9488' }}>Banco</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ponto.map((p, i) => {
+                          const bancoColor = p.banco_horas > 0 ? '#0D9488' : p.banco_horas < 0 ? '#ff2f69' : C.gray;
+                          const temHE = (p.extra_50 + p.extra_60 + p.extra_100) > 0;
+                          const temAbs = (p.falta_injustificada + p.atestado) > 0;
+                          return (
+                            <tr key={p.mes}
+                              className="border-t transition-colors hover:bg-amber-50"
+                              style={{ borderColor: '#f3f4f6', background: i === 0 ? '#fffbeb' : undefined }}>
+                              <td className="px-4 py-3 font-bold whitespace-nowrap" style={{ color: C.dark }}>
+                                {fmtMesPonto(p.mes)}
+                                {i === 0 && <span className="ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: AMBER, color: '#fff' }}>atual</span>}
+                              </td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums text-gray-600">{fmtH(p.horas_normais)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums" style={{ color: temHE && p.extra_50 > 0 ? AMBER : C.gray }}>{fmtH(p.extra_50)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums" style={{ color: temHE && p.extra_60 > 0 ? AMBER : C.gray }}>{fmtH(p.extra_60)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums" style={{ color: temHE && p.extra_100 > 0 ? AMBER : C.gray }}>{fmtH(p.extra_100)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums font-bold" style={{ color: temAbs && p.falta_injustificada > 0 ? '#ff2f69' : C.gray }}>{fmtH(p.falta_injustificada)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums" style={{ color: temAbs && p.atestado > 0 ? '#3B82F6' : C.gray }}>{fmtH(p.atestado)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums" style={{ color: p.atraso > 0 ? '#F97316' : C.gray }}>{fmtH(p.atraso)}</td>
+                              <td className="px-3 py-3 text-right font-mono tabular-nums" style={{ color: p.adicional_noturno > 0 ? '#6366F1' : C.gray }}>{fmtH(p.adicional_noturno)}</td>
+                              <td className="px-3 py-3 text-right font-bold font-mono tabular-nums" style={{ color: bancoColor }}>
+                                {p.banco_horas > 0 ? '+' : ''}{fmtH(p.banco_horas)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      {/* Totais */}
+                      <tfoot>
+                        <tr style={{ background: '#f9fafb', borderTop: `2px solid ${AMBER}` }}>
+                          <td className="px-4 py-3 font-black text-gray-700">Total</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono text-gray-700">{fmtH(ponto.reduce((s,p) => s+p.horas_normais, 0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: AMBER }}>{fmtH(ponto.reduce((s,p) => s+p.extra_50,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: AMBER }}>{fmtH(ponto.reduce((s,p) => s+p.extra_60,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: AMBER }}>{fmtH(ponto.reduce((s,p) => s+p.extra_100,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#ff2f69' }}>{fmtH(ponto.reduce((s,p) => s+p.falta_injustificada,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#3B82F6' }}>{fmtH(ponto.reduce((s,p) => s+p.atestado,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#F97316' }}>{fmtH(ponto.reduce((s,p) => s+p.atraso,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#6366F1' }}>{fmtH(ponto.reduce((s,p) => s+p.adicional_noturno,0))}</td>
+                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: banco_atual >= 0 ? '#0D9488' : '#ff2f69' }}>
+                            {banco_atual > 0 ? '+' : ''}{fmtH(banco_atual)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
         )}
 
