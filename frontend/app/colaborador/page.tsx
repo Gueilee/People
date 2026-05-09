@@ -899,9 +899,14 @@ export default function ColaboradorPage() {
                           <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#3B82F6' }}>{fmtH(ponto.reduce((s,p) => s+p.atestado,0))}</td>
                           <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#F97316' }}>{fmtH(ponto.reduce((s,p) => s+p.atraso,0))}</td>
                           <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: '#6366F1' }}>{fmtH(ponto.reduce((s,p) => s+p.adicional_noturno,0))}</td>
-                          <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: banco_atual >= 0 ? '#0D9488' : '#ff2f69' }}>
-                            {banco_atual > 0 ? '+' : ''}{fmtH(banco_atual)}
-                          </td>
+                          {(() => {
+                            const totalBanco = ponto.reduce((s,p) => s+p.banco_horas, 0);
+                            return (
+                              <td className="px-3 py-3 text-right font-bold font-mono" style={{ color: totalBanco >= 0 ? '#0D9488' : '#ff2f69' }}>
+                                {totalBanco > 0 ? '+' : ''}{fmtH(totalBanco)}
+                              </td>
+                            );
+                          })()}
                         </tr>
                       </tfoot>
                     </table>
