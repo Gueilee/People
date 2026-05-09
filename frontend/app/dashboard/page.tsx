@@ -715,7 +715,7 @@ export default function DashboardRH() {
                   <table className="w-full text-xs min-w-[680px]">
                     <thead>
                       <tr className="text-left text-[10px] uppercase text-gray-400 border-b">
-                        {['Colaborador','Cargo','Área / Unidade','Tempo','Score','Nível','Fatores'].map(h => (
+                        {['Colaborador','Cargo','Área / Unidade','Score','Nível','Fatores'].map(h => (
                           <th key={h} className="pb-2 font-bold pr-3">{h}</th>
                         ))}
                       </tr>
@@ -734,7 +734,6 @@ export default function DashboardRH() {
                             <td className="py-2 pr-3 text-gray-500 text-[10px]">
                               {r.departamento}<br/><span className="text-gray-400">{r.unidade}</span>
                             </td>
-                            <td className="py-2 pr-3 font-mono text-gray-600">{diasLabel}</td>
                             <td className="py-2 pr-3">
                               <div className="flex items-center gap-1.5">
                                 <div className="flex-1 bg-gray-100 rounded-full h-2 w-16 overflow-hidden">
