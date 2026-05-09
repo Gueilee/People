@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { NavHeader, FilterSelect, FilterTag, SyncBadge } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, FilterTag, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -56,7 +56,8 @@ type Tendencia = {
 };
 
 type PontoData = {
-  mes: string;
+  filtroMeses: string[];
+  filtroFiliais: string[];
   mesesDisponiveis: string[];
   kpis: KPIs;
   porFilial: PorFilial[];
@@ -377,28 +378,28 @@ export default function PontoPage() {
   const [data,    setData]    = useState<PontoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro,    setErro]    = useState('');
-  const [mes,     setMes]     = useState('');
-  const [filial,  setFilial]  = useState('');
+  const [meses,   setMeses]   = useState<string[]>([]);
+  const [filiais, setFiliais] = useState<string[]>([]);
 
-  const carregar = useCallback((m: string, f: string) => {
+  const carregar = useCallback((m: string[], f: string[]) => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (m) params.set('mes', m);
-    if (f) params.set('filial', f);
+    if (m.length) params.set('mes',    m.join(','));
+    if (f.length) params.set('filial', f.join(','));
     fetch(`/api/ponto?${params}`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(d => {
         if (d.erro) { setErro(d.erro); setData(null); }
-        else { setData(d); setErro(''); if (!m) setMes(d.mes); }
+        else { setData(d); setErro(''); }
       })
       .catch(e => setErro(e.message))
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { carregar(mes, filial); }, [mes, filial, carregar]);
+  useEffect(() => { carregar(meses, filiais); }, [meses, filiais, carregar]);
 
   const kpis      = data?.kpis;
-  const filiais   = [...new Set((data?.porFilial ?? []).map(f => f.filial))];
+  const filiaisOpcoes = [...new Set((data?.porFilial ?? []).map(f => f.filial))];
   const syncedAt  = kpis?.syncedAt
     ? new Date(kpis.syncedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
@@ -412,22 +413,24 @@ export default function PontoPage() {
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
       <NavHeader>
-        <FilterSelect
-          value={mes}
-          onChange={setMes}
-          label="Selecione o mês"
-          options={data?.mesesDisponiveis ?? (mes ? [mes] : [])}
+        <MultiFilterSelect
+          values={meses}
+          onChange={setMeses}
+          label="Todos os meses"
+          options={data?.mesesDisponiveis ?? []}
           color={C.amber}
           labelFn={fmtMes}
         />
-        <FilterSelect
-          value={filial}
-          onChange={setFilial}
+        <MultiFilterSelect
+          values={filiais}
+          onChange={setFiliais}
           label="Todas as filiais"
-          options={filiais}
+          options={filiaisOpcoes}
           color={C.amber}
         />
-        {filial && <FilterTag label={filial} onClear={() => setFilial('')} />}
+        {(meses.length > 0 || filiais.length > 0) && (
+          <FilterTag label="limpar filtros" onClear={() => { setMeses([]); setFiliais([]); }} />
+        )}
         {syncedAt && <SyncBadge label={`Sync: ${syncedAt}`} />}
       </NavHeader>
 
@@ -438,11 +441,21 @@ export default function PontoPage() {
         <div>
           <h1 className="text-2xl font-black" style={{ color: C.purple }}>
             Jornada & Ponto
-            {mes && <span className="text-base font-bold text-gray-400 ml-3">{fmtMes(mes)}</span>}
-            {filial && <span className="text-base font-bold ml-2" style={{ color: C.amber }}> · {filial}</span>}
+            {meses.length > 0 && (
+              <span className="text-base font-bold text-gray-400 ml-3">
+                {meses.length === 1 ? fmtMes(meses[0]) : `${meses.length} meses selecionados`}
+              </span>
+            )}
+            {filiais.length > 0 && (
+              <span className="text-base font-bold ml-2" style={{ color: C.amber }}>
+                {' · '}{filiais.length === 1 ? filiais[0] : `${filiais.length} filiais`}
+              </span>
+            )}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque
+            {meses.length === 0
+              ? 'Acumulado histórico (2025–2026) · Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'
+              : 'Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'}
           </p>
         </div>
 
