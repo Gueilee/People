@@ -108,6 +108,15 @@ export async function GET(request: Request) {
       params
     );
 
+    // ── Top banco positivo ───────────────────────────────────────────────────
+    const topBancoPos = await db.all<any>(
+      `SELECT nome, cargo, filial, banco_horas
+       FROM ponto_mensal
+       WHERE ${where} AND banco_horas > 0
+       ORDER BY banco_horas DESC LIMIT 15`,
+      params
+    );
+
     // ── Top atrasos ──────────────────────────────────────────────────────────
     const topAtrasos = await db.all<any>(
       `SELECT nome, cargo, filial, atraso
@@ -200,6 +209,7 @@ export async function GET(request: Request) {
       topFaltas,
       topExtras,
       topBancoNeg,
+      topBancoPos,
       topAtrasos,
       distBanco,
       absByGestor,

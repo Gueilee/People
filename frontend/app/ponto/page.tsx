@@ -63,6 +63,7 @@ type PontoData = {
   topFaltas: TopFalta[];
   topExtras: TopExtra[];
   topBancoNeg: TopBanco[];
+  topBancoPos: TopBanco[];
   topAtrasos: TopAtraso[];
   distBanco: DistBanco;
   absByGestor: AbsGestor[];
@@ -476,12 +477,14 @@ export default function PontoPage() {
             <Card>
               <SectionTitle icon="🏦">Distribuição Banco de Horas</SectionTitle>
               <DistBancoBar dist={data.distBanco} />
-              <div className="mt-5">
-                <SectionTitle icon="⚠️">Maior Saldo Negativo</SectionTitle>
-                {data.topBancoNeg.length === 0
-                  ? <p className="text-xs text-gray-400">Nenhum saldo negativo.</p>
-                  : (
-                    <div className="overflow-x-auto">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
+                {/* Saldo Negativo */}
+                <div>
+                  <SectionTitle icon="⚠️">Maior Saldo Negativo</SectionTitle>
+                  {data.topBancoNeg.length === 0
+                    ? <p className="text-xs text-gray-400">Nenhum saldo negativo.</p>
+                    : (
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="text-gray-400 border-b">
@@ -493,16 +496,44 @@ export default function PontoPage() {
                           {data.topBancoNeg.map((r, i) => (
                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                               <td className="py-1.5 leading-tight">
-                                <div className="font-semibold text-gray-800">{r.nome}</div>
-                                <div className="text-gray-400">{r.cargo} · {r.filial}</div>
+                                <div className="font-semibold text-gray-800 text-[11px]">{r.nome}</div>
+                                <div className="text-gray-400 text-[10px]">{r.cargo} · {r.filial}</div>
                               </td>
                               <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.pink }}>{fmtH(r.banco_horas)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                    </div>
-                  )}
+                    )}
+                </div>
+
+                {/* Saldo Positivo */}
+                <div>
+                  <SectionTitle icon="✅">Maior Saldo Positivo</SectionTitle>
+                  {data.topBancoPos.length === 0
+                    ? <p className="text-xs text-gray-400">Nenhum saldo positivo.</p>
+                    : (
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-400 border-b">
+                            <th className="text-left pb-2 font-semibold">Colaborador</th>
+                            <th className="text-right pb-2 font-semibold w-20">Saldo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.topBancoPos.map((r, i) => (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                              <td className="py-1.5 leading-tight">
+                                <div className="font-semibold text-gray-800 text-[11px]">{r.nome}</div>
+                                <div className="text-gray-400 text-[10px]">{r.cargo} · {r.filial}</div>
+                              </td>
+                              <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.teal }}>+{fmtH(r.banco_horas)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                </div>
               </div>
             </Card>
 
