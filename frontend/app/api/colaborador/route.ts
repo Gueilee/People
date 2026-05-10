@@ -15,13 +15,27 @@ export async function GET(request: Request) {
     const db = await getDb();
 
     if (busca) {
+      // Normaliza para ASCII removendo diacríticos — permite busca sem acento encontrar "THÁLITA" ao digitar "THALITA"
+      const buscaNorm = busca.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+      const like = `%${buscaNorm}%`;
+
       const rows = await db.all(
         `SELECT id_colaborador, nome, cargo, unidade, departamento, status
          FROM colaboradores
-         WHERE nome LIKE ?
-         ORDER BY nome ASC
-         LIMIT 12`,
-        [`%${busca}%`]
+         WHERE replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
+                 replace(replace(replace(replace(replace(UPPER(nome),
+                 'Á','A'),'À','A'),'Â','A'),'Ã','A'),
+                 'É','E'),'Ê','E'),'È','E'),
+                 'Í','I'),'Î','I'),
+                 'Ó','O'),'Ô','O'),'Õ','O'),
+                 'Ú','U'),'Û','U'),
+                 'Ç','C')
+               LIKE ?
+         ORDER BY
+           CASE WHEN UPPER(nome) LIKE ? THEN 0 ELSE 1 END,
+           nome ASC
+         LIMIT 25`,
+        [like, `%${busca.toUpperCase()}%`]
       );
       await db.close();
       return NextResponse.json(rows);
