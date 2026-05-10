@@ -16,6 +16,8 @@ type KPIs = {
   saldoBanco: number;
   bancoNegativo: number;
   totalNoturno: number;
+  totalHoraNot: number;
+  totalDsr: number;
   totalAbono: number;
   totalFerias: number;
   totalAfastamento: number;
@@ -33,13 +35,17 @@ type PorFilial = {
   ausencias: number;
   atrasos: number;
   banco_horas: number;
+  adicional_noturno: number;
+  hora_noturna_reduzida: number;
+  dsr: number;
   banco_negativo: number;
 };
 
 type TopFalta  = { nome: string; cargo: string; filial: string; departamento: string; falta_injustificada: number; atestado: number; total_ausencia: number };
 type TopExtra  = { nome: string; cargo: string; filial: string; departamento: string; extra_50: number; extra_60: number; extra_100: number; total_he: number };
 type TopBanco  = { nome: string; cargo: string; filial: string; banco_horas: number };
-type TopAtraso = { nome: string; cargo: string; filial: string; atraso: number };
+type TopAtraso  = { nome: string; cargo: string; filial: string; atraso: number };
+type TopNoturno = { nome: string; cargo: string; filial: string; adicional_noturno: number; hora_noturna_reduzida: number };
 
 type DistBanco = { critico: number; negativo: number; equilibrado: number; positivo: number; excesso: number };
 
@@ -66,6 +72,7 @@ type PontoData = {
   topBancoNeg: TopBanco[];
   topBancoPos: TopBanco[];
   topAtrasos: TopAtraso[];
+  topNoturno: TopNoturno[];
   distBanco: DistBanco;
   absByGestor: AbsGestor[];
   absByCargo: AbsCargo[];
@@ -489,7 +496,7 @@ export default function PontoPage() {
             <KpiCard label="Atestados"       value={fmtH(kpis.totalAtestados)}    sub="médicos/ausências just." color={C.blue}  icon="🏥" />
             <KpiCard label="Atrasos"         value={fmtH(kpis.totalAtraso)}       sub="soma do período"       color={C.orange} icon="🕐" />
             <KpiCard label="Banco de Horas"  value={fmtH(kpis.saldoBanco)}        sub={`${kpis.bancoNegativo} com saldo neg.`} color={kpis.saldoBanco >= 0 ? C.teal : C.pink} icon="🏦" />
-            <KpiCard label="Adic. Noturno"   value={fmtH(kpis.totalNoturno)}      sub="horas noturnas"        color={C.indigo} icon="🌙" />
+            <KpiCard label="Adic. Noturno"   value={fmtH(kpis.totalNoturno)}      sub={`HR reduzida: ${fmtH(kpis.totalHoraNot)}`} color={C.indigo} icon="🌙" />
           </div>
         )}
 
@@ -513,6 +520,88 @@ export default function PontoPage() {
                       color={PALETTE[i % PALETTE.length]}
                       subLabel={`Faltas: ${fmtH(f.faltas)} · Atestados: ${fmtH(f.atestados)}`} />
               ))}
+            </Card>
+          </div>
+        )}
+
+        {/* ── Jornada Noturna ── */}
+        {!loading && data && data.kpis.totalNoturno > 0 && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            <Card>
+              <SectionTitle icon="🌙">Adicional Noturno por Filial</SectionTitle>
+
+              {/* Mini-KPIs */}
+              <div className="flex gap-3 mb-5 flex-wrap">
+                <div className="flex-1 min-w-0 rounded-xl p-3" style={{ background: '#EEF2FF' }}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: C.indigo }}>Adic. Noturno</div>
+                  <div className="text-xl font-black" style={{ color: C.indigo }}>{fmtH(data.kpis.totalNoturno)}</div>
+                </div>
+                <div className="flex-1 min-w-0 rounded-xl p-3" style={{ background: '#F3F0FF' }}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: C.purple }}>HR Reduzida</div>
+                  <div className="text-xl font-black" style={{ color: C.purple }}>{fmtH(data.kpis.totalHoraNot)}</div>
+                </div>
+                <div className="flex-1 min-w-0 rounded-xl p-3 bg-gray-50">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1 text-gray-400">DSR</div>
+                  <div className="text-xl font-black text-gray-600">{fmtH(data.kpis.totalDsr)}</div>
+                </div>
+              </div>
+
+              {/* Barras por filial */}
+              {data.porFilial.filter(f => f.adicional_noturno > 0).length === 0
+                ? <p className="text-xs text-gray-400">Nenhum adicional noturno no período selecionado.</p>
+                : data.porFilial
+                    .filter(f => f.adicional_noturno > 0)
+                    .sort((a, b) => b.adicional_noturno - a.adicional_noturno)
+                    .map((f, i) => (
+                      <BarH key={f.filial} label={f.filial} value={f.adicional_noturno}
+                            max={Math.max(...data.porFilial.map(x => x.adicional_noturno), 1)}
+                            color={PALETTE[i % PALETTE.length]}
+                            subLabel={`HR Red.: ${fmtH(f.hora_noturna_reduzida)} · DSR: ${fmtH(f.dsr)}`} />
+                    ))
+              }
+
+              {/* Nota explicativa */}
+              <div className="mt-4 p-3 rounded-xl text-[11px] leading-relaxed" style={{ background: '#EEF2FF', color: '#6366F1' }}>
+                <strong>Adicional noturno</strong> incide sobre horas trabalhadas entre 22h e 5h (acréscimo de 20%).<br />
+                <strong>Hora noturna reduzida</strong>: cada hora noturna equivale a 52min52s — o campo registra o crédito de tempo gerado por essa redução.
+              </div>
+            </Card>
+
+            <Card>
+              <SectionTitle icon="🌃">Top Colaboradores — Noturno</SectionTitle>
+              {data.topNoturno.length === 0
+                ? <p className="text-xs text-gray-400">Nenhum adicional noturno no período.</p>
+                : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-400 border-b">
+                          <th className="text-left pb-2 font-semibold">Colaborador</th>
+                          <th className="text-right pb-2 font-semibold w-20">Adic. Not.</th>
+                          <th className="text-right pb-2 font-semibold w-20">HR Red.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.topNoturno.map((r, i) => (
+                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                            <td className="py-1.5 leading-tight">
+                              <div className="font-semibold text-gray-800">{r.nome}</div>
+                              <div className="text-gray-400">{r.cargo} · {r.filial}</div>
+                            </td>
+                            <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.indigo }}>{fmtH(r.adicional_noturno)}</td>
+                            <td className="py-1.5 text-right font-mono text-gray-500">{fmtH(r.hora_noturna_reduzida)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              }
+
+              <div className="mt-5 p-3 rounded-xl text-[11px] leading-relaxed bg-amber-50 text-amber-600">
+                <strong>Atenção:</strong> colaboradores com adicional noturno recorrente podem indicar jornadas sistematicamente estendidas além das 22h — recomendado acompanhamento pelo gestor.
+              </div>
             </Card>
           </div>
         )}

@@ -58,6 +58,8 @@ export async function GET(request: Request) {
         SUM(atraso)                                        AS total_atraso,
         SUM(banco_horas)                                   AS saldo_banco,
         SUM(adicional_noturno)                             AS total_noturno,
+        SUM(hora_noturna_reduzida)                         AS total_hora_not,
+        SUM(dsr)                                           AS total_dsr,
         SUM(abono)                                         AS total_abono,
         SUM(ferias)                                        AS total_ferias,
         SUM(afastamento_nao_rem)                           AS total_afastamento,
@@ -86,6 +88,9 @@ export async function GET(request: Request) {
         SUM(falta_injustificada + atestado)            AS ausencias,
         SUM(atraso)                                    AS atrasos,
         SUM(banco_horas)                               AS banco_horas,
+        SUM(adicional_noturno)                         AS adicional_noturno,
+        SUM(hora_noturna_reduzida)                     AS hora_noturna_reduzida,
+        SUM(dsr)                                       AS dsr,
         COUNT(CASE WHEN banco_horas < 0 THEN 1 END)    AS banco_negativo
        FROM ponto_mensal ${where}
        GROUP BY filial
@@ -147,6 +152,18 @@ export async function GET(request: Request) {
        GROUP BY nome, cargo, filial
        HAVING atraso > 0
        ORDER BY atraso DESC LIMIT 15`,
+      params
+    );
+
+    // ── Top noturno (acumulado por colaborador) ──────────────────────────────
+    const topNoturno = await db.all<any>(
+      `SELECT nome, cargo, filial,
+        SUM(adicional_noturno)     AS adicional_noturno,
+        SUM(hora_noturna_reduzida) AS hora_noturna_reduzida
+       FROM ponto_mensal ${where}
+       GROUP BY nome, cargo, filial
+       HAVING adicional_noturno > 0
+       ORDER BY adicional_noturno DESC LIMIT 10`,
       params
     );
 
@@ -231,7 +248,9 @@ export async function GET(request: Request) {
         totalAtraso:       +(kpiRow?.total_atraso   || 0).toFixed(1),
         saldoBanco:        +(kpiRow?.saldo_banco    || 0).toFixed(1),
         bancoNegativo:     bancoNegRow?.n            || 0,
-        totalNoturno:      +(kpiRow?.total_noturno  || 0).toFixed(1),
+        totalNoturno:      +(kpiRow?.total_noturno   || 0).toFixed(1),
+        totalHoraNot:      +(kpiRow?.total_hora_not || 0).toFixed(1),
+        totalDsr:          +(kpiRow?.total_dsr      || 0).toFixed(1),
         totalAbono:        +(kpiRow?.total_abono    || 0).toFixed(1),
         totalFerias:       +(kpiRow?.total_ferias   || 0).toFixed(1),
         totalAfastamento:  +(kpiRow?.total_afastamento || 0).toFixed(1),
@@ -243,6 +262,7 @@ export async function GET(request: Request) {
       topBancoNeg,
       topBancoPos,
       topAtrasos,
+      topNoturno,
       distBanco,
       absByGestor,
       absByCargo,
