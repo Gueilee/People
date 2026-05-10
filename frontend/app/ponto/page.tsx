@@ -141,16 +141,22 @@ function KpiCard({ label, value, sub, color, icon }: {
   );
 }
 
-function BarH({ label, value, max, color, suffix = 'h', subLabel, labelWidth = 110 }: {
+function BarH({ label, value, max, color, suffix = 'h', subLabel, labelWidth = 110, wrap = false }: {
   label: string; value: number; max: number; color: string;
-  suffix?: string; subLabel?: string; labelWidth?: number;
+  suffix?: string; subLabel?: string; labelWidth?: number; wrap?: boolean;
 }) {
   const pct = max > 0 ? Math.max((Math.abs(value) / Math.abs(max)) * 100, 2) : 2;
   return (
     <div className="flex items-center gap-3 mb-2">
-      <div className="text-right shrink-0 overflow-hidden" style={{ width: labelWidth }}>
-        <span className="text-xs font-semibold text-gray-700 leading-tight block overflow-hidden text-ellipsis whitespace-nowrap"
-              title={label}>{label}</span>
+      <div className="text-right shrink-0" style={{ width: labelWidth }}>
+        {wrap ? (
+          <span className="text-xs font-semibold text-gray-700 leading-tight block"
+                style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}
+                title={label}>{label}</span>
+        ) : (
+          <span className="text-xs font-semibold text-gray-700 leading-tight block overflow-hidden text-ellipsis whitespace-nowrap"
+                title={label}>{label}</span>
+        )}
         {subLabel && <div className="text-[10px] text-gray-400 leading-tight">{subLabel}</div>}
       </div>
       <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
@@ -802,7 +808,7 @@ export default function PontoPage() {
                 <SectionTitle icon="👔">Absenteísmo por Gestor</SectionTitle>
                 {data.absByGestor.map((g, i) => (
                   <BarH key={g.gestor} label={g.gestor} value={g.total_ausencia} max={maxGestor}
-                        color={PALETTE[i % PALETTE.length]}
+                        color={PALETTE[i % PALETTE.length]} labelWidth={165} wrap
                         subLabel={`${g.funcionarios} func · média ${fmtH(g.media_ausencia)}/pessoa`} />
                 ))}
               </Card>
@@ -813,7 +819,7 @@ export default function PontoPage() {
                 <SectionTitle icon="🏷">Ausências por Cargo</SectionTitle>
                 {data.absByCargo.slice(0, 12).map((c, i) => (
                   <BarH key={c.cargo} label={c.cargo} value={c.total_ausencia} max={maxCargo}
-                        color={PALETTE[i % PALETTE.length]}
+                        color={PALETTE[i % PALETTE.length]} labelWidth={165} wrap
                         subLabel={`${c.funcionarios} func · HE: ${fmtH(c.total_he)}`} />
                 ))}
               </Card>
