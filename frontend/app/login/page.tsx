@@ -54,11 +54,7 @@ export default function LoginPage() {
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: 'url(/login_v1.jpeg)' }}
         />
-        <div className="absolute bottom-10 left-10">
-          <p className="text-white/40 text-xs tracking-[0.25em] uppercase">
-            Empowering Your People
-          </p>
-        </div>
+
       </div>
 
       {/* ── Lado direito: painel off-white ── */}
