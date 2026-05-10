@@ -843,6 +843,11 @@ export default function PontoPage() {
             <p className="text-sm mt-1">Execute: <code className="bg-gray-100 px-2 py-0.5 rounded">py scripts/sync_ponto.py --mes 2026-04</code></p>
           </div>
         )}
+
+        {/* ── Footer ── */}
+        <footer className="text-center text-[10px] text-gray-400 pb-6">
+          VENDEMMIA PEOPLE — Sistema de Gestão de Pessoas · Dados via API TiqueTaque · {new Date().getFullYear()}
+        </footer>
       </main>
     </div>
   );
