@@ -109,7 +109,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         colaborador: { ...(colab as any), gravatar_hash: gravatarHash((colab as any).email) },
         historico,
-        organograma: { diretos: diretos.slice(0, 8), totalDiretos, gestorInfo, gestorDoGestor, irmaos },
+        organograma: { diretos: diretos.slice(0, 20), totalDiretos, gestorInfo, gestorDoGestor, irmaos },
         ponto,
       });
     }

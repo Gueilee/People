@@ -204,59 +204,83 @@ function OrgAvatar({ nome, email, role, size }: {
   );
 }
 
+const CARD_W   = 144;
+const CARD_GAP = 14;
+
 function OrgCard({ pessoa, role = 'report' }: { pessoa: OrgPessoa; role?: CardRole }) {
-  const isSelf     = role === 'self';
-  const isAncestor = role === 'ancestor';
-  const avatarSz   = isSelf ? 56 : 44;
+  const isSelf = role === 'self';
+  const isAnc  = role === 'ancestor';
+  const isMgr  = role === 'manager';
+  const avSz   = isSelf ? 52 : 40;
 
   return (
     <div style={{
-      width: 176, borderRadius: 20, flexShrink: 0, position: 'relative',
-      padding: isSelf ? '24px 14px 18px' : '16px 14px',
-      background: isSelf ? GRAD : '#fff',
-      border: isSelf ? 'none' : `1.5px solid ${isAncestor ? '#ebebeb' : C.border}`,
-      boxShadow: isSelf
-        ? `0 20px 60px ${C.purple}40, 0 6px 20px ${C.purple}25`
-        : isAncestor ? 'none' : '0 2px 12px rgba(0,0,0,0.06)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-      opacity: isAncestor ? 0.6 : 1,
+      width: CARD_W,
+      borderRadius: 18,
+      flexShrink: 0,
+      position: 'relative',
+      padding: isSelf ? '22px 12px 16px' : '14px 12px 12px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+      ...(isSelf ? {
+        background: GRAD,
+        boxShadow: `0 16px 48px ${C.purple}35, 0 4px 16px ${C.purple}20`,
+      } : isAnc ? {
+        background: '#f9fafb',
+        border: '1px solid #eee',
+        opacity: 0.65,
+      } : isMgr ? {
+        background: '#fff',
+        border: `1.5px solid ${C.purple}28`,
+        boxShadow: `0 4px 20px ${C.purple}10`,
+      } : {
+        background: '#fff',
+        border: `1.5px solid ${C.border}`,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+      }),
     }}>
       {isSelf && (
         <div style={{
-          position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)',
-          background: '#fff', borderRadius: 99, padding: '3px 14px',
-          border: `1.5px solid ${C.purple}40`,
-          boxShadow: `0 2px 10px ${C.purple}20`,
-          fontSize: 9, fontWeight: 900, color: C.purple, letterSpacing: '0.12em',
-          whiteSpace: 'nowrap',
+          position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)',
+          background: '#fff', borderRadius: 99, padding: '2px 12px',
+          border: `1.5px solid ${C.purple}25`,
+          fontSize: 8, fontWeight: 900, color: C.purple,
+          letterSpacing: '0.1em', whiteSpace: 'nowrap',
+          boxShadow: `0 2px 8px ${C.purple}12`,
         }}>★ SELECIONADO</div>
       )}
-      <OrgAvatar nome={pessoa.nome} email={pessoa.email} role={role} size={avatarSz} />
+
+      <OrgAvatar nome={pessoa.nome} email={pessoa.email} role={role} size={avSz} />
+
       <div style={{ textAlign: 'center', width: '100%' }}>
         <p style={{
-          fontSize: isSelf ? 13 : 11, fontWeight: 700, lineHeight: 1.3, margin: 0,
-          color: isSelf ? '#fff' : isAncestor ? '#9ca3af' : '#1f2937',
+          fontSize: isSelf ? 12 : 10.5,
+          fontWeight: 700, lineHeight: 1.25, margin: 0,
+          color: isSelf ? '#fff' : isAnc ? '#9ca3af' : '#1f2937',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           overflow: 'hidden', wordBreak: 'break-word',
         }}>{pessoa.nome}</p>
+
         {pessoa.cargo && (
           <p style={{
-            fontSize: 10, margin: '4px 0 0', lineHeight: 1.2,
-            color: isSelf ? 'rgba(255,255,255,0.82)' : '#6b7280',
+            fontSize: 9, margin: '3px 0 0', lineHeight: 1.2,
+            color: isSelf ? 'rgba(255,255,255,0.75)' : '#6b7280',
             overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
           }}>{pessoa.cargo}</p>
         )}
-        {!isAncestor && pessoa.unidade && (
+
+        {!isAnc && pessoa.unidade && (
           <p style={{
-            fontSize: 9, margin: '2px 0 0',
-            color: isSelf ? 'rgba(255,255,255,0.55)' : '#9ca3af',
+            fontSize: 8.5, margin: '2px 0 0',
+            color: isSelf ? 'rgba(255,255,255,0.5)' : '#9ca3af',
             overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
           }}>{pessoa.unidade}</p>
         )}
+
         {pessoa.status === 'Desligado' && !isSelf && (
           <span style={{
-            display: 'inline-block', marginTop: 6, fontSize: 8, fontWeight: 700,
-            color: C.red, background: '#fef2f2', borderRadius: 99, padding: '2px 8px',
+            display: 'inline-block', marginTop: 5,
+            fontSize: 7.5, fontWeight: 700,
+            color: C.red, background: '#fef2f2', borderRadius: 99, padding: '2px 7px',
           }}>Desligado</span>
         )}
       </div>
@@ -276,12 +300,10 @@ function LineV({ h = 24, dashed = false }: { h?: number; dashed?: boolean }) {
 
 function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
   const { diretos, totalDiretos, gestorInfo, gestorDoGestor, irmaos } = org;
-  const isMgr  = totalDiretos > 0;
-  const extras = totalDiretos > 8 ? totalDiretos - diretos.length : 0;
-  const n      = diretos.length + (extras > 0 ? 1 : 0);
-
-  const hLineLeft  = n > 1 ? `${(0.5 / n) * 100}%` : '50%';
-  const hLineRight = n > 1 ? `${(0.5 / n) * 100}%` : '50%';
+  const isMgr = totalDiretos > 0;
+  const n     = diretos.length;
+  // Largura total da linha de subordinados — usada para a linha H calculada em pixels
+  const totalRowW = n * CARD_W + Math.max(n - 1, 0) * CARD_GAP;
 
   const colabPessoa: OrgPessoa = {
     id_colaborador: colab.id_colaborador,
@@ -298,7 +320,7 @@ function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
       padding: '28px 28px 24px',
     }}>
       {/* Cabeçalho */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h3 style={{ margin: 0, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.purple }}>
             Organograma
@@ -309,45 +331,40 @@ function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
               : gestorInfo ? `Equipe de ${gestorInfo.nome.split(' ')[0]}` : 'Posição hierárquica'}
           </p>
         </div>
-        {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {gestorDoGestor && (
-            <span style={{
-              fontSize: 10, color: '#9ca3af', background: '#f9fafb',
-              padding: '4px 10px', borderRadius: 99, border: '1px solid #f0f0f0',
-            }}>{gestorDoGestor.nome.split(' ')[0]}</span>
+            <span style={{ fontSize: 10, color: '#9ca3af', background: '#f9fafb', padding: '4px 10px', borderRadius: 99, border: '1px solid #f0f0f0' }}>
+              {gestorDoGestor.nome.split(' ')[0]}
+            </span>
           )}
           {gestorDoGestor && gestorInfo && <span style={{ fontSize: 10, color: '#d1d5db' }}>›</span>}
           {gestorInfo && (
-            <span style={{
-              fontSize: 10, color: C.gray, background: '#f3f4f6',
-              padding: '4px 10px', borderRadius: 99, border: `1px solid ${C.border}`,
-            }}>{gestorInfo.nome.split(' ')[0]}</span>
+            <span style={{ fontSize: 10, color: C.gray, background: '#f3f4f6', padding: '4px 10px', borderRadius: 99, border: `1px solid ${C.border}` }}>
+              {gestorInfo.nome.split(' ')[0]}
+            </span>
           )}
           {gestorInfo && <span style={{ fontSize: 10, color: '#d1d5db' }}>›</span>}
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: '#fff', background: C.purple,
-            padding: '4px 12px', borderRadius: 99,
-          }}>★ {colab.nome.split(' ')[0]}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: C.purple, padding: '4px 12px', borderRadius: 99 }}>
+            ★ {colab.nome.split(' ')[0]}
+          </span>
           {isMgr && <span style={{ fontSize: 10, color: '#d1d5db' }}>›</span>}
           {isMgr && (
-            <span style={{
-              fontSize: 10, color: C.teal, background: '#f0fdfa',
-              padding: '4px 10px', borderRadius: 99, border: `1px solid ${C.teal}30`,
-            }}>{totalDiretos} direto{totalDiretos > 1 ? 's' : ''}</span>
+            <span style={{ fontSize: 10, color: C.teal, background: '#f0fdfa', padding: '4px 10px', borderRadius: 99, border: `1px solid ${C.teal}30` }}>
+              {totalDiretos} direto{totalDiretos > 1 ? 's' : ''}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Árvore hierárquica */}
-      <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 200 }}>
+      {/* Árvore — paddingTop evita corte do badge "★ SELECIONADO" que fica em top:-11px */}
+      <div style={{ overflowX: 'auto', paddingTop: 18, paddingBottom: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 'max-content' }}>
 
           {/* Nível 0: Gestor do Gestor */}
           {gestorDoGestor && (
             <>
               <OrgCard pessoa={gestorDoGestor as OrgPessoa} role="ancestor" />
-              <LineV h={24} />
+              <LineV h={28} />
             </>
           )}
 
@@ -355,69 +372,57 @@ function OrgChartSection({ colab, org }: { colab: Colab; org: Organograma }) {
           {gestorInfo && (
             <>
               <OrgCard pessoa={gestorInfo as OrgPessoa} role="manager" />
-              <LineV h={24} />
+              <LineV h={28} />
             </>
           )}
 
           {/* Nível 2: Colaborador selecionado */}
           <OrgCard pessoa={colabPessoa} role="self" />
 
-          {/* Nível 3: Subordinados diretos */}
-          {isMgr && (
+          {/* Nível 3: Subordinados diretos — todos exibidos, sem caixa "+N" */}
+          {isMgr && n > 0 && (
             <>
-              <LineV h={24} />
-              <div style={{ position: 'relative', width: '100%' }}>
-                <div style={{
-                  position: 'absolute', top: 0,
-                  left: hLineLeft, right: hLineRight, height: 2,
-                  background: `linear-gradient(to right, ${C.purple}60, ${C.teal}60)`,
-                }} />
-                <div style={{
-                  display: 'flex', justifyContent: 'space-around',
-                  alignItems: 'flex-start', gap: 10,
-                  flexWrap: diretos.length > 5 ? 'wrap' : 'nowrap',
-                }}>
-                  {diretos.map((d) => (
+              <LineV h={28} />
+              {/* Wrapper com largura exata para que left/right em px funcionem corretamente */}
+              <div style={{ position: 'relative', width: totalRowW }}>
+                {/* Linha horizontal conectando o primeiro ao último subordinado */}
+                {n > 1 && (
+                  <div style={{
+                    position: 'absolute', top: 0,
+                    left: CARD_W / 2, right: CARD_W / 2,
+                    height: 2,
+                    background: `linear-gradient(to right, ${C.purple}70, ${C.teal}70)`,
+                  }} />
+                )}
+                <div style={{ display: 'flex', gap: CARD_GAP, alignItems: 'flex-start' }}>
+                  {diretos.map(d => (
                     <div key={d.nome} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <LineV h={24} />
+                      <LineV h={28} />
                       <OrgCard pessoa={d} role="report" />
                     </div>
                   ))}
-                  {extras > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <LineV h={24} />
-                      <div style={{
-                        width: 176, borderRadius: 20, border: `1.5px dashed ${C.purple}40`,
-                        background: C.light, display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center', gap: 4,
-                        padding: '20px 14px',
-                      }}>
-                        <span style={{ fontSize: 24, fontWeight: 900, color: C.purple, lineHeight: 1 }}>+{extras}</span>
-                        <span style={{ fontSize: 9, color: C.gray, marginTop: 2 }}>colaboradores</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
+              {/* Aviso se há mais diretos do que os exibidos */}
+              {totalDiretos > n && (
+                <p style={{ marginTop: 10, fontSize: 11, color: C.gray, textAlign: 'center' }}>
+                  + {totalDiretos - n} colaborador{totalDiretos - n > 1 ? 'es' : ''} não exibido{totalDiretos - n > 1 ? 's' : ''}
+                </p>
+              )}
             </>
           )}
 
-          {/* Não-gestor: equipe com mesmo gestor */}
+          {/* Não-gestor: colegas de equipe */}
           {!isMgr && irmaos.length > 0 && (
             <div style={{ marginTop: 32, width: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
                 <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${C.border})` }} />
-                <span style={{
-                  fontSize: 10, fontWeight: 700, color: C.gray, letterSpacing: '0.1em',
-                  textTransform: 'uppercase', whiteSpace: 'nowrap',
-                  padding: '5px 14px', background: '#f9fafb',
-                  border: `1px solid ${C.border}`, borderRadius: 99,
-                }}>
-                  Equipe com {gestorInfo?.nome.split(' ')[0] || 'o gestor'} · {irmaos.length + 1} pessoas
+                <span style={{ fontSize: 10, fontWeight: 700, color: C.gray, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', padding: '5px 14px', background: '#f9fafb', border: `1px solid ${C.border}`, borderRadius: 99 }}>
+                  Equipe de {gestorInfo?.nome.split(' ')[0] || 'o gestor'} · {irmaos.length + 1} pessoas
                 </span>
                 <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${C.border})` }} />
               </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: CARD_GAP, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {irmaos.map(s => <OrgCard key={s.nome} pessoa={s} role="peer" />)}
               </div>
             </div>
