@@ -144,22 +144,32 @@ export async function GET(request: Request) {
     // Período: meses específicos (múltiplos) OU janela deslizante
     let deslPeriodo: Colab[];
     let admPeriodo: Colab[];
+    let inicioRef: Date | null = null;
 
     if (filtroMeses.length > 0) {
       const mesesSet = new Set(filtroMeses);
       deslPeriodo = todosDesl.filter(c => mesesSet.has(c.data_desligamento!.substring(0, 7)));
       admPeriodo  = todos.filter(c => mesesSet.has(c.data_admissao.substring(0, 7)));
     } else {
-      const inicio = subMonths(hoje, meses);
+      inicioRef = subMonths(hoje, meses);
       deslPeriodo = todosDesl.filter(c => {
         const d = new Date(c.data_desligamento!);
-        return d >= inicio && d <= hoje;
+        return d >= inicioRef! && d <= hoje;
       });
       admPeriodo = todos.filter(c => {
         const d = new Date(c.data_admissao);
-        return d >= inicio && d <= hoje;
+        return d >= inicioRef! && d <= hoje;
       });
     }
+
+    // Headcount no início do período selecionado (responde ao 3m/6m/12m)
+    const ativosNoPeriodo = inicioRef
+      ? todos.filter(c => {
+          const adm  = new Date(c.data_admissao);
+          const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+          return adm <= inicioRef! && (desl === null || desl > inicioRef!);
+        })
+      : ativos;
 
     // ── KPIs ──────────────────────────────────────────────────────────────────
     const hMedia      = Math.max((ativos.length + deslPeriodo.length) / 2, 1);
@@ -417,7 +427,8 @@ export async function GET(request: Request) {
       // Indicadores existentes
       kpis: {
         headcountTotal: todos.length,
-        headcountAtivo: ativos.length,
+        headcountAtivo: ativosNoPeriodo.length,
+        headcountHoje:  ativos.length,
         desligamentosPeriodo: deslPeriodo.length,
         admissoesPeriodo: admPeriodo.length,
         turnoverRate: +turnoverRate.toFixed(1),

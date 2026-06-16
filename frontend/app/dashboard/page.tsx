@@ -6,6 +6,7 @@ import { NavHeader, MultiFilterSelect, PeriodButtons, SyncBadge, FilterTag } fro
 type KPIs = {
   headcountTotal: number;
   headcountAtivo: number;
+  headcountHoje:  number;
   desligamentosPeriodo: number;
   admissoesPeriodo: number;
   turnoverRate: number;
@@ -476,8 +477,29 @@ export default function DashboardRH() {
 
         {/* ── KPI Cards ── */}
         <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+
+          {/* Headcount — responde ao período selecionado */}
+          <div className="bg-white rounded-2xl shadow-sm p-4 border-t-4 flex flex-col" style={{ borderColor: C.purple }}>
+            <div className="text-xl mb-1">👥</div>
+            <div className="text-[10px] font-bold uppercase text-gray-400 mb-1 leading-tight">
+              Headcount ({periodoLabel})
+            </div>
+            {loading
+              ? <Skeleton className="h-9 w-16 mt-1" />
+              : <>
+                  <div className="text-3xl font-black mt-auto" style={{ color: C.purple }}>
+                    {kpis?.headcountAtivo ?? '—'}
+                  </div>
+                  {kpis && kpis.headcountHoje !== kpis.headcountAtivo && (
+                    <div className="text-[10px] text-gray-400 mt-1">
+                      hoje: {kpis.headcountHoje}
+                    </div>
+                  )}
+                </>
+            }
+          </div>
+
           {[
-            { label: 'Headcount Ativo',      value: kpis?.headcountAtivo,       color: C.purple, icon: '👥', suffix: '' },
             { label: `Desligamentos (${periodoLabel})`, value: kpis?.desligamentosPeriodo, color: C.pink,   icon: '📉', suffix: '' },
             { label: `Admissões (${periodoLabel})`,     value: kpis?.admissoesPeriodo,     color: C.green,  icon: '📈', suffix: '' },
             { label: 'Taxa de Turnover',      value: kpis?.turnoverRate,         color: C.amber,  icon: '🔄', suffix: '%' },
