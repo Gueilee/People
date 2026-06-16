@@ -475,10 +475,9 @@ export default function DashboardRH() {
         )}
 
         {/* ── KPI Cards ── */}
-        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {[
             { label: 'Headcount Ativo',      value: kpis?.headcountAtivo,       color: C.purple, icon: '👥', suffix: '' },
-            { label: 'Headcount Total',       value: kpis?.headcountTotal,       color: C.dark,   icon: '🏢', suffix: '' },
             { label: `Desligamentos (${periodoLabel})`, value: kpis?.desligamentosPeriodo, color: C.pink,   icon: '📉', suffix: '' },
             { label: `Admissões (${periodoLabel})`,     value: kpis?.admissoesPeriodo,     color: C.green,  icon: '📈', suffix: '' },
             { label: 'Taxa de Turnover',      value: kpis?.turnoverRate,         color: C.amber,  icon: '🔄', suffix: '%' },
