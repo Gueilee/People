@@ -65,9 +65,9 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
 }
 
-function BarH({ label, value, max, color, suffix = '', subLabel, labelWidth = 120 }: {
+function BarH({ label, value, max, color, suffix = '', subLabel, labelWidth = 120, valueLabel }: {
   label: string; value: number; max: number; color: string;
-  suffix?: string; subLabel?: string; labelWidth?: number;
+  suffix?: string; subLabel?: string; labelWidth?: number; valueLabel?: string;
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
@@ -81,7 +81,7 @@ function BarH({ label, value, max, color, suffix = '', subLabel, labelWidth = 12
              style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color }} />
       </div>
       <span className="text-xs font-bold shrink-0" style={{ color, width: 50 }}>
-        {value}{suffix}
+        {valueLabel ?? `${value}${suffix}`}
       </span>
     </div>
   );
@@ -364,9 +364,12 @@ export default function CarreiraPage() {
                 ? <Skeleton className="h-36 w-full" />
                 : (() => {
                     const items = (data?.promocoesPorArea ?? []).slice(0, 6);
+                    const totalP = items.reduce((s, i) => s + i.count, 0);
                     const maxV = Math.max(...items.map(i => i.count), 1);
                     return items.length
-                      ? items.map(i => <BarH key={i.area} label={i.area} value={i.count} max={maxV} color={C.purple} suffix=" prom." labelWidth={130} />)
+                      ? items.map(i => <BarH key={i.area} label={i.area} value={i.count} max={maxV} color={C.purple} labelWidth={130}
+                          valueLabel={totalP > 0 ? `${((i.count / totalP) * 100).toFixed(0)}%` : '0%'}
+                          subLabel={`${i.count} prom.`} />)
                       : <p className="text-xs text-gray-400 text-center pt-8">Nenhuma promoção no período</p>;
                   })()
               }
@@ -479,11 +482,14 @@ export default function CarreiraPage() {
               ? <Skeleton className="h-24 w-full" />
               : (() => {
                   const items = data?.promocoesPorUnidade ?? [];
+                  const totalP = items.reduce((s, i) => s + i.count, 0);
                   const maxV = Math.max(...items.map(i => i.count), 1);
                   return items.length
                     ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                        {items.map(i => <BarH key={i.unidade} label={i.unidade} value={i.count} max={maxV} color={C.teal} suffix=" prom." />)}
+                        {items.map(i => <BarH key={i.unidade} label={i.unidade} value={i.count} max={maxV} color={C.teal}
+                          valueLabel={totalP > 0 ? `${((i.count / totalP) * 100).toFixed(0)}%` : '0%'}
+                          subLabel={`${i.count} prom.`} />)}
                       </div>
                     )
                     : <p className="text-xs text-gray-400 text-center py-4">Nenhuma promoção no período</p>;
@@ -525,13 +531,14 @@ export default function CarreiraPage() {
                 ? <Skeleton className="h-36 w-full" />
                 : (() => {
                     const items = data?.reajustesPorArea ?? [];
+                    const totalR = items.reduce((s, i) => s + i.total, 0);
                     const maxV = Math.max(...items.map(i => i.total), 1);
                     return items.length
                       ? items.map(i => (
                           <BarH key={i.area} label={i.area} value={i.total} max={maxV}
-                            color={C.blue} suffix=" reaj."
-                            subLabel={`Coletivo ${i.coletivo} · Mérito ${i.merito} · Enquad. ${i.salarial}`}
-                            labelWidth={130} />
+                            color={C.blue} labelWidth={130}
+                            valueLabel={totalR > 0 ? `${((i.total / totalR) * 100).toFixed(0)}%` : '0%'}
+                            subLabel={`${i.total} reaj. · Col. ${i.coletivo} · Mér. ${i.merito} · Enq. ${i.salarial}`} />
                         ))
                       : <p className="text-xs text-gray-400 text-center pt-8">Nenhum reajuste no período</p>;
                   })()

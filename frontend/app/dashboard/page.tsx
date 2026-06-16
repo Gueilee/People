@@ -100,8 +100,8 @@ function taxaColor(taxa: number): string {
 
 // ─── Componentes de gráfico ────────────────────────────────────────────────────
 
-function BarHorizontal({ label, value, max, color, suffix = '%', subLabel, labelWidth = 100 }: {
-  label: string; value: number; max: number; color: string; suffix?: string; subLabel?: string; labelWidth?: number;
+function BarHorizontal({ label, value, max, color, suffix = '%', subLabel, labelWidth = 100, valueLabel }: {
+  label: string; value: number; max: number; color: string; suffix?: string; subLabel?: string; labelWidth?: number; valueLabel?: string;
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
@@ -119,7 +119,7 @@ function BarHorizontal({ label, value, max, color, suffix = '%', subLabel, label
         />
       </div>
       <span className="text-xs font-bold shrink-0" style={{ color, width: 42 }}>
-        {value}{suffix}
+        {valueLabel ?? `${value}${suffix}`}
       </span>
     </div>
   );
@@ -254,7 +254,9 @@ function DonutChart({ data, total }: { data: TipoDesl[]; total: number }) {
           <li key={d.tipo} className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tipoColor(d.tipo, i) }} />
             <span className="text-xs text-gray-600 leading-tight">{d.tipo}</span>
-            <span className="ml-auto text-xs font-bold" style={{ color: tipoColor(d.tipo, i) }}>{d.count}</span>
+            <span className="ml-auto text-xs font-bold" style={{ color: tipoColor(d.tipo, i) }}>
+              {total > 0 ? `${((d.count / total) * 100).toFixed(0)}%` : '0%'}
+            </span>
           </li>
         ))}
       </ul>
@@ -287,14 +289,16 @@ function GenderBar({ M, F }: { M: number; F: number }) {
   );
 }
 
-function PiramideRow({ faixa, M, F, maxVal }: { faixa: string; M: number; F: number; maxVal: number }) {
+function PiramideRow({ faixa, M, F, maxVal, totalVal }: { faixa: string; M: number; F: number; maxVal: number; totalVal: number }) {
   const pM = maxVal > 0 ? (M / maxVal) * 100 : 0;
   const pF = maxVal > 0 ? (F / maxVal) * 100 : 0;
+  const mPct = totalVal > 0 ? `${((M / totalVal) * 100).toFixed(0)}%` : '—';
+  const fPct = totalVal > 0 ? `${((F / totalVal) * 100).toFixed(0)}%` : '—';
   return (
     <div className="flex items-center gap-2 mb-2">
       {/* Lado masculino — barra cresce do centro para a esquerda */}
       <div className="flex-1 flex items-center justify-end gap-2">
-        <span className="text-xs font-bold tabular-nums shrink-0" style={{ color: C.purple, minWidth: 20, textAlign: 'right' }}>{M}</span>
+        <span className="text-xs font-bold tabular-nums shrink-0" style={{ color: C.purple, minWidth: 28, textAlign: 'right' }}>{mPct}</span>
         <div className="flex-1 flex justify-end">
           <div className="h-7 rounded-l-full"
                style={{ width: `${pM}%`, backgroundColor: C.purple, minWidth: M > 0 ? 4 : 0 }} />
@@ -308,7 +312,7 @@ function PiramideRow({ faixa, M, F, maxVal }: { faixa: string; M: number; F: num
           <div className="h-7 rounded-r-full"
                style={{ width: `${pF}%`, backgroundColor: C.pink, minWidth: F > 0 ? 4 : 0 }} />
         </div>
-        <span className="text-xs font-bold tabular-nums shrink-0" style={{ color: C.pink, minWidth: 20 }}>{F}</span>
+        <span className="text-xs font-bold tabular-nums shrink-0" style={{ color: C.pink, minWidth: 28 }}>{fPct}</span>
       </div>
     </div>
   );
@@ -554,6 +558,7 @@ export default function DashboardRH() {
             {loading
               ? <Skeleton className="h-48 w-full" />
               : (() => {
+                  const totalA = (data?.headcountPorUnidade ?? []).reduce((s, d) => s + d.ativos, 0);
                   const maxA = Math.max(...(data?.headcountPorUnidade.map(d => d.ativos) ?? [1]));
                   return data?.headcountPorUnidade.map(d => (
                     <BarHorizontal
@@ -562,8 +567,8 @@ export default function DashboardRH() {
                       value={d.ativos}
                       max={maxA}
                       color={C.purple}
-                      suffix=""
-                      subLabel={`${d.desligados} desligados (histórico)`}
+                      valueLabel={totalA > 0 ? `${((d.ativos / totalA) * 100).toFixed(0)}%` : '0%'}
+                      subLabel={`${d.ativos} ativos · ${d.desligados} desl.`}
                       labelWidth={150}
                     />
                   )) ?? null;
@@ -612,7 +617,7 @@ export default function DashboardRH() {
                         <th className="pb-2 font-bold">Gestor</th>
                         <th className="pb-2 font-bold">Depto / Unidade</th>
                         <th className="pb-2 font-bold text-right">Desl.</th>
-                        <th className="pb-2 font-bold text-right">Taxa</th>
+                        <th className="pb-2 font-bold text-right">Taxa %</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -626,8 +631,8 @@ export default function DashboardRH() {
                             {g.departamento}<br />
                             <span className="text-[10px]">{g.unidade}</span>
                           </td>
-                          <td className="py-2 text-right font-black" style={{ color: C.pink }}>{g.desligados}</td>
-                          <td className="py-2 text-right font-bold" style={{ color: taxaColor(g.taxa) }}>{g.taxa}%</td>
+                          <td className="py-2 text-right text-[10px] text-gray-400">{g.desligados}</td>
+                          <td className="py-2 text-right font-black" style={{ color: taxaColor(g.taxa) }}>{g.taxa}%</td>
                         </tr>
                       ))}
                     </tbody>
@@ -789,10 +794,13 @@ export default function DashboardRH() {
                 ? <Skeleton className="h-44 w-full" />
                 : (() => {
                     const faixas = data?.tenure.faixas ?? [];
+                    const totalF = faixas.reduce((s, f) => s + f.count, 0);
                     const maxF = Math.max(...faixas.map(f => f.count), 1);
                     return faixas.map(f => (
                       <BarHorizontal key={f.faixa} label={f.faixa} value={f.count} max={maxF}
-                        color={C.blue} suffix=" col." labelWidth={110} />
+                        color={C.blue} labelWidth={110}
+                        valueLabel={totalF > 0 ? `${((f.count / totalF) * 100).toFixed(0)}%` : '0%'}
+                        subLabel={`${f.count} col.`} />
                     ));
                   })()
               }
@@ -830,8 +838,9 @@ export default function DashboardRH() {
                             {mi.porUnidade.slice(0, 5).map(u => (
                               <BarHorizontal key={u.unidade} label={u.unidade} value={u.ate3m}
                                 max={Math.max(...mi.porUnidade.map(x => x.ate3m), 1)}
-                                color={C.pink} suffix=" col." subLabel={`de ${u.total} desligados`}
-                                labelWidth={155} />
+                                color={C.pink} labelWidth={155}
+                                valueLabel={u.total > 0 ? `${((u.ate3m / u.total) * 100).toFixed(0)}%` : '0%'}
+                                subLabel={`${u.ate3m} de ${u.total} desl.`} />
                             ))}
                           </div>
                         )}
@@ -874,10 +883,12 @@ export default function DashboardRH() {
                       { label: '8 a 15 diretos',  value: sb.de8a15,  color: C.amber,  desc: 'Amplo' },
                       { label: 'Acima de 15',     value: sb.acima15, color: C.pink,   desc: 'Sobrecarregado' },
                     ];
+                    const totalB = buckets.reduce((s, b) => s + b.value, 0);
                     const maxB = Math.max(...buckets.map(b => b.value), 1);
                     return buckets.map(b => (
                       <BarHorizontal key={b.label} label={b.label} value={b.value} max={maxB}
-                        color={b.color} suffix=" gestores" subLabel={b.desc} labelWidth={110} />
+                        color={b.color} subLabel={`${b.desc} · ${b.value} gest.`} labelWidth={110}
+                        valueLabel={totalB > 0 ? `${((b.value / totalB) * 100).toFixed(0)}%` : '0%'} />
                     ));
                   })()
               }
@@ -974,7 +985,8 @@ export default function DashboardRH() {
                       const maxE = Math.max(...dist.map(e => e.count), 1);
                       return dist.map(e => (
                         <BarHorizontal key={e.etnia} label={e.etnia} value={e.count} max={maxE}
-                          color={C.dark} suffix=" col." subLabel={`${e.pct}%`} labelWidth={80} />
+                          color={C.dark} labelWidth={80}
+                          valueLabel={`${e.pct}%`} subLabel={`${e.count} col.`} />
                       ));
                     })()
                 }
@@ -1011,6 +1023,7 @@ export default function DashboardRH() {
                 ? <Skeleton className="h-44 w-full" />
                 : (() => {
                     const faixas = data?.diversidade.idade.faixas ?? [];
+                    const totalV = data?.diversidade.idade.totalComInfo ?? 1;
                     const maxV = Math.max(...faixas.flatMap(f => [f.M, f.F]), 1);
                     return (
                       <div>
@@ -1019,7 +1032,7 @@ export default function DashboardRH() {
                           <span style={{ color: C.pink }}>Feminino ▶</span>
                         </div>
                         {[...faixas].reverse().map(f => (
-                          <PiramideRow key={f.faixa} faixa={f.faixa} M={f.M} F={f.F} maxVal={maxV} />
+                          <PiramideRow key={f.faixa} faixa={f.faixa} M={f.M} F={f.F} maxVal={maxV} totalVal={totalV} />
                         ))}
                       </div>
                     );
@@ -1043,8 +1056,8 @@ export default function DashboardRH() {
                         value={g.count}
                         max={maxG}
                         color={CORES[i % CORES.length]}
-                        suffix=" col."
-                        subLabel={`${totalCom > 0 ? ((g.count / totalCom) * 100).toFixed(0) : 0}% · ${g.geracao.match(/\(([^)]+)\)/)?.[1] ?? ''}`}
+                        valueLabel={totalCom > 0 ? `${((g.count / totalCom) * 100).toFixed(0)}%` : '0%'}
+                        subLabel={`${g.count} col. · ${g.geracao.match(/\(([^)]+)\)/)?.[1] ?? ''}`}
                         labelWidth={90}
                       />
                     ));
