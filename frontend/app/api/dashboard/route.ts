@@ -182,19 +182,35 @@ export async function GET(request: Request) {
     // ── Turnover por Unidade ─────────────────────────────────────────────────
     const unidades = [...new Set(todos.map(c => c.unidade))].filter(Boolean);
     const turnoverPorUnidade = unidades.map(u => {
-      const desl = deslPeriodo.filter(c => c.unidade === u).length;
-      const ativ = ativos.filter(c => c.unidade === u).length;
-      const taxa = (desl / Math.max((ativ + desl) / 2, 1)) * 100;
-      return { unidade: u, total: todos.filter(c => c.unidade === u).length, ativos: ativ, desligados: desl, taxa: +taxa.toFixed(1) };
+      const desl     = deslPeriodo.filter(c => c.unidade === u).length;
+      const ativHoje = ativos.filter(c => c.unidade === u).length;
+      const ativInicio = inicioRef
+        ? todos.filter(c => {
+            if (c.unidade !== u) return false;
+            const adm = new Date(c.data_admissao);
+            const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+            return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
+          }).length
+        : ativHoje;
+      const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
+      return { unidade: u, total: todos.filter(c => c.unidade === u).length, ativos: ativInicio, desligados: desl, taxa: +taxa.toFixed(1) };
     }).sort((a, b) => b.taxa - a.taxa);
 
     // ── Turnover por Área ────────────────────────────────────────────────────
     const departamentos = [...new Set(todos.map(c => c.departamento))].filter(Boolean);
     const turnoverPorArea = departamentos.map(dep => {
-      const desl = deslPeriodo.filter(c => c.departamento === dep).length;
-      const ativ = ativos.filter(c => c.departamento === dep).length;
-      const taxa = (desl / Math.max((ativ + desl) / 2, 1)) * 100;
-      return { departamento: dep, ativos: ativ, desligados: desl, taxa: +taxa.toFixed(1) };
+      const desl     = deslPeriodo.filter(c => c.departamento === dep).length;
+      const ativHoje = ativos.filter(c => c.departamento === dep).length;
+      const ativInicio = inicioRef
+        ? todos.filter(c => {
+            if (c.departamento !== dep) return false;
+            const adm = new Date(c.data_admissao);
+            const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+            return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
+          }).length
+        : ativHoje;
+      const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
+      return { departamento: dep, ativos: ativInicio, desligados: desl, taxa: +taxa.toFixed(1) };
     }).sort((a, b) => b.taxa - a.taxa);
 
     // ── Ranking Gestores ─────────────────────────────────────────────────────
@@ -202,11 +218,19 @@ export async function GET(request: Request) {
       todos.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
     )];
     const rankingGestores = gestoresList.map(g => {
-      const equipe = todos.filter(c => c.gestor === g);
-      const desl   = deslPeriodo.filter(c => c.gestor === g).length;
-      const ativ   = ativos.filter(c => c.gestor === g).length;
-      const taxa   = (desl / Math.max((ativ + desl) / 2, 1)) * 100;
-      return { gestor: g, totalEquipe: equipe.length, ativos: ativ, desligados: desl,
+      const equipe   = todos.filter(c => c.gestor === g);
+      const desl     = deslPeriodo.filter(c => c.gestor === g).length;
+      const ativHoje = ativos.filter(c => c.gestor === g).length;
+      const ativInicio = inicioRef
+        ? todos.filter(c => {
+            if (c.gestor !== g) return false;
+            const adm = new Date(c.data_admissao);
+            const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+            return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
+          }).length
+        : ativHoje;
+      const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
+      return { gestor: g, totalEquipe: equipe.length, ativos: ativInicio, desligados: desl,
                unidade: equipe[0]?.unidade || '', departamento: equipe[0]?.departamento || '',
                taxa: +taxa.toFixed(1) };
     }).filter(g => g.desligados > 0).sort((a, b) => b.desligados - a.desligados).slice(0, 20);
