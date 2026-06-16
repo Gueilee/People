@@ -238,6 +238,19 @@ export async function GET(request: Request) {
       desligados: todosDesl.filter(c => c.unidade === u).length,
     })).sort((a, b) => b.ativos - a.ativos);
 
+    // ── Tendência de Headcount (24 meses) ────────────────────────────────────
+    const tendenciaHeadcount = Array.from({ length: 24 }, (_, i) => {
+      const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (23 - i), 1);
+      const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (23 - i) + 1, 0);
+      const label = mi.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      const hc = todos.filter(c => {
+        const adm  = new Date(c.data_admissao);
+        const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+        return adm <= mf && (desl === null || desl >= mi);
+      }).length;
+      return { mes: label, headcount: hc };
+    });
+
     // ── Últimos Desligamentos ────────────────────────────────────────────────
     const ultimosDesligamentos = todosDesl
       .sort((a, b) => new Date(b.data_desligamento!).getTime() - new Date(a.data_desligamento!).getTime())
@@ -439,6 +452,7 @@ export async function GET(request: Request) {
       rankingGestores,
       tiposDesligamento,
       tendenciaMensal,
+      tendenciaHeadcount,
       headcountPorUnidade,
       ultimosDesligamentos,
 

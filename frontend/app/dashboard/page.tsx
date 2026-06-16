@@ -49,6 +49,7 @@ type DashData = {
   rankingGestores: Gestor[];
   tiposDesligamento: TipoDesl[];
   tendenciaMensal: Tendencia[];
+  tendenciaHeadcount: { mes: string; headcount: number }[];
   headcountPorUnidade: HcUnidade[];
   ultimosDesligamentos: UltDesl[];
   riscoTurnover: { alto: number; medio: number; baixo: number; top20: RiscoColab[] };
@@ -262,6 +263,86 @@ function DonutChart({ data, total }: { data: TipoDesl[]; total: number }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+// ─── Headcount Trend Chart ────────────────────────────────────────────────────
+function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }) {
+  const W = 560, H = 160, padL = 36, padR = 16, padT = 20, padB = 44;
+  if (!data.length) return null;
+
+  const n      = data.length;
+  const minVal = Math.max(0, Math.min(...data.map(d => d.headcount)) - 10);
+  const maxVal = Math.max(...data.map(d => d.headcount)) + 10;
+  const range  = Math.max(maxVal - minVal, 1);
+  const getX   = (i: number) => padL + (i / Math.max(n - 1, 1)) * (W - padL - padR);
+  const getY   = (v: number) => padT + (1 - (v - minVal) / range) * (H - padT - padB);
+
+  const pts: [number, number][] = data.map((d, i) => [getX(i), getY(d.headcount)]);
+
+  // Área de preenchimento
+  const areaPath = `M ${pts[0][0]},${H - padB} L ${pts.map(([x, y]) => `${x},${y}`).join(' L ')} L ${pts[pts.length - 1][0]},${H - padB} Z`;
+
+  // Linha suave
+  let linePath = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1];
+    const [x1, y1] = pts[i];
+    const cpx = (x0 + x1) / 2;
+    linePath += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
+  }
+
+  // Ticks de mês a cada 3 pontos
+  const ticks = data.filter((_, i) => i % 3 === 0 || i === n - 1);
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="hcGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#422c76" stopOpacity={0.25} />
+          <stop offset="100%" stopColor="#422c76" stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+
+      {/* Linha guia */}
+      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#E5E7EB" strokeWidth={1} />
+
+      {/* Área */}
+      <path d={areaPath} fill="url(#hcGrad)" />
+
+      {/* Linha */}
+      <path d={linePath} fill="none" stroke="#422c76" strokeWidth={2} strokeLinejoin="round" />
+
+      {/* Pontos + tooltip no hover */}
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={3} fill="#422c76" opacity={0.7} />
+      ))}
+
+      {/* Labels dos meses */}
+      {ticks.map(d => {
+        const i = data.indexOf(d);
+        const x = getX(i);
+        return (
+          <text key={i} x={x} y={H - padB + 14} textAnchor="middle" fontSize={7.5} fill="#9CA3AF">
+            {d.mes}
+          </text>
+        );
+      })}
+
+      {/* Valor no último ponto */}
+      {(() => {
+        const last = data[n - 1];
+        const [lx, ly] = pts[n - 1];
+        return (
+          <g>
+            <rect x={lx - 16} y={ly - 16} width={32} height={14} rx={4} fill="#422c76" />
+            <text x={lx} y={ly - 5} textAnchor="middle" fontSize={8} fontWeight="bold" fill="white">
+              {last.headcount}
+            </text>
+          </g>
+        );
+      })()}
+    </svg>
   );
 }
 
@@ -550,7 +631,33 @@ export default function DashboardRH() {
           </div>
         </section>
 
-        {/* ── Turnover por Unidade + Headcount ── */}
+        {/* ── Headcount Tendência (full width) ── */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>
+                Tendência de Headcount (24 meses)
+              </h2>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                Ativos por mês — responde a todos os filtros
+              </p>
+            </div>
+            {kpis && (
+              <div className="text-right shrink-0">
+                <div className="text-2xl font-black" style={{ color: C.purple }}>{kpis.headcountAtivo}</div>
+                <div className="text-[10px] text-gray-400">ativos ({periodoLabel})</div>
+              </div>
+            )}
+          </div>
+          {loading
+            ? <Skeleton className="h-40 w-full" />
+            : data?.tendenciaHeadcount.length
+              ? <HeadcountChart data={data.tendenciaHeadcount} />
+              : <p className="text-xs text-gray-400 text-center pt-8">Sem dados</p>
+          }
+        </section>
+
+        {/* ── Turnover por Unidade + Headcount por Unidade (só com filtro ativo) ── */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           <div className="bg-white rounded-2xl shadow-sm p-5">
@@ -574,28 +681,30 @@ export default function DashboardRH() {
             }
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Headcount por Unidade</h2>
-            {loading
-              ? <Skeleton className="h-48 w-full" />
-              : (() => {
-                  const totalA = (data?.headcountPorUnidade ?? []).reduce((s, d) => s + d.ativos, 0);
-                  const maxA = Math.max(...(data?.headcountPorUnidade.map(d => d.ativos) ?? [1]));
-                  return data?.headcountPorUnidade.map(d => (
-                    <BarHorizontal
-                      key={d.unidade}
-                      label={d.unidade}
-                      value={d.ativos}
-                      max={maxA}
-                      color={C.purple}
-                      valueLabel={totalA > 0 ? `${((d.ativos / totalA) * 100).toFixed(0)}%` : '0%'}
-                      subLabel={`${d.ativos} ativos · ${d.desligados} desl.`}
-                      labelWidth={150}
-                    />
-                  )) ?? null;
-                })()
-            }
-          </div>
+          {filtrosUnidade.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Headcount por Unidade</h2>
+              {loading
+                ? <Skeleton className="h-48 w-full" />
+                : (() => {
+                    const totalA = (data?.headcountPorUnidade ?? []).reduce((s, d) => s + d.ativos, 0);
+                    const maxA = Math.max(...(data?.headcountPorUnidade.map(d => d.ativos) ?? [1]));
+                    return data?.headcountPorUnidade.map(d => (
+                      <BarHorizontal
+                        key={d.unidade}
+                        label={d.unidade}
+                        value={d.ativos}
+                        max={maxA}
+                        color={C.purple}
+                        valueLabel={totalA > 0 ? `${((d.ativos / totalA) * 100).toFixed(0)}%` : '0%'}
+                        subLabel={`${d.ativos} ativos · ${d.desligados} desl.`}
+                        labelWidth={150}
+                      />
+                    )) ?? null;
+                  })()
+              }
+            </div>
+          )}
         </section>
 
         {/* ── Turnover por Área + Ranking Gestores ── */}
