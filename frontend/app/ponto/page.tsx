@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { NavHeader, MultiFilterSelect, FilterTag, SyncBadge } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, PeriodButtons, FilterTag, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -63,8 +63,9 @@ type Tendencia = {
 
 type PontoData = {
   filtroMeses: string[];
-  filtroFiliais: string[];
+  filtroUnidades: string[];
   mesesDisponiveis: string[];
+  opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[] };
   kpis: KPIs;
   porFilial: PorFilial[];
   topFaltas: TopFalta[];
@@ -395,17 +396,23 @@ function DistBancoBar({ dist }: { dist: DistBanco }) {
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function PontoPage() {
-  const [data,    setData]    = useState<PontoData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [erro,    setErro]    = useState('');
-  const [meses,   setMeses]   = useState<string[]>([]);
-  const [filiais, setFiliais] = useState<string[]>([]);
+  const [data,      setData]      = useState<PontoData | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [erro,      setErro]      = useState('');
+  const [periodo,   setPeriodo]   = useState(12);
+  const [filtrosMes, setFiltrosMes] = useState<string[]>([]);
+  const [unidades,  setUnidades]  = useState<string[]>([]);
+  const [areas,     setAreas]     = useState<string[]>([]);
+  const [gestores,  setGestores]  = useState<string[]>([]);
 
-  const carregar = useCallback((m: string[], f: string[]) => {
+  const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[]) => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (m.length) params.set('mes',    m.join(','));
-    if (f.length) params.set('filial', f.join(','));
+    if (mes.length)  params.set('mes',     mes.join(','));
+    else             params.set('meses',   String(per));
+    if (uni.length)  params.set('unidade', uni.join(','));
+    if (ar.length)   params.set('area',    ar.join(','));
+    if (gest.length) params.set('gestor',  gest.join(','));
     fetch(`/api/ponto?${params}`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(d => {
@@ -416,10 +423,9 @@ export default function PontoPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { carregar(meses, filiais); }, [meses, filiais, carregar]);
+  useEffect(() => { carregar(periodo, filtrosMes, unidades, areas, gestores); }, [periodo, filtrosMes, unidades, areas, gestores, carregar]);
 
-  const kpis      = data?.kpis;
-  const filiaisOpcoes = [...new Set((data?.porFilial ?? []).map(f => f.filial))];
+  const kpis = data?.kpis;
   const syncedAt  = kpis?.syncedAt
     ? new Date(kpis.syncedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
@@ -434,22 +440,37 @@ export default function PontoPage() {
 
       <NavHeader>
         <MultiFilterSelect
-          values={meses}
-          onChange={setMeses}
+          values={filtrosMes}
+          onChange={setFiltrosMes}
           label="Todos os meses"
           options={data?.mesesDisponiveis ?? []}
           color={C.amber}
           labelFn={fmtMes}
         />
+        <PeriodButtons value={periodo} onChange={setPeriodo} color={C.amber} />
         <MultiFilterSelect
-          values={filiais}
-          onChange={setFiliais}
-          label="Todas as filiais"
-          options={filiaisOpcoes}
+          values={unidades}
+          onChange={setUnidades}
+          label="Todas as unidades"
+          options={data?.opcoesFiltro.unidades ?? []}
           color={C.amber}
         />
-        {(meses.length > 0 || filiais.length > 0) && (
-          <FilterTag label="limpar filtros" onClear={() => { setMeses([]); setFiliais([]); }} />
+        <MultiFilterSelect
+          values={areas}
+          onChange={setAreas}
+          label="Todas as áreas"
+          options={data?.opcoesFiltro.areas ?? []}
+          color={C.amber}
+        />
+        <MultiFilterSelect
+          values={gestores}
+          onChange={setGestores}
+          label="Todos os gestores"
+          options={data?.opcoesFiltro.gestores ?? []}
+          color={C.amber}
+        />
+        {(filtrosMes.length > 0 || unidades.length > 0 || areas.length > 0 || gestores.length > 0) && (
+          <FilterTag label="limpar filtros" onClear={() => { setFiltrosMes([]); setUnidades([]); setAreas([]); setGestores([]); }} />
         )}
         {syncedAt && <SyncBadge label={`Sync: ${syncedAt}`} />}
       </NavHeader>
@@ -461,19 +482,19 @@ export default function PontoPage() {
         <div>
           <h1 className="text-2xl font-black" style={{ color: C.purple }}>
             Jornada & Ponto
-            {meses.length > 0 && (
+            {filtrosMes.length > 0 && (
               <span className="text-base font-bold text-gray-400 ml-3">
-                {meses.length === 1 ? fmtMes(meses[0]) : `${meses.length} meses selecionados`}
+                {filtrosMes.length === 1 ? fmtMes(filtrosMes[0]) : `${filtrosMes.length} meses selecionados`}
               </span>
             )}
-            {filiais.length > 0 && (
+            {unidades.length > 0 && (
               <span className="text-base font-bold ml-2" style={{ color: C.amber }}>
-                {' · '}{filiais.length === 1 ? filiais[0] : `${filiais.length} filiais`}
+                {' · '}{unidades.length === 1 ? unidades[0] : `${unidades.length} unidades`}
               </span>
             )}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            {meses.length === 0
+            {filtrosMes.length === 0
               ? 'Acumulado histórico (2025–2026) · Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'
               : 'Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'}
           </p>

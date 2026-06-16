@@ -4,36 +4,103 @@ import { getDb } from '@/lib/db';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  // Filtros com múltipla seleção
-  const filtroMeses   = (searchParams.get('mes')    || '').split(',').filter(Boolean);
-  const filtroFiliais = (searchParams.get('filial') || '').split(',').filter(Boolean);
+  const filtroMeses    = (searchParams.get('mes')     || '').split(',').filter(Boolean);
+  const filtroUnidades = (searchParams.get('unidade') || '').split(',').filter(Boolean);
+  const filtroAreas    = (searchParams.get('area')    || '').split(',').filter(Boolean);
+  const filtroGestores = (searchParams.get('gestor')  || '').split(',').filter(Boolean);
+  const filtroPeriodo  = parseInt(searchParams.get('meses') || '0', 10);
 
   try {
     const db = await getDb();
 
-    // Meses disponíveis (sempre o total histórico)
+    // ── Opções de filtro (sempre do total histórico) ──────────────────────────
     const mesesRows = await db.all<{ mes: string }>(
       `SELECT DISTINCT mes FROM ponto_mensal ORDER BY mes DESC`
     );
-    const mesesDisponiveis = mesesRows.map(r => r.mes);
+    const unidadesRows = await db.all<{ filial: string }>(
+      `SELECT DISTINCT filial FROM ponto_mensal WHERE filial IS NOT NULL AND filial != '' ORDER BY filial`
+    );
+    const areasRows = await db.all<{ area: string }>(
+      `SELECT DISTINCT c.area FROM colaboradores c
+       INNER JOIN ponto_mensal p ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
+       WHERE c.area IS NOT NULL AND c.area != '' ORDER BY c.area`
+    );
+    const gestoresRows = await db.all<{ gestor: string }>(
+      `SELECT DISTINCT c.gestor FROM colaboradores c
+       INNER JOIN ponto_mensal p ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
+       WHERE c.gestor IS NOT NULL AND c.gestor != '' ORDER BY c.gestor`
+    );
 
     // ── Construção do WHERE ──────────────────────────────────────────────────
     const whereParts: string[] = [];
-    const params: string[]     = [];
+    const params: (string | number)[] = [];
 
     if (filtroMeses.length > 0) {
       whereParts.push(`mes IN (${filtroMeses.map(() => '?').join(',')})`);
       params.push(...filtroMeses);
+    } else if (filtroPeriodo > 0) {
+      whereParts.push(`mes >= strftime('%Y-%m', date('now', '-' || CAST(? AS TEXT) || ' months'))`);
+      params.push(filtroPeriodo);
     }
-    if (filtroFiliais.length > 0) {
-      whereParts.push(`filial IN (${filtroFiliais.map(() => '?').join(',')})`);
-      params.push(...filtroFiliais);
+    if (filtroUnidades.length > 0) {
+      whereParts.push(`filial IN (${filtroUnidades.map(() => '?').join(',')})`);
+      params.push(...filtroUnidades);
+    }
+    if (filtroAreas.length > 0) {
+      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE area IN (${filtroAreas.map(() => '?').join(',')}))`);
+      params.push(...filtroAreas);
+    }
+    if (filtroGestores.length > 0) {
+      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map(() => '?').join(',')}))`);
+      params.push(...filtroGestores);
     }
 
     const where = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
 
+    // ── WHERE para tendência (sem filtro de mês, mantém série histórica) ─────
+    const whereTendParts: string[] = [];
+    const whereTendParams: (string | number)[] = [];
+    if (filtroUnidades.length > 0) {
+      whereTendParts.push(`filial IN (${filtroUnidades.map(() => '?').join(',')})`);
+      whereTendParams.push(...filtroUnidades);
+    }
+    if (filtroAreas.length > 0) {
+      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE area IN (${filtroAreas.map(() => '?').join(',')}))`);
+      whereTendParams.push(...filtroAreas);
+    }
+    if (filtroGestores.length > 0) {
+      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map(() => '?').join(',')}))`);
+      whereTendParams.push(...filtroGestores);
+    }
+    const whereTend = whereTendParts.length > 0 ? `WHERE ${whereTendParts.join(' AND ')}` : '';
+
+    // ── WHERE para absByGestor (JOIN com colaboradores) ───────────────────────
+    const whereJoinParts: string[] = [
+      `c.gestor IS NOT NULL`, `c.gestor != ''`, `c.status = 'Ativo'`
+    ];
+    const whereJoinParams: (string | number)[] = [];
+    if (filtroMeses.length > 0) {
+      whereJoinParts.push(`p.mes IN (${filtroMeses.map(() => '?').join(',')})`);
+      whereJoinParams.push(...filtroMeses);
+    } else if (filtroPeriodo > 0) {
+      whereJoinParts.push(`p.mes >= strftime('%Y-%m', date('now', '-' || CAST(? AS TEXT) || ' months'))`);
+      whereJoinParams.push(filtroPeriodo);
+    }
+    if (filtroUnidades.length > 0) {
+      whereJoinParts.push(`p.filial IN (${filtroUnidades.map(() => '?').join(',')})`);
+      whereJoinParams.push(...filtroUnidades);
+    }
+    if (filtroAreas.length > 0) {
+      whereJoinParts.push(`c.area IN (${filtroAreas.map(() => '?').join(',')})`);
+      whereJoinParams.push(...filtroAreas);
+    }
+    if (filtroGestores.length > 0) {
+      whereJoinParts.push(`c.gestor IN (${filtroGestores.map(() => '?').join(',')})`);
+      whereJoinParams.push(...filtroGestores);
+    }
+    const whereJoin = `WHERE ${whereJoinParts.join(' AND ')}`;
+
     // ── KPIs gerais ──────────────────────────────────────────────────────────
-    // bancoNegativo = funcionários com saldo ACUMULADO negativo
     const bancoNegRow = await db.get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM (
          SELECT nome, SUM(banco_horas) AS acum
@@ -98,7 +165,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top faltas (acumulado por colaborador) ───────────────────────────────
+    // ── Top faltas ───────────────────────────────────────────────────────────
     const topFaltas = await db.all<any>(
       `SELECT nome, cargo, filial, departamento,
         SUM(falta_injustificada)                        AS falta_injustificada,
@@ -111,7 +178,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top horas extras (acumulado por colaborador) ─────────────────────────
+    // ── Top horas extras ─────────────────────────────────────────────────────
     const topExtras = await db.all<any>(
       `SELECT nome, cargo, filial, departamento,
         SUM(extra_50)                                   AS extra_50,
@@ -125,7 +192,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top banco negativo (saldo ACUMULADO por colaborador) ─────────────────
+    // ── Top banco negativo ───────────────────────────────────────────────────
     const topBancoNeg = await db.all<any>(
       `SELECT nome, cargo, filial, SUM(banco_horas) AS banco_horas
        FROM ponto_mensal ${where}
@@ -135,7 +202,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top banco positivo (saldo ACUMULADO por colaborador) ─────────────────
+    // ── Top banco positivo ───────────────────────────────────────────────────
     const topBancoPos = await db.all<any>(
       `SELECT nome, cargo, filial, SUM(banco_horas) AS banco_horas
        FROM ponto_mensal ${where}
@@ -145,7 +212,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top atrasos (acumulado por colaborador) ──────────────────────────────
+    // ── Top atrasos ──────────────────────────────────────────────────────────
     const topAtrasos = await db.all<any>(
       `SELECT nome, cargo, filial, SUM(atraso) AS atraso
        FROM ponto_mensal ${where}
@@ -155,7 +222,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top noturno (acumulado por colaborador) ──────────────────────────────
+    // ── Top noturno ──────────────────────────────────────────────────────────
     const topNoturno = await db.all<any>(
       `SELECT nome, cargo, filial,
         SUM(adicional_noturno)     AS adicional_noturno,
@@ -167,7 +234,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Distribuição banco de horas (saldo ACUMULADO por colaborador) ─────────
+    // ── Distribuição banco de horas ──────────────────────────────────────────
     const distBanco = await db.get<any>(
       `SELECT
         COUNT(CASE WHEN acum < -40                        THEN 1 END) AS critico,
@@ -183,7 +250,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Absenteísmo por gestor (cruzamento Convenia) ─────────────────────────
+    // ── Absenteísmo por gestor ───────────────────────────────────────────────
     const absByGestor = await db.all<any>(
       `SELECT c.gestor,
         COUNT(DISTINCT p.nome)                              AS funcionarios,
@@ -191,11 +258,11 @@ export async function GET(request: Request) {
         ROUND(AVG(p.falta_injustificada + p.atestado), 2)  AS media_ausencia
        FROM ponto_mensal p
        LEFT JOIN colaboradores c ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
-       ${where ? where + ' AND' : 'WHERE'} c.gestor IS NOT NULL AND c.gestor != '' AND c.status = 'Ativo'
+       ${whereJoin}
        GROUP BY c.gestor
        HAVING total_ausencia > 0
        ORDER BY total_ausencia DESC LIMIT 12`,
-      params
+      whereJoinParams
     );
 
     // ── Absenteísmo por cargo ────────────────────────────────────────────────
@@ -212,7 +279,7 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Tendência histórica — sempre todos os meses, sem filtro de período ───
+    // ── Tendência histórica (sem filtro de mês) ──────────────────────────────
     const tendencia = await db.all<any>(
       `SELECT mes,
         COUNT(DISTINCT nome)                               AS funcionarios,
@@ -220,20 +287,22 @@ export async function GET(request: Request) {
         ROUND(SUM(falta_injustificada+atestado), 2)       AS ausencias,
         ROUND(SUM(atraso), 2)                             AS atrasos,
         ROUND(SUM(banco_horas), 2)                        AS saldo_banco
-       FROM ponto_mensal
-       ${filtroFiliais.length > 0
-         ? `WHERE filial IN (${filtroFiliais.map(() => '?').join(',')})`
-         : ''}
+       FROM ponto_mensal ${whereTend}
        GROUP BY mes ORDER BY mes ASC`,
-      filtroFiliais.length > 0 ? filtroFiliais : []
+      whereTendParams
     );
 
     await db.close();
 
     return NextResponse.json({
       filtroMeses,
-      filtroFiliais,
-      mesesDisponiveis,
+      filtroUnidades,
+      mesesDisponiveis: mesesRows.map(r => r.mes),
+      opcoesFiltro: {
+        unidades: unidadesRows.map(r => r.filial),
+        areas:    areasRows.map(r => r.area),
+        gestores: gestoresRows.map(r => r.gestor),
+      },
       kpis: {
         totalFuncionarios: kpiRow?.total_func       || 0,
         horasNormais:      +(kpiRow?.horas_normais  || 0).toFixed(1),

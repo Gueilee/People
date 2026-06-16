@@ -42,46 +42,91 @@ const LABEL_TIPO: Record<string, string> = {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const meses = parseInt(searchParams.get('meses') || '12', 10);
+    const meses          = parseInt(searchParams.get('meses') || '12', 10);
+    const filtroMesesArr = (searchParams.get('mes')     || '').split(',').filter(Boolean);
+    const filtroUnidades = (searchParams.get('unidade') || '').split(',').filter(Boolean);
+    const filtroAreas    = (searchParams.get('area')    || '').split(',').filter(Boolean);
+    const filtroGestores = (searchParams.get('gestor')  || '').split(',').filter(Boolean);
 
     const db  = await getDb();
     const all: Historico[] = await db.all('SELECT * FROM historico_cargo_salario ORDER BY nome, data_inicio');
+
+    // Gestores disponíveis (via colaboradores)
+    const gestoresRows = await db.all<{ gestor: string }>(
+      `SELECT DISTINCT c.gestor FROM colaboradores c
+       INNER JOIN historico_cargo_salario h ON UPPER(TRIM(c.nome)) = UPPER(TRIM(h.nome))
+       WHERE c.gestor IS NOT NULL AND c.gestor != ''
+       ORDER BY c.gestor`
+    );
+
+    // Nomes que correspondem ao filtro de gestor
+    let nomesGestor: Set<string> | null = null;
+    if (filtroGestores.length > 0) {
+      const rows = await db.all<{ nome: string }>(
+        `SELECT DISTINCT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map(() => '?').join(',')})`,
+        filtroGestores
+      );
+      nomesGestor = new Set(rows.map(r => r.nome.toUpperCase().trim()));
+    }
+
     await db.close();
 
     if (!all.length) {
       return NextResponse.json({ error: 'Tabela historico_cargo_salario vazia. Execute etl_historico.py.' }, { status: 404 });
     }
 
-    const hoje  = new Date();
+    // ── Opções de filtro (do total histórico) ─────────────────────────────────
+    const opcoesFiltro = {
+      unidades: [...new Set(all.filter(r => r.unidade).map(r => r.unidade))].sort(),
+      areas:    [...new Set(all.filter(r => r.area).map(r => r.area))].sort(),
+      gestores: gestoresRows.map(r => r.gestor),
+    };
+    const mesesDisponiveis = [...new Set(
+      all.filter(r => r.data_inicio).map(r => r.data_inicio!.substring(0, 7))
+    )].sort().reverse();
+
+    // ── Aplicar filtros ───────────────────────────────────────────────────────
+    let filtered = all;
+    if (filtroUnidades.length > 0) {
+      filtered = filtered.filter(r => filtroUnidades.includes(r.unidade));
+    }
+    if (filtroAreas.length > 0) {
+      filtered = filtered.filter(r => filtroAreas.includes(r.area));
+    }
+    if (nomesGestor) {
+      filtered = filtered.filter(r => nomesGestor!.has(r.nome.toUpperCase().trim()));
+    }
+    if (filtroMesesArr.length > 0) {
+      filtered = filtered.filter(r => r.data_inicio && filtroMesesArr.some(m => r.data_inicio!.startsWith(m)));
+    }
+
+    const hoje   = new Date();
     const inicio = subMonths(hoje, meses);
     const inicioStr = inicio.toISOString().split('T')[0];
 
     // ── Partição por tipo ─────────────────────────────────────────────────────
-    const promocoes    = all.filter(r => r.tipo_evento === 'promocao');
-    const reajustes    = all.filter(r => ['reajuste_merito','reajuste_coletivo','reajuste_salarial'].includes(r.tipo_evento));
-    const promPeriodo  = promocoes.filter(r => r.data_inicio && r.data_inicio >= inicioStr);
-    const reajPeriodo  = reajustes.filter(r => r.data_inicio && r.data_inicio >= inicioStr);
+    const promocoes   = filtered.filter(r => r.tipo_evento === 'promocao');
+    const reajustes   = filtered.filter(r => ['reajuste_merito','reajuste_coletivo','reajuste_salarial'].includes(r.tipo_evento));
+    // Só aplica filtro de período quando não há seleção específica de meses
+    const usarPeriodo = filtroMesesArr.length === 0;
+    const promPeriodo = usarPeriodo ? promocoes.filter(r => r.data_inicio && r.data_inicio >= inicioStr) : promocoes;
+    const reajPeriodo = usarPeriodo ? reajustes.filter(r => r.data_inicio && r.data_inicio >= inicioStr) : reajustes;
 
     // ── KPIs ─────────────────────────────────────────────────────────────────
-    // Tempo médio na função: duracao média de todos os registros com duracao_dias
-    const comDuracao = all.filter(r => r.duracao_dias != null && r.duracao_dias > 0);
+    const comDuracao = filtered.filter(r => r.duracao_dias != null && r.duracao_dias > 0);
     const tempoMedioNaFuncaoDias = comDuracao.length
       ? Math.round(comDuracao.reduce((s, r) => s + r.duracao_dias!, 0) / comDuracao.length)
       : 0;
 
-    // Tempo médio para promoção: para cada promoção, pegar duracao_dias do registro anterior do mesmo colaborador
     const byNome = new Map<string, Historico[]>();
-    all.forEach(r => {
-      const k = r.nome;
-      if (!byNome.has(k)) byNome.set(k, []);
-      byNome.get(k)!.push(r);
+    filtered.forEach(r => {
+      if (!byNome.has(r.nome)) byNome.set(r.nome, []);
+      byNome.get(r.nome)!.push(r);
     });
 
-    // Colaboradores com promoção
     const nomesComPromocao = new Set(promocoes.map(r => r.nome));
     const totalColabs = byNome.size;
 
-    // Tempo até primeira promoção (dias desde admissão até 1ª promoção)
     const diasAtePromocao: number[] = [];
     byNome.forEach((registros) => {
       const sorted = registros.sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
@@ -96,14 +141,13 @@ export async function GET(request: Request) {
       ? Math.round(diasAtePromocao.reduce((s, d) => s + d, 0) / diasAtePromocao.length)
       : 0;
 
-    // ── Promoções por área ────────────────────────────────────────────────────
+    // ── Promoções por área e unidade ─────────────────────────────────────────
     const promArea: Record<string, number> = {};
     promPeriodo.forEach(r => { promArea[r.area || 'Não informado'] = (promArea[r.area || 'Não informado'] || 0) + 1; });
     const promocoesPorArea = Object.entries(promArea)
       .map(([area, count]) => ({ area, count }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Promoções por unidade ─────────────────────────────────────────────────
     const promUnid: Record<string, number> = {};
     promPeriodo.forEach(r => { promUnid[r.unidade || 'Não informado'] = (promUnid[r.unidade || 'Não informado'] || 0) + 1; });
     const promocoesPorUnidade = Object.entries(promUnid)
@@ -129,10 +173,10 @@ export async function GET(request: Request) {
       }
       promCount[r.nome].count++;
       if ((r.data_inicio || '') > promCount[r.nome].ultima) {
-        promCount[r.nome].ultima = r.data_inicio || '';
-        promCount[r.nome].cargo  = r.cargo;
-        promCount[r.nome].area   = r.area;
-        promCount[r.nome].unidade= r.unidade;
+        promCount[r.nome].ultima   = r.data_inicio || '';
+        promCount[r.nome].cargo    = r.cargo;
+        promCount[r.nome].area     = r.area;
+        promCount[r.nome].unidade  = r.unidade;
       }
     });
     const topPromovidos = Object.entries(promCount)
@@ -140,12 +184,12 @@ export async function GET(request: Request) {
       .sort((a, b) => b.totalPromocoes - a.totalPromocoes)
       .slice(0, 15);
 
-    // ── Últimas promoções com cargo anterior ─────────────────────────────────
+    // ── Últimas promoções ─────────────────────────────────────────────────────
     const ultimasPromocoes: { nome: string; cargo_anterior: string; cargo_novo: string; area: string; unidade: string; data: string; motivo: string }[] = [];
     byNome.forEach((registros, nome) => {
       const sorted = registros.sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
       sorted.forEach((r, i) => {
-        if (r.tipo_evento === 'promocao' && r.data_inicio && r.data_inicio >= inicioStr) {
+        if (r.tipo_evento === 'promocao' && r.data_inicio && (usarPeriodo ? r.data_inicio >= inicioStr : true)) {
           const anterior = sorted.slice(0, i).reverse().find(x => x.cargo !== r.cargo);
           ultimasPromocoes.push({
             nome,
@@ -161,7 +205,7 @@ export async function GET(request: Request) {
     });
     ultimasPromocoes.sort((a, b) => b.data.localeCompare(a.data));
 
-    // ── Reajustes por tipo ────────────────────────────────────────────────────
+    // ── Reajustes ─────────────────────────────────────────────────────────────
     const reajTipo: Record<string, number> = {};
     reajPeriodo.forEach(r => { reajTipo[r.tipo_evento] = (reajTipo[r.tipo_evento] || 0) + 1; });
     const totalReaj = reajPeriodo.length;
@@ -174,7 +218,6 @@ export async function GET(request: Request) {
       }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Reajustes por área ────────────────────────────────────────────────────
     const reajAreaMap: Record<string, { coletivo: number; merito: number; salarial: number }> = {};
     reajPeriodo.forEach(r => {
       const area = r.area || 'Não informado';
@@ -189,18 +232,18 @@ export async function GET(request: Request) {
 
     // ── Distribuição tempo na função ──────────────────────────────────────────
     const faixasTempo = [
-      { faixa: 'Até 3 meses',   min: 0,    max: 90   },
-      { faixa: '3 a 6 meses',   min: 91,   max: 180  },
-      { faixa: '6 a 12 meses',  min: 181,  max: 365  },
-      { faixa: '1 a 2 anos',    min: 366,  max: 730  },
-      { faixa: '2 a 4 anos',    min: 731,  max: 1460 },
-      { faixa: 'Mais de 4 anos',min: 1461, max: 99999},
+      { faixa: 'Até 3 meses',    min: 0,    max: 90    },
+      { faixa: '3 a 6 meses',    min: 91,   max: 180   },
+      { faixa: '6 a 12 meses',   min: 181,  max: 365   },
+      { faixa: '1 a 2 anos',     min: 366,  max: 730   },
+      { faixa: '2 a 4 anos',     min: 731,  max: 1460  },
+      { faixa: 'Mais de 4 anos', min: 1461, max: 99999 },
     ].map(f => ({
       faixa: f.faixa,
       count: comDuracao.filter(r => r.duracao_dias! >= f.min && r.duracao_dias! <= f.max).length,
     }));
 
-    // ── Top colaboradores com mais reajustes de mérito ─────────────────────
+    // ── Top mérito ────────────────────────────────────────────────────────────
     const meritoCt: Record<string, { count: number; area: string; unidade: string }> = {};
     reajustes.filter(r => r.tipo_evento === 'reajuste_merito').forEach(r => {
       if (!meritoCt[r.nome]) meritoCt[r.nome] = { count: 0, area: r.area, unidade: r.unidade };
@@ -211,35 +254,36 @@ export async function GET(request: Request) {
       .sort((a, b) => b.totalReajustes - a.totalReajustes)
       .slice(0, 10);
 
-    // ── Histórico individual (busca por nome) ─────────────────────────────────
+    // ── Histórico individual ──────────────────────────────────────────────────
     const nomeBusca = searchParams.get('nome');
     let historicoColaborador: Historico[] = [];
     if (nomeBusca) {
       const q = nomeBusca.toUpperCase();
-      historicoColaborador = all.filter(r => r.nome.includes(q)).sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
+      historicoColaborador = filtered.filter(r => r.nome.includes(q)).sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
     }
 
-    // ── Response ──────────────────────────────────────────────────────────────
     return NextResponse.json({
       periodo: meses,
       atualizadoEm: hoje.toISOString(),
+      opcoesFiltro,
+      mesesDisponiveis,
       kpis: {
-        totalPromocoes:            promPeriodo.length,
-        totalReajustes:            reajPeriodo.length,
+        totalPromocoes:           promPeriodo.length,
+        totalReajustes:           reajPeriodo.length,
         tempoMedioPromocaoDias,
         tempoMedioNaFuncaoDias,
-        colaboradoresComPromocao:  nomesComPromocao.size,
-        taxaPromocao:              totalColabs ? +((nomesComPromocao.size / totalColabs) * 100).toFixed(1) : 0,
-        totalColaboradores:        totalColabs,
+        colaboradoresComPromocao: nomesComPromocao.size,
+        taxaPromocao:             totalColabs ? +((nomesComPromocao.size / totalColabs) * 100).toFixed(1) : 0,
+        totalColaboradores:       totalColabs,
       },
       promocoesPorArea,
       promocoesPorUnidade,
       tendenciaPromocoes,
       topPromovidos,
-      ultimasPromocoes:            ultimasPromocoes.slice(0, 20),
+      ultimasPromocoes:           ultimasPromocoes.slice(0, 20),
       reajustesPorTipo,
       reajustesPorArea,
-      tempoNaFuncaoFaixas:         faixasTempo,
+      tempoNaFuncaoFaixas:        faixasTempo,
       topMerito,
       historicoColaborador,
     });

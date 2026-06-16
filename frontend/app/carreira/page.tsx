@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { NavHeader, PeriodButtons, SyncBadge } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, PeriodButtons, FilterTag, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -26,6 +26,8 @@ type TopMerito    = { nome: string; totalReajustes: number; area: string; unidad
 type CarreiraData = {
   periodo: number;
   atualizadoEm: string;
+  opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[] };
+  mesesDisponiveis: string[];
   kpis: KPIs;
   promocoesPorArea: PromArea[];
   promocoesPorUnidade: PromUnidade[];
@@ -220,21 +222,30 @@ function setaPromo(anterior: string, novo: string) {
 
 // ─── Página ──────────────────────────────────────────────────────────────────
 export default function CarreiraPage() {
-  const [data, setData] = useState<CarreiraData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState('');
-  const [periodo, setPeriodo] = useState(12);
+  const [data,       setData]       = useState<CarreiraData | null>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [erro,       setErro]       = useState('');
+  const [periodo,    setPeriodo]    = useState(12);
+  const [filtrosMes, setFiltrosMes] = useState<string[]>([]);
+  const [unidades,   setUnidades]   = useState<string[]>([]);
+  const [areas,      setAreas]      = useState<string[]>([]);
+  const [gestores,   setGestores]   = useState<string[]>([]);
 
-  const carregar = useCallback((meses: number) => {
+  const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[]) => {
     setLoading(true);
-    fetch(`/api/carreira?meses=${meses}`)
+    const params = new URLSearchParams({ meses: String(per) });
+    if (mes.length)  params.set('mes',     mes.join(','));
+    if (uni.length)  params.set('unidade', uni.join(','));
+    if (ar.length)   params.set('area',    ar.join(','));
+    if (gest.length) params.set('gestor',  gest.join(','));
+    fetch(`/api/carreira?${params}`)
       .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then(d => { setData(d); setErro(''); })
       .catch(e => setErro(e.message))
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { carregar(periodo); }, [periodo, carregar]);
+  useEffect(() => { carregar(periodo, filtrosMes, unidades, areas, gestores); }, [periodo, filtrosMes, unidades, areas, gestores, carregar]);
 
   const kpis = data?.kpis;
   const atualizado = data?.atualizadoEm
@@ -245,7 +256,38 @@ export default function CarreiraPage() {
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
       <NavHeader>
-        <PeriodButtons value={periodo} onChange={setPeriodo} options={[6, 12, 24]} color={C.teal} />
+        <MultiFilterSelect
+          values={filtrosMes}
+          onChange={setFiltrosMes}
+          label="Todos os meses"
+          options={data?.mesesDisponiveis ?? []}
+          color={C.teal}
+        />
+        <PeriodButtons value={periodo} onChange={setPeriodo} color={C.teal} />
+        <MultiFilterSelect
+          values={unidades}
+          onChange={setUnidades}
+          label="Todas as unidades"
+          options={data?.opcoesFiltro.unidades ?? []}
+          color={C.teal}
+        />
+        <MultiFilterSelect
+          values={areas}
+          onChange={setAreas}
+          label="Todas as áreas"
+          options={data?.opcoesFiltro.areas ?? []}
+          color={C.teal}
+        />
+        <MultiFilterSelect
+          values={gestores}
+          onChange={setGestores}
+          label="Todos os gestores"
+          options={data?.opcoesFiltro.gestores ?? []}
+          color={C.teal}
+        />
+        {(filtrosMes.length > 0 || unidades.length > 0 || areas.length > 0 || gestores.length > 0) && (
+          <FilterTag label="limpar filtros" onClear={() => { setFiltrosMes([]); setUnidades([]); setAreas([]); setGestores([]); }} />
+        )}
         {atualizado && <SyncBadge label={`Atualizado: ${atualizado}`} />}
       </NavHeader>
 
