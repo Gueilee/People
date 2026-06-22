@@ -578,50 +578,6 @@ export default function CarreiraPage() {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/*  TEMPO NA FUNÇÃO                                           */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section className="space-y-4">
-          <h2 className="font-black text-base uppercase tracking-wide border-l-4 pl-3"
-              style={{ color: C.amber, borderColor: C.amber }}>
-            Permanência por Função
-          </h2>
-
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="font-black text-sm uppercase" style={{ color: C.dark }}>
-                Distribuição de Tempo por Período de Função
-              </h3>
-              <span className="text-xs text-gray-500 shrink-0 ml-4">
-                Tempo médio: <strong style={{ color: C.amber }}>
-                  {kpis ? fmtDias(kpis.tempoMedioNaFuncaoDias) : '—'}
-                </strong> por período
-              </span>
-            </div>
-            {/* Explicação do indicador */}
-            <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded-lg" style={{ backgroundColor: '#FEF9EE', border: '1px solid #FDE68A' }}>
-              <span className="text-sm shrink-0 mt-0.5">💡</span>
-              <p className="text-xs text-amber-800 leading-relaxed">
-                Cada <strong>período</strong> representa um trecho contínuo em que um colaborador permaneceu no mesmo cargo antes de ser promovido ou ter o cargo alterado.
-                Por exemplo, <strong>&quot;Até 3 meses — 329 períodos&quot;</strong> significa que houve 329 passagens por um cargo com duração inferior a 3 meses no histórico analisado.
-                Um mesmo colaborador pode ter gerado mais de um período ao longo da carreira.
-              </p>
-            </div>
-            {loading
-              ? <Skeleton className="h-40 w-full" />
-              : (() => {
-                  const faixas = data?.tempoNaFuncaoFaixas ?? [];
-                  const maxV = Math.max(...faixas.map(f => f.count), 1);
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                      {faixas.map(f => <BarH key={f.faixa} label={f.faixa} value={f.count} max={maxV} color={C.amber} suffix=" períodos" labelWidth={110} />)}
-                    </div>
-                  );
-                })()
-            }
-          </div>
-        </section>
-
         {/* Footer */}
         <footer className="text-center text-[10px] text-gray-400 pb-6">
           VENDEMMIA PEOPLE — Carreira & Desenvolvimento · Dados: Histórico Convenia · {new Date().getFullYear()}
