@@ -719,7 +719,7 @@ export default function PontoPage() {
             </div>
           </Card>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
 
             <Card>
               <SectionTitle icon="🏦">Distribuição Banco de Horas</SectionTitle>
@@ -753,49 +753,6 @@ export default function PontoPage() {
               </div>
             </Card>
 
-            <Card>
-              <SectionTitle icon="🕐">Top Atrasos</SectionTitle>
-              {data.topAtrasos.length === 0
-                ? <p className="text-xs text-gray-400">Nenhum atraso no período.</p>
-                : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-400 border-b">
-                          <th className="text-left pb-2 font-semibold">Colaborador</th>
-                          <th className="text-right pb-2 font-semibold w-20">Atraso</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.topAtrasos.map((r, i) => (
-                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                            <td className="py-1.5 leading-tight">
-                              <div className="font-semibold text-gray-800">{r.nome}</div>
-                              <div className="text-gray-400">{r.cargo} · {r.filial}</div>
-                            </td>
-                            <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.orange }}>{fmtH(r.atraso)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-              {/* Atrasos por Filial */}
-              {data.porFilial.some(f => f.atrasos > 0) && (
-                <div className="mt-5">
-                  <SectionTitle icon="📊">Atrasos por Filial</SectionTitle>
-                  {data.porFilial
-                    .filter(f => f.atrasos > 0)
-                    .sort((a, b) => b.atrasos - a.atrasos)
-                    .map((f, i) => (
-                      <BarH key={f.filial} label={f.filial} value={f.atrasos}
-                            max={Math.max(...data.porFilial.map(x => x.atrasos), 1)}
-                            color={PALETTE[i % PALETTE.length]} />
-                    ))}
-                </div>
-              )}
-            </Card>
           </div>
           </>
         )}
