@@ -28,6 +28,21 @@ export class Database {
     return rows[0];
   }
 
+  async run(sql: string, params: Params = []): Promise<void> {
+    this._db.run(sql, params as (string | number | null)[]);
+  }
+
+  async lastId(): Promise<number> {
+    const row = await this.get<{ id: number }>('SELECT last_insert_rowid() as id');
+    return row?.id ?? 0;
+  }
+
+  save(): void {
+    const dbPath = path.resolve(process.cwd(), 'database/vendemmia_people.db');
+    const data = this._db.export();
+    fs.writeFileSync(dbPath, Buffer.from(data));
+  }
+
   async close(): Promise<void> {
     this._db.close();
   }

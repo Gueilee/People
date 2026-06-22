@@ -4,9 +4,10 @@ import { usePathname } from 'next/navigation';
 import React, { useState, useEffect, useRef } from 'react';
 
 const NAV = [
-  { href: '/dashboard',   label: 'People Analytics',     color: '#422c76' },
-  { href: '/ponto',       label: 'Jornada & Ponto',      color: '#F59E0B' },
-  { href: '/carreira',    label: 'Carreira',             color: '#0D9488' },
+  { href: '/dashboard',     label: 'People Analytics',     color: '#422c76' },
+  { href: '/ponto',         label: 'Jornada & Ponto',      color: '#F59E0B' },
+  { href: '/carreira',      label: 'Carreira',             color: '#0D9488' },
+  { href: '/recrutamento',  label: 'Recrutamento',         color: '#ff2f69' },
 ];
 
 // ─── Seleção única (usado em /ponto e outros) ────────────────────────────────
