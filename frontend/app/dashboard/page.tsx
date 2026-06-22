@@ -26,6 +26,7 @@ type TenureTipo  = { tipo: string; mediaDias: number; count: number };
 type MortUnid    = { unidade: string; ate3m: number; total: number };
 type CargoCt     = { cargo: string; count: number };
 type SpanBkts    = { ate3: number; de4a7: number; de8a15: number; acima15: number };
+type SpanDetalhe = { gestor: string; cargo: string; departamento: string; unidade: string; diretos: number; faixa: string };
 type GenUnid     = { unidade: string; M: number; F: number };
 type EtniaItem   = { etnia: string; count: number; pct: number };
 type IdadeFaixa  = { faixa: string; M: number; F: number; total: number };
@@ -58,7 +59,7 @@ type DashData = {
     ate3m: number; de3a6m: number; ate6m: number; total: number;
     pctAte3m: number; pctAte6m: number; porUnidade: MortUnid[];
   };
-  estrutura: { totalGestores: number; spanMedio: number; spanBuckets: SpanBkts; headcountPorCargo: CargoCt[] };
+  estrutura: { totalGestores: number; spanMedio: number; spanBuckets: SpanBkts; spanDetalhes: SpanDetalhe[]; headcountPorCargo: CargoCt[] };
   diversidade: {
     genero: {
       geral: { M: number; F: number; ND: number; total: number };
@@ -107,12 +108,13 @@ function taxaColor(taxa: number): string {
 
 // ─── Componentes de gráfico ────────────────────────────────────────────────────
 
-function BarHorizontal({ label, value, max, color, suffix = '%', subLabel, labelWidth = 100, valueLabel }: {
-  label: string; value: number; max: number; color: string; suffix?: string; subLabel?: string; labelWidth?: number; valueLabel?: string;
+function BarHorizontal({ label, value, max, color, suffix = '%', subLabel, labelWidth = 100, valueLabel, onClick }: {
+  label: string; value: number; max: number; color: string; suffix?: string; subLabel?: string; labelWidth?: number; valueLabel?: string; onClick?: () => void;
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex items-center gap-3 mb-3">
+    <div className="flex items-center gap-3 mb-3"
+         onClick={onClick} style={onClick ? { cursor: 'pointer' } : undefined}>
       <div className="text-right shrink-0 overflow-hidden" style={{ width: labelWidth }}>
         <span className="text-xs font-semibold text-gray-700 leading-tight"
               style={{ whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}
@@ -430,6 +432,7 @@ export default function DashboardRH() {
   const [filtrosArea,    setFiltrosArea]    = useState<string[]>([]);
   const [filtrosGestor,  setFiltrosGestor]  = useState<string[]>([]);
   const [tipoCargoTab,   setTipoCargoTab]   = useState<'todos' | 'lideranca' | 'operacional' | 'administrativo'>('todos');
+  const [spanFaixa,      setSpanFaixa]      = useState<string | null>(null);
 
   // Alertas
   const [alertaOpen,      setAlertaOpen]      = useState(false);
@@ -974,18 +977,122 @@ export default function DashboardRH() {
                     const sb = data?.estrutura.spanBuckets;
                     if (!sb) return null;
                     const buckets = [
-                      { label: 'Até 3 diretos',   value: sb.ate3,    color: C.blue,   desc: 'Subutilizado' },
-                      { label: '4 a 7 diretos',   value: sb.de4a7,   color: C.green,  desc: 'Ideal' },
-                      { label: '8 a 15 diretos',  value: sb.de8a15,  color: C.amber,  desc: 'Amplo' },
-                      { label: 'Acima de 15',     value: sb.acima15, color: C.pink,   desc: 'Sobrecarregado' },
+                      { key: 'ate3',    label: 'Até 3 diretos',  value: sb.ate3,    color: C.blue,   desc: 'Subutilizado' },
+                      { key: 'de4a7',   label: '4 a 7 diretos',  value: sb.de4a7,   color: C.green,  desc: 'Ideal' },
+                      { key: 'de8a15',  label: '8 a 15 diretos', value: sb.de8a15,  color: C.amber,  desc: 'Amplo' },
+                      { key: 'acima15', label: 'Acima de 15',    value: sb.acima15, color: C.pink,   desc: 'Sobrecarregado' },
                     ];
                     const totalB = buckets.reduce((s, b) => s + b.value, 0);
-                    const maxB = Math.max(...buckets.map(b => b.value), 1);
-                    return buckets.map(b => (
-                      <BarHorizontal key={b.label} label={b.label} value={b.value} max={maxB}
-                        color={b.color} subLabel={`${b.desc} · ${b.value} gest.`} labelWidth={110}
-                        valueLabel={totalB > 0 ? `${((b.value / totalB) * 100).toFixed(0)}%` : '0%'} />
-                    ));
+                    const maxB   = Math.max(...buckets.map(b => b.value), 1);
+
+                    const listaAtiva = spanFaixa
+                      ? (data?.estrutura.spanDetalhes ?? []).filter(d => d.faixa === spanFaixa)
+                      : [];
+                    const bucketAtivo = buckets.find(b => b.key === spanFaixa);
+
+                    function exportarCSV() {
+                      if (!listaAtiva.length) return;
+                      const bom  = '﻿';
+                      const cols = ['Gestor','Cargo','Área','Unidade','Nº Diretos'];
+                      const rows = listaAtiva.map(d =>
+                        [d.gestor, d.cargo, d.departamento, d.unidade, String(d.diretos)]
+                          .map(v => `"${v.replace(/"/g,'""')}"`).join(';')
+                      );
+                      const csv = [cols.join(';'), ...rows].join('\r\n');
+                      const a   = document.createElement('a');
+                      a.href    = URL.createObjectURL(new Blob([bom + csv], { type: 'text/csv;charset=utf-8' }));
+                      a.download = `span_${spanFaixa}.csv`;
+                      a.click();
+                    }
+
+                    function exportarPDF() {
+                      if (!listaAtiva.length || !bucketAtivo) return;
+                      const titulo = `Span of Control — ${bucketAtivo.label} (${bucketAtivo.desc})`;
+                      const linhas = listaAtiva.map(d => `
+                        <tr>
+                          <td>${d.gestor}</td><td>${d.cargo}</td>
+                          <td>${d.departamento}</td><td>${d.unidade}</td>
+                          <td style="text-align:center;font-weight:bold">${d.diretos}</td>
+                        </tr>`).join('');
+                      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title>
+                        <style>
+                          body{font-family:Arial,sans-serif;font-size:12px;margin:24px;color:#222}
+                          h2{color:#422c76;margin-bottom:4px}p{color:#888;margin-bottom:16px;font-size:11px}
+                          table{width:100%;border-collapse:collapse}
+                          th{background:#422c76;color:#fff;padding:8px;text-align:left;font-size:11px}
+                          td{padding:6px 8px;border-bottom:1px solid #eee;font-size:12px}
+                          tr:nth-child(even){background:#f9f9f9}
+                        </style></head><body>
+                        <h2>${titulo}</h2>
+                        <p>${listaAtiva.length} gestores · gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
+                        <table><thead><tr><th>Gestor</th><th>Cargo</th><th>Área</th><th>Unidade</th><th>Diretos</th></tr></thead>
+                        <tbody>${linhas}</tbody></table>
+                        <script>window.onload=()=>window.print()<\/script>
+                        </body></html>`;
+                      const w = window.open('','_blank');
+                      if (w) { w.document.write(html); w.document.close(); }
+                    }
+
+                    return (
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-2">Clique em uma faixa para ver os gestores</p>
+                        {buckets.map(b => (
+                          <BarHorizontal key={b.label} label={b.label} value={b.value} max={maxB}
+                            color={b.color} subLabel={`${b.desc} · ${b.value} gest.`} labelWidth={110}
+                            valueLabel={totalB > 0 ? `${((b.value / totalB) * 100).toFixed(0)}%` : '0%'}
+                            onClick={() => setSpanFaixa(prev => prev === b.key ? null : b.key)} />
+                        ))}
+
+                        {spanFaixa && bucketAtivo && listaAtiva.length > 0 && (
+                          <div className="mt-4 border rounded-xl overflow-hidden" style={{ borderColor: `${bucketAtivo.color}40` }}>
+                            <div className="flex items-center justify-between px-3 py-2"
+                                 style={{ backgroundColor: `${bucketAtivo.color}15` }}>
+                              <span className="text-xs font-black" style={{ color: bucketAtivo.color }}>
+                                {bucketAtivo.label} — {bucketAtivo.desc} ({listaAtiva.length} gestores)
+                              </span>
+                              <div className="flex gap-2">
+                                <button onClick={exportarCSV}
+                                  className="px-2 py-1 rounded text-[10px] font-bold text-white"
+                                  style={{ backgroundColor: C.green }}>
+                                  Excel
+                                </button>
+                                <button onClick={exportarPDF}
+                                  className="px-2 py-1 rounded text-[10px] font-bold text-white"
+                                  style={{ backgroundColor: C.purple }}>
+                                  PDF
+                                </button>
+                                <button onClick={() => setSpanFaixa(null)}
+                                  className="px-2 py-1 rounded text-[10px] font-bold text-gray-500 bg-gray-100">
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-[10px] uppercase text-gray-400 border-b text-left">
+                                  <th className="px-3 py-2 font-bold">Gestor</th>
+                                  <th className="px-3 py-2 font-bold">Cargo</th>
+                                  <th className="px-3 py-2 font-bold">Área</th>
+                                  <th className="px-3 py-2 font-bold">Unidade</th>
+                                  <th className="px-3 py-2 font-bold text-right">Diretos</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {listaAtiva.map((d, i) => (
+                                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                                    <td className="px-3 py-1.5 font-semibold">{d.gestor}</td>
+                                    <td className="px-3 py-1.5 text-gray-500 max-w-[120px] truncate">{d.cargo || '—'}</td>
+                                    <td className="px-3 py-1.5 text-gray-500">{d.departamento}</td>
+                                    <td className="px-3 py-1.5 text-gray-500">{d.unidade}</td>
+                                    <td className="px-3 py-1.5 text-right font-black" style={{ color: bucketAtivo.color }}>{d.diretos}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
                   })()
               }
             </div>

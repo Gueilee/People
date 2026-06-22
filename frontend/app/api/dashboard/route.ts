@@ -370,11 +370,18 @@ export async function GET(request: Request) {
     const spanDistrib = gestoresAtivos.map(g => ativos.filter(c => c.gestor === g).length);
     const spanMedio   = spanDistrib.length ? spanDistrib.reduce((s, n) => s + n, 0) / spanDistrib.length : 0;
     const spanBuckets = {
-      'ate3':  spanDistrib.filter(n => n <= 3).length,
-      'de4a7': spanDistrib.filter(n => n >= 4 && n <= 7).length,
-      'de8a15':spanDistrib.filter(n => n >= 8 && n <= 15).length,
+      'ate3':   spanDistrib.filter(n => n <= 3).length,
+      'de4a7':  spanDistrib.filter(n => n >= 4 && n <= 7).length,
+      'de8a15': spanDistrib.filter(n => n >= 8 && n <= 15).length,
       'acima15':spanDistrib.filter(n => n > 15).length,
     };
+
+    const spanDetalhes = gestoresAtivos.map(g => {
+      const diretos = ativos.filter(c => c.gestor === g).length;
+      const gest    = ativos.find(c => c.nome === g);
+      const faixa   = diretos <= 3 ? 'ate3' : diretos <= 7 ? 'de4a7' : diretos <= 15 ? 'de8a15' : 'acima15';
+      return { gestor: g, cargo: gest?.cargo || '', departamento: gest?.departamento || '', unidade: gest?.unidade || '', diretos, faixa };
+    }).sort((a, b) => b.diretos - a.diretos);
 
     // ── Gênero ───────────────────────────────────────────────────────────────
     const genM = ativos.filter(c => c.gender === 'M').length;
@@ -527,6 +534,7 @@ export async function GET(request: Request) {
         totalGestores: gestoresAtivos.length,
         spanMedio: +spanMedio.toFixed(1),
         spanBuckets,
+        spanDetalhes,
         headcountPorCargo,
       },
       diversidade: {
