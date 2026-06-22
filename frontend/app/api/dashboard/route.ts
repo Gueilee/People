@@ -377,29 +377,43 @@ export async function GET(request: Request) {
     };
 
     // ── Gênero ───────────────────────────────────────────────────────────────
-    const ativosComGenero = ativos.filter(c => c.gender === 'M' || c.gender === 'F');
     const genM = ativos.filter(c => c.gender === 'M').length;
     const genF = ativos.filter(c => c.gender === 'F').length;
     const genND= ativos.filter(c => !c.gender || (c.gender !== 'M' && c.gender !== 'F')).length;
 
-    // Gênero por liderança (gestores)
-    const liderancaIds = new Set(rankingGestores.map(g => g.gestor));
-    const lideres = ativos.filter(c => liderancaIds.has(c.nome) || liderancaIds.has(c.gestor));
-    const generoLideranca = {
-      M: ativos.filter(c => gestoresAtivos.includes(c.nome) && c.gender === 'M').length,
-      F: ativos.filter(c => gestoresAtivos.includes(c.nome) && c.gender === 'F').length,
-    };
+    // Liderança = ativos que aparecem como gestor de outros ativos
+    const liderancaSet = new Set(gestoresAtivos);
 
-    // Gênero por unidade
-    const generoPorUnidade = unidades.map(u => {
-      const g = ativos.filter(c => c.unidade === u);
-      return { unidade: u, M: g.filter(c => c.gender === 'M').length, F: g.filter(c => c.gender === 'F').length };
-    }).filter(u => u.M + u.F > 0).sort((a, b) => (b.M + b.F) - (a.M + a.F));
+    // Classificação por tipo de cargo
+    function tipoCargoFn(c: Colab): 'lideranca' | 'operacional' | 'administrativo' {
+      if (liderancaSet.has(c.nome)) return 'lideranca';
+      const cargo = (c.cargo || '').toLowerCase();
+      if (/operador|conferente|separador|estoquista|carregador|descarregador|montador|ajudante|motorista|técnico op|inspetor|porteiro/.test(cargo))
+        return 'operacional';
+      return 'administrativo';
+    }
+
+    const generoTipoCargo = (['lideranca', 'operacional', 'administrativo'] as const).reduce((acc, tipo) => {
+      const grp = ativos.filter(c => tipoCargoFn(c) === tipo);
+      const m   = grp.filter(c => c.gender === 'M').length;
+      const f   = grp.filter(c => c.gender === 'F').length;
+      acc[tipo] = { total: grp.length, M: m, F: f, ND: grp.length - m - f,
+                    pctF: grp.length ? +((f / grp.length) * 100).toFixed(1) : 0 };
+      return acc;
+    }, {} as Record<string, { total: number; M: number; F: number; ND: number; pctF: number }>);
 
     const distribuicaoGenero = {
       geral: { M: genM, F: genF, ND: genND, total: ativos.length },
-      pctF: ativos.length ? +((genF / ativos.length) * 100).toFixed(1) : 0,
-      porUnidade: generoPorUnidade,
+      pctF:  ativos.length ? +((genF / ativos.length) * 100).toFixed(1) : 0,
+      lideranca: {
+        total:  liderancaSet.size,
+        M:      ativos.filter(c => liderancaSet.has(c.nome) && c.gender === 'M').length,
+        F:      ativos.filter(c => liderancaSet.has(c.nome) && c.gender === 'F').length,
+        pctF:   liderancaSet.size
+                  ? +((ativos.filter(c => liderancaSet.has(c.nome) && c.gender === 'F').length / liderancaSet.size) * 100).toFixed(1)
+                  : 0,
+      },
+      porTipoCargo: generoTipoCargo,
     };
 
     // ── Etnia / Raça ─────────────────────────────────────────────────────────

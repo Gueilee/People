@@ -60,7 +60,12 @@ type DashData = {
   };
   estrutura: { totalGestores: number; spanMedio: number; spanBuckets: SpanBkts; headcountPorCargo: CargoCt[] };
   diversidade: {
-    genero: { geral: { M: number; F: number; ND: number; total: number }; pctF: number; porUnidade: GenUnid[] };
+    genero: {
+      geral: { M: number; F: number; ND: number; total: number };
+      pctF: number;
+      lideranca: { total: number; M: number; F: number; pctF: number };
+      porTipoCargo: Record<string, { total: number; M: number; F: number; ND: number; pctF: number }>;
+    };
     etnia: { distribuicao: EtniaItem[]; pctNaoBranca: number; totalComInfo: number };
     idade: { media: number; faixas: IdadeFaixa[]; geracoes: Geracao[]; totalComInfo: number };
     vinculo: VinculoItem[];
@@ -424,6 +429,7 @@ export default function DashboardRH() {
   const [filtrosUnidade, setFiltrosUnidade] = useState<string[]>([]);
   const [filtrosArea,    setFiltrosArea]    = useState<string[]>([]);
   const [filtrosGestor,  setFiltrosGestor]  = useState<string[]>([]);
+  const [tipoCargoTab,   setTipoCargoTab]   = useState<'todos' | 'lideranca' | 'operacional' | 'administrativo'>('todos');
 
   // Alertas
   const [alertaOpen,      setAlertaOpen]      = useState(false);
@@ -1022,10 +1028,37 @@ export default function DashboardRH() {
                 : (() => {
                     const gen = data?.diversidade.genero;
                     if (!gen) return null;
-                    const { M, F, ND, total } = gen.geral;
+
+                    // Dado ativo conforme tab selecionada
+                    const tabData = tipoCargoTab === 'todos'
+                      ? { M: gen.geral.M, F: gen.geral.F, ND: gen.geral.ND, total: gen.geral.total }
+                      : { ...gen.porTipoCargo[tipoCargoTab], total: gen.porTipoCargo[tipoCargoTab]?.total ?? 0 };
+                    const { M, F, ND, total } = tabData;
+
+                    const TABS: { key: typeof tipoCargoTab; label: string }[] = [
+                      { key: 'todos',          label: 'Todos'          },
+                      { key: 'lideranca',      label: 'Liderança'      },
+                      { key: 'operacional',    label: 'Operacional'    },
+                      { key: 'administrativo', label: 'Administrativo' },
+                    ];
+
                     return (
-                      <div className="space-y-5">
+                      <div className="space-y-4">
+                        {/* Tabs tipo cargo */}
+                        <div className="flex gap-1 flex-wrap">
+                          {TABS.map(t => (
+                            <button key={t.key} onClick={() => setTipoCargoTab(t.key)}
+                              className="px-3 py-1 rounded-full text-[10px] font-bold transition-colors"
+                              style={tipoCargoTab === t.key
+                                ? { backgroundColor: C.purple, color: '#fff' }
+                                : { backgroundColor: '#f3f4f6', color: C.gray }}>
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+
                         <GenderBar M={M} F={F} />
+
                         <div className="grid grid-cols-3 gap-3 text-center">
                           {[
                             { label: 'Masculino',     value: M,  color: C.purple },
@@ -1041,18 +1074,28 @@ export default function DashboardRH() {
                             </div>
                           ))}
                         </div>
-                        <div>
-                          <p className="text-[10px] uppercase font-bold text-gray-400 mb-2">Por unidade</p>
-                          {gen.porUnidade.map(u => (
-                            <div key={u.unidade} className="mb-2.5">
-                              <div className="flex justify-between text-[10px] text-gray-500 mb-0.5">
-                                <span className="font-semibold">{u.unidade}</span>
-                                <span>{u.M}M / {u.F}F</span>
+
+                        {/* Liderança feminina destaque */}
+                        {(() => {
+                          const lid = gen.lideranca;
+                          return (
+                            <div className="rounded-xl p-3 flex items-center gap-4 border"
+                                 style={{ borderColor: `${C.pink}40`, backgroundColor: `${C.pink}0d` }}>
+                              <div className="text-center min-w-[60px]">
+                                <div className="text-xl font-black" style={{ color: C.pink }}>{lid.pctF}%</div>
+                                <div className="text-[9px] font-bold text-gray-500 leading-tight">Mulheres na<br/>liderança</div>
                               </div>
-                              <GenderBar M={u.M} F={u.F} />
+                              <div className="flex-1">
+                                <GenderBar M={lid.M} F={lid.F} />
+                                <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                                  <span>{lid.M} gestores M</span>
+                                  <span>{lid.F} gestoras F</span>
+                                  <span>{lid.total} total</span>
+                                </div>
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
                       </div>
                     );
                   })()
