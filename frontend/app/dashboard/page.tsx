@@ -936,10 +936,10 @@ export default function DashboardRH() {
               }
             </div>
 
-            {/* Mortalidade infantil */}
+            {/* Turnover Precoce */}
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <h3 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>
-                Mortalidade Infantil ({periodoLabel})
+                Turnover Precoce ({periodoLabel})
               </h3>
               {loading
                 ? <Skeleton className="h-44 w-full" />
@@ -964,7 +964,7 @@ export default function DashboardRH() {
                         </div>
                         {mi.porUnidade.length > 0 && (
                           <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 mb-2">Saídas &lt; 3 meses por unidade</p>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 mb-2">Turnover precoce (&lt; 3m) por unidade</p>
                             {mi.porUnidade.slice(0, 5).map(u => (
                               <BarHorizontal key={u.unidade} label={u.unidade} value={u.ate3m}
                                 max={Math.max(...mi.porUnidade.map(x => x.ate3m), 1)}
