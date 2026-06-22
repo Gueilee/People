@@ -234,6 +234,30 @@ export async function GET(request: Request) {
       params
     );
 
+    // ── Saldo positivo de BH por unidade ────────────────────────────────────
+    const bhPorUnidadeRows = await db.all<any>(
+      `SELECT filial,
+         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END), 1) AS saldo_pos,
+         COUNT(CASE WHEN acum > 0 THEN 1 END)                   AS count_pos,
+         COUNT(DISTINCT nome)                                    AS total_func
+       FROM (
+         SELECT filial, nome, SUM(banco_horas) AS acum
+         FROM ponto_mensal ${where}
+         GROUP BY filial, nome
+       )
+       GROUP BY filial ORDER BY filial`,
+      params
+    );
+
+    const saldoBancoPosRow = await db.get<{ total: number }>(
+      `SELECT COALESCE(SUM(acum), 0) AS total FROM (
+         SELECT nome, SUM(banco_horas) AS acum
+         FROM ponto_mensal ${where}
+         GROUP BY nome HAVING acum > 0
+       )`,
+      params
+    );
+
     // ── Distribuição banco de horas ──────────────────────────────────────────
     const distBanco = await db.get<any>(
       `SELECT
@@ -316,6 +340,7 @@ export async function GET(request: Request) {
         taxaAbsenteismo,
         totalAtraso:       +(kpiRow?.total_atraso   || 0).toFixed(1),
         saldoBanco:        +(kpiRow?.saldo_banco    || 0).toFixed(1),
+        saldoBancoPos:     +(saldoBancoPosRow?.total || 0).toFixed(1),
         bancoNegativo:     bancoNegRow?.n            || 0,
         totalNoturno:      +(kpiRow?.total_noturno   || 0).toFixed(1),
         totalHoraNot:      +(kpiRow?.total_hora_not || 0).toFixed(1),
@@ -330,6 +355,7 @@ export async function GET(request: Request) {
       topExtras,
       topBancoNeg,
       topBancoPos,
+      bhPorUnidade: bhPorUnidadeRows,
       topAtrasos,
       topNoturno,
       distBanco,

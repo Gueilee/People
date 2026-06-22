@@ -14,10 +14,8 @@ type KPIs = {
   taxaAbsenteismo: number;
   totalAtraso: number;
   saldoBanco: number;
+  saldoBancoPos: number;
   bancoNegativo: number;
-  totalNoturno: number;
-  totalHoraNot: number;
-  totalDsr: number;
   totalAbono: number;
   totalFerias: number;
   totalAfastamento: number;
@@ -45,7 +43,7 @@ type TopFalta  = { nome: string; cargo: string; filial: string; departamento: st
 type TopExtra  = { nome: string; cargo: string; filial: string; departamento: string; extra_50: number; extra_60: number; extra_100: number; total_he: number };
 type TopBanco  = { nome: string; cargo: string; filial: string; banco_horas: number };
 type TopAtraso  = { nome: string; cargo: string; filial: string; atraso: number };
-type TopNoturno = { nome: string; cargo: string; filial: string; adicional_noturno: number; hora_noturna_reduzida: number };
+type BhUnidade = { filial: string; saldo_pos: number; count_pos: number; total_func: number };
 
 type DistBanco = { critico: number; negativo: number; equilibrado: number; positivo: number; excesso: number };
 
@@ -73,7 +71,7 @@ type PontoData = {
   topBancoNeg: TopBanco[];
   topBancoPos: TopBanco[];
   topAtrasos: TopAtraso[];
-  topNoturno: TopNoturno[];
+  bhPorUnidade: BhUnidade[];
   distBanco: DistBanco;
   absByGestor: AbsGestor[];
   absByCargo: AbsCargo[];
@@ -360,15 +358,13 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
 
 // ─── Distribuição banco de horas ──────────────────────────────────────────────
 function DistBancoBar({ dist }: { dist: DistBanco }) {
-  const total = dist.critico + dist.negativo + dist.equilibrado + dist.positivo + dist.excesso;
-  if (total === 0) return null;
   const segs = [
-    { label: 'Crítico (<-40h)',    val: dist.critico,    color: '#DC2626' },
-    { label: 'Negativo (-40…0h)',  val: dist.negativo,   color: C.pink },
-    { label: 'Equilibrado (0‑20h)',val: dist.equilibrado, color: C.green },
-    { label: 'Positivo (20‑40h)', val: dist.positivo,   color: C.teal },
-    { label: 'Excesso (>40h)',     val: dist.excesso,    color: C.amber },
+    { label: 'Equilibrado (0‑20h)', val: dist.equilibrado, color: C.green },
+    { label: 'Positivo (20‑40h)',   val: dist.positivo,    color: C.teal },
+    { label: 'Excesso (>40h)',      val: dist.excesso,     color: C.amber },
   ];
+  const total = segs.reduce((s, seg) => s + seg.val, 0);
+  if (total === 0) return null;
   return (
     <div>
       <div className="flex rounded-xl overflow-hidden h-8 mb-3">
@@ -403,7 +399,17 @@ export default function PontoPage() {
   const [filtrosMes, setFiltrosMes] = useState<string[]>([]);
   const [unidades,  setUnidades]  = useState<string[]>([]);
   const [areas,     setAreas]     = useState<string[]>([]);
-  const [gestores,  setGestores]  = useState<string[]>([]);
+  const [gestores,      setGestores]      = useState<string[]>([]);
+  const [custoMedioHora, setCustoMedioHora] = useState<string>('');
+
+  // Fechamento de BH por unidade (calendário fixo)
+  function fechamentoBH(filial: string): string {
+    const f = filial.toLowerCase();
+    if (f.includes('itapevi'))                                          return 'Janeiro';
+    if (f.includes('olimpia') || f.includes('olímpia'))                return 'Agosto';
+    if (f.includes('navegantes') || f.includes('garuva'))              return 'Junho · Dezembro';
+    return '—';
+  }
 
   const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[]) => {
     setLoading(true);
@@ -522,8 +528,7 @@ export default function PontoPage() {
             <KpiCard label="Faltas"          value={fmtH(kpis.totalFaltas)}       sub="injustificadas"        color={C.pink}   icon="🚫" />
             <KpiCard label="Atestados"       value={fmtH(kpis.totalAtestados)}    sub="médicos/ausências just." color={C.blue}  icon="🏥" />
             <KpiCard label="Atrasos"         value={fmtH(kpis.totalAtraso)}       sub="soma do período"       color={C.orange} icon="🕐" />
-            <KpiCard label="Banco de Horas"  value={fmtH(kpis.saldoBanco)}        sub={`${kpis.bancoNegativo} com saldo neg.`} color={kpis.saldoBanco >= 0 ? C.teal : C.pink} icon="🏦" />
-            <KpiCard label="Adic. Noturno"   value={fmtH(kpis.totalNoturno)}      sub={`HR reduzida: ${fmtH(kpis.totalHoraNot)}`} color={C.indigo} icon="🌙" />
+            <KpiCard label="Banco de Horas"  value={fmtH(kpis.saldoBancoPos)}     sub="saldo positivo acumulado"              color={C.teal}   icon="🏦" />
           </div>
         )}
 
@@ -551,87 +556,6 @@ export default function PontoPage() {
           </div>
         )}
 
-        {/* ── Jornada Noturna ── */}
-        {!loading && data && data.kpis.totalNoturno > 0 && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-
-            <Card>
-              <SectionTitle icon="🌙">Adicional Noturno por Filial</SectionTitle>
-
-              {/* Mini-KPIs */}
-              <div className="flex gap-3 mb-5 flex-wrap">
-                <div className="flex-1 min-w-0 rounded-xl p-3" style={{ background: '#EEF2FF' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: C.indigo }}>Adic. Noturno</div>
-                  <div className="text-xl font-black" style={{ color: C.indigo }}>{fmtH(data.kpis.totalNoturno)}</div>
-                </div>
-                <div className="flex-1 min-w-0 rounded-xl p-3" style={{ background: '#F3F0FF' }}>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: C.purple }}>HR Reduzida</div>
-                  <div className="text-xl font-black" style={{ color: C.purple }}>{fmtH(data.kpis.totalHoraNot)}</div>
-                </div>
-                <div className="flex-1 min-w-0 rounded-xl p-3 bg-gray-50">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1 text-gray-400">DSR</div>
-                  <div className="text-xl font-black text-gray-600">{fmtH(data.kpis.totalDsr)}</div>
-                </div>
-              </div>
-
-              {/* Barras por filial */}
-              {data.porFilial.filter(f => f.adicional_noturno > 0).length === 0
-                ? <p className="text-xs text-gray-400">Nenhum adicional noturno no período selecionado.</p>
-                : data.porFilial
-                    .filter(f => f.adicional_noturno > 0)
-                    .sort((a, b) => b.adicional_noturno - a.adicional_noturno)
-                    .map((f, i) => (
-                      <BarH key={f.filial} label={f.filial} value={f.adicional_noturno}
-                            max={Math.max(...data.porFilial.map(x => x.adicional_noturno), 1)}
-                            color={PALETTE[i % PALETTE.length]}
-                            subLabel={`HR Red.: ${fmtH(f.hora_noturna_reduzida)} · DSR: ${fmtH(f.dsr)}`} />
-                    ))
-              }
-
-              {/* Nota explicativa */}
-              <div className="mt-4 p-3 rounded-xl text-[11px] leading-relaxed" style={{ background: '#EEF2FF', color: '#6366F1' }}>
-                <strong>Adicional noturno</strong> incide sobre horas trabalhadas entre 22h e 5h (acréscimo de 20%).<br />
-                <strong>Hora noturna reduzida</strong>: cada hora noturna equivale a 52min52s — o campo registra o crédito de tempo gerado por essa redução.
-              </div>
-            </Card>
-
-            <Card>
-              <SectionTitle icon="🌃">Top Colaboradores — Noturno</SectionTitle>
-              {data.topNoturno.length === 0
-                ? <p className="text-xs text-gray-400">Nenhum adicional noturno no período.</p>
-                : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-400 border-b">
-                          <th className="text-left pb-2 font-semibold">Colaborador</th>
-                          <th className="text-right pb-2 font-semibold w-20">Adic. Not.</th>
-                          <th className="text-right pb-2 font-semibold w-20">HR Red.</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.topNoturno.map((r, i) => (
-                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                            <td className="py-1.5 leading-tight">
-                              <div className="font-semibold text-gray-800">{r.nome}</div>
-                              <div className="text-gray-400">{r.cargo} · {r.filial}</div>
-                            </td>
-                            <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.indigo }}>{fmtH(r.adicional_noturno)}</td>
-                            <td className="py-1.5 text-right font-mono text-gray-500">{fmtH(r.hora_noturna_reduzida)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              }
-
-              <div className="mt-5 p-3 rounded-xl text-[11px] leading-relaxed bg-amber-50 text-amber-600">
-                <strong>Atenção:</strong> colaboradores com adicional noturno recorrente podem indicar jornadas sistematicamente estendidas além das 22h — recomendado acompanhamento pelo gestor.
-              </div>
-            </Card>
-          </div>
-        )}
 
         {/* ── Top Faltas + Top Extras ── */}
         {!loading && data && (
@@ -709,68 +633,123 @@ export default function PontoPage() {
 
         {/* ── Banco de Horas ── */}
         {!loading && data && (
+          <>
+          {/* Fechamento + Impacto Financeiro — full width */}
+          <Card>
+            <div className="flex flex-col lg:flex-row gap-6">
+
+              {/* Calendário de fechamento por unidade */}
+              <div className="flex-1">
+                <SectionTitle icon="📅">Fechamento de BH por Unidade</SectionTitle>
+                <div className="space-y-2">
+                  {data.bhPorUnidade.map(u => {
+                    const mes = fechamentoBH(u.filial);
+                    return (
+                      <div key={u.filial} className="flex items-center justify-between rounded-xl px-4 py-2.5 bg-gray-50">
+                        <div>
+                          <div className="text-xs font-bold text-gray-800">{u.filial}</div>
+                          <div className="text-[10px] text-gray-400">
+                            Fecha em: <span className="font-semibold" style={{ color: C.teal }}>{mes}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black" style={{ color: C.teal }}>+{fmtH(u.saldo_pos)}</div>
+                          <div className="text-[10px] text-gray-400">{u.count_pos} func. c/ saldo pos.</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {data.bhPorUnidade.length === 0 && (
+                    <p className="text-xs text-gray-400">Nenhum dado disponível.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Impacto Financeiro */}
+              <div className="lg:w-72 shrink-0">
+                <SectionTitle icon="💰">Impacto Financeiro do BH</SectionTitle>
+                <div className="space-y-3">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: `${C.teal}12`, borderLeft: `3px solid ${C.teal}` }}>
+                    <div className="text-[10px] font-bold uppercase text-gray-400 mb-1">Saldo positivo total</div>
+                    <div className="text-2xl font-black" style={{ color: C.teal }}>{fmtH(data.kpis.saldoBancoPos)}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">horas devidas aos colaboradores</div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">
+                      Custo médio por hora (R$)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Ex: 20,00"
+                      value={custoMedioHora}
+                      onChange={e => setCustoMedioHora(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none"
+                      style={{ borderColor: custoMedioHora ? C.teal : undefined }}
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Informe o custo médio (salário ÷ 220h × encargos).
+                    </p>
+                  </div>
+
+                  {custoMedioHora && parseFloat(custoMedioHora) > 0 && (() => {
+                    const custo    = parseFloat(custoMedioHora);
+                    const total    = data.kpis.saldoBancoPos * custo;
+                    const fmtBRL   = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    return (
+                      <div className="rounded-xl p-4 space-y-2" style={{ backgroundColor: `${C.amber}15`, borderLeft: `3px solid ${C.amber}` }}>
+                        <div className="text-[10px] font-bold uppercase" style={{ color: C.amber }}>Passivo estimado</div>
+                        <div className="text-2xl font-black" style={{ color: C.amber }}>{fmtBRL(total)}</div>
+                        <div className="text-[10px] text-gray-500">
+                          {fmtH(data.kpis.saldoBancoPos)} × {fmtBRL(custo)}/h
+                        </div>
+                        {data.bhPorUnidade.map(u => (
+                          <div key={u.filial} className="flex justify-between text-[10px] text-gray-500 border-t border-amber-100 pt-1.5">
+                            <span>{u.filial}</span>
+                            <span className="font-bold">{fmtBRL(u.saldo_pos * custo)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          </Card>
+
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
             <Card>
               <SectionTitle icon="🏦">Distribuição Banco de Horas</SectionTitle>
               <DistBancoBar dist={data.distBanco} />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
-                {/* Saldo Negativo */}
-                <div>
-                  <SectionTitle icon="⚠️">Maior Saldo Negativo</SectionTitle>
-                  {data.topBancoNeg.length === 0
-                    ? <p className="text-xs text-gray-400">Nenhum saldo negativo.</p>
-                    : (
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="text-gray-400 border-b">
-                            <th className="text-left pb-2 font-semibold">Colaborador</th>
-                            <th className="text-right pb-2 font-semibold w-20">Saldo</th>
+              <div className="mt-5">
+                <SectionTitle icon="✅">Maior Saldo Positivo</SectionTitle>
+                {data.topBancoPos.length === 0
+                  ? <p className="text-xs text-gray-400">Nenhum saldo positivo.</p>
+                  : (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-400 border-b">
+                          <th className="text-left pb-2 font-semibold">Colaborador</th>
+                          <th className="text-right pb-2 font-semibold w-20">Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.topBancoPos.map((r, i) => (
+                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                            <td className="py-1.5 leading-tight">
+                              <div className="font-semibold text-gray-800 text-[11px]">{r.nome}</div>
+                              <div className="text-gray-400 text-[10px]">{r.cargo} · {r.filial}</div>
+                            </td>
+                            <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.teal }}>+{fmtH(r.banco_horas)}</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {data.topBancoNeg.map((r, i) => (
-                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                              <td className="py-1.5 leading-tight">
-                                <div className="font-semibold text-gray-800 text-[11px]">{r.nome}</div>
-                                <div className="text-gray-400 text-[10px]">{r.cargo} · {r.filial}</div>
-                              </td>
-                              <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.pink }}>{fmtH(r.banco_horas)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                </div>
-
-                {/* Saldo Positivo */}
-                <div>
-                  <SectionTitle icon="✅">Maior Saldo Positivo</SectionTitle>
-                  {data.topBancoPos.length === 0
-                    ? <p className="text-xs text-gray-400">Nenhum saldo positivo.</p>
-                    : (
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="text-gray-400 border-b">
-                            <th className="text-left pb-2 font-semibold">Colaborador</th>
-                            <th className="text-right pb-2 font-semibold w-20">Saldo</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.topBancoPos.map((r, i) => (
-                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                              <td className="py-1.5 leading-tight">
-                                <div className="font-semibold text-gray-800 text-[11px]">{r.nome}</div>
-                                <div className="text-gray-400 text-[10px]">{r.cargo} · {r.filial}</div>
-                              </td>
-                              <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.teal }}>+{fmtH(r.banco_horas)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
               </div>
             </Card>
 
@@ -818,6 +797,7 @@ export default function PontoPage() {
               )}
             </Card>
           </div>
+          </>
         )}
 
         {/* ── Cruzamento RH (por gestor + por cargo) ── */}
