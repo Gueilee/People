@@ -113,7 +113,11 @@ export async function GET(request: Request) {
     const reajPeriodo = usarPeriodo ? reajustes.filter(r => r.data_inicio && r.data_inicio >= inicioStr) : reajustes;
 
     // ── KPIs ─────────────────────────────────────────────────────────────────
-    const comDuracao = filtered.filter(r => r.duracao_dias != null && r.duracao_dias > 0);
+    // Registros do período com duração válida
+    const filteredPeriodo = usarPeriodo
+      ? filtered.filter(r => r.data_inicio && r.data_inicio >= inicioStr)
+      : filtered;
+    const comDuracao = filteredPeriodo.filter(r => r.duracao_dias != null && r.duracao_dias > 0);
     const tempoMedioNaFuncaoDias = comDuracao.length
       ? Math.round(comDuracao.reduce((s, r) => s + r.duracao_dias!, 0) / comDuracao.length)
       : 0;
@@ -124,12 +128,16 @@ export async function GET(request: Request) {
       byNome.get(r.nome)!.push(r);
     });
 
-    const nomesComPromocao = new Set(promocoes.map(r => r.nome));
+    // Contar apenas quem teve promoção dentro do período selecionado
+    const nomesComPromocao = new Set(promPeriodo.map(r => r.nome));
     const totalColabs = byNome.size;
 
+    // Tempo até promoção: calcular só para quem foi promovido no período
     const diasAtePromocao: number[] = [];
-    byNome.forEach((registros) => {
-      const sorted = registros.sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
+    nomesComPromocao.forEach(nome => {
+      const registros = byNome.get(nome);
+      if (!registros) return;
+      const sorted = [...registros].sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
       const admissao = sorted.find(r => r.tipo_evento === 'admissao');
       const primeiraPromo = sorted.find(r => r.tipo_evento === 'promocao');
       if (admissao?.data_inicio && primeiraPromo?.data_inicio) {
