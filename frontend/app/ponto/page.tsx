@@ -140,11 +140,14 @@ function KpiCard({ label, value, sub, color, icon }: {
   );
 }
 
-function BarH({ label, value, max, color, suffix = 'h', subLabel, labelWidth = 110, wrap = false }: {
+function BarH({ label, value, max, color, suffix = 'h', subLabel, labelWidth = 110, wrap = false, total }: {
   label: string; value: number; max: number; color: string;
-  suffix?: string; subLabel?: string; labelWidth?: number; wrap?: boolean;
+  suffix?: string; subLabel?: string; labelWidth?: number; wrap?: boolean; total?: number;
 }) {
   const pct = max > 0 ? Math.max((Math.abs(value) / Math.abs(max)) * 100, 2) : 2;
+  const displayValue = total != null && total > 0
+    ? `${((value / total) * 100).toFixed(1)}%`
+    : `${fmtH(value)}${suffix === '%' ? '%' : ''}`;
   return (
     <div className="flex items-center gap-3 mb-2">
       <div className="text-right shrink-0" style={{ width: labelWidth }}>
@@ -163,7 +166,7 @@ function BarH({ label, value, max, color, suffix = 'h', subLabel, labelWidth = 1
              style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
       <span className="text-xs font-bold shrink-0 tabular-nums" style={{ color, width: 52 }}>
-        {fmtH(value)}{suffix === '%' ? '%' : ''}
+        {displayValue}
       </span>
     </div>
   );
@@ -440,6 +443,7 @@ export default function PontoPage() {
   const maxFilialAbs  = Math.max(...(data?.porFilial ?? []).map(f => f.ausencias), 1);
   const maxGestor     = Math.max(...(data?.absByGestor ?? []).map(g => g.total_ausencia), 1);
   const maxCargo      = Math.max(...(data?.absByCargo ?? []).map(c => c.total_ausencia), 1);
+  const totalAbsCargo = (data?.absByCargo ?? []).reduce((s, c) => s + c.total_ausencia, 0);
 
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
@@ -778,6 +782,7 @@ export default function PontoPage() {
                 {data.absByCargo.slice(0, 12).map((c, i) => (
                   <BarH key={c.cargo} label={c.cargo} value={c.total_ausencia} max={maxCargo}
                         color={PALETTE[i % PALETTE.length]} labelWidth={165} wrap
+                        total={totalAbsCargo}
                         subLabel={`${c.funcionarios} func · HE: ${fmtH(c.total_he)}`} />
                 ))}
               </Card>
