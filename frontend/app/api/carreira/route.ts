@@ -29,6 +29,14 @@ function fmtMes(d: Date) {
   return d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 }
 
+function normalizarArea(area: string | null | undefined): string {
+  if (!area) return 'Não informado';
+  const a = area.trim();
+  if (/^opera[çc][õo]es?\s*(0?[1-4])?$/i.test(a)) return 'Operações';
+  if (/^(cont[áa]bil|fiscal|controladoria)$/i.test(a)) return 'Controladoria';
+  return a;
+}
+
 const LABEL_TIPO: Record<string, string> = {
   admissao:          'Admissão',
   promocao:          'Promoção / Enquadramento de Função',
@@ -74,6 +82,9 @@ export async function GET(request: Request) {
     if (!all.length) {
       return NextResponse.json({ error: 'Tabela historico_cargo_salario vazia. Execute etl_historico.py.' }, { status: 404 });
     }
+
+    // Normalizar áreas antes de qualquer filtro ou agrupamento
+    all.forEach(r => { r.area = normalizarArea(r.area); });
 
     // ── Opções de filtro (do total histórico) ─────────────────────────────────
     const opcoesFiltro = {
