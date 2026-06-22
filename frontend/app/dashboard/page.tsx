@@ -772,46 +772,6 @@ export default function DashboardRH() {
           </div>
         </section>
 
-        {/* ── Últimos Desligamentos ── */}
-        <section className="bg-white rounded-2xl shadow-sm p-5 overflow-auto">
-          <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Últimos Desligamentos</h2>
-          {loading
-            ? <Skeleton className="h-32 w-full" />
-            : !data?.ultimosDesligamentos.length
-              ? <p className="text-xs text-gray-400 text-center py-8">Nenhum desligamento registrado</p>
-              : (
-                <table className="w-full text-xs min-w-[720px]">
-                  <thead>
-                    <tr className="text-left text-[10px] uppercase text-gray-400 border-b">
-                      {['Colaborador', 'Cargo', 'Área', 'Unidade', 'Gestor', 'Data', 'Tipo'].map(h => (
-                        <th key={h} className="pb-2 font-bold pr-3">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.ultimosDesligamentos.map((d, i) => (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="py-2 pr-3 font-semibold">{d.nome}</td>
-                        <td className="py-2 pr-3 text-gray-500 max-w-[120px] truncate">{d.cargo || '—'}</td>
-                        <td className="py-2 pr-3 text-gray-500">{d.departamento}</td>
-                        <td className="py-2 pr-3 text-gray-500">{d.unidade}</td>
-                        <td className="py-2 pr-3 text-gray-500 max-w-[120px] truncate">{d.gestor}</td>
-                        <td className="py-2 pr-3 font-mono text-gray-600">{fmtData(d.data_desligamento)}</td>
-                        <td className="py-2 pr-3">
-                          <span
-                            className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold whitespace-nowrap"
-                            style={{ backgroundColor: TIPO_CORES[d.tipo_desligamento] || C.gray }}
-                          >
-                            {d.tipo_desligamento}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-          }
-        </section>
 
         {/* ══════════════════════════════════════════════════════════════ */}
         {/*  RADAR DE RISCO DE TURNOVER                                   */}
