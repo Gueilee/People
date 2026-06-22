@@ -790,6 +790,47 @@ export default function DashboardRH() {
             Radar de Risco — Turnover por Colaborador
           </h2>
 
+          {/* Painel explicativo do cálculo */}
+          <div className="rounded-xl p-4 text-xs leading-relaxed" style={{ backgroundColor: '#FFF5F5', border: '1px solid #FECACA' }}>
+            <div className="font-black text-sm mb-3" style={{ color: '#DC2626' }}>Como é calculado o Risco de Turnover?</div>
+            <p className="text-gray-600 mb-3">
+              Cada colaborador ativo recebe um <strong>score de 0 a 100</strong> composto por quatro fatores. A classificação final é determinada pela soma desses pontos:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="bg-white rounded-lg p-3 border border-red-100">
+                <div className="font-bold text-gray-700 mb-1">⏱ Tempo de empresa <span className="text-gray-400 font-normal">(até 40 pts)</span></div>
+                <p className="text-gray-500">Quanto mais recente a admissão, maior o risco. O score começa em 40 pts no dia da admissão e decai linearmente até zero aos 18 meses (540 dias). Após 18 meses, não contribui mais.</p>
+                <div className="mt-1.5 text-[10px] text-gray-400">Admitido há 0m → 40 pts · 6m → 27 pts · 12m → 13 pts · 18m+ → 0 pts</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-red-100">
+                <div className="font-bold text-gray-700 mb-1">🏭 Turnover da unidade <span className="text-gray-400 font-normal">(até 35 pts)</span></div>
+                <p className="text-gray-500">Colaboradores de unidades com alta taxa de turnover historicamente são mais propensos a sair. A taxa da unidade é multiplicada por 0,53, limitada a 35 pontos.</p>
+                <div className="mt-1.5 text-[10px] text-gray-400">Taxa 20% → 11 pts · Taxa 40% → 21 pts · Taxa 66%+ → 35 pts (máx)</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-red-100">
+                <div className="font-bold text-gray-700 mb-1">👔 Turnover do gestor <span className="text-gray-400 font-normal">(até 20 pts)</span></div>
+                <p className="text-gray-500">Gestores com alto índice de desligamentos em suas equipes são um sinal de alerta. A taxa do gestor é multiplicada por 0,4, limitada a 20 pontos.</p>
+                <div className="mt-1.5 text-[10px] text-gray-400">Taxa gestor 15% → 6 pts · Taxa 30% → 12 pts · Taxa 50%+ → 20 pts (máx)</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-red-100">
+                <div className="font-bold text-gray-700 mb-1">📋 Tipo de vínculo <span className="text-gray-400 font-normal">(até 5 pts)</span></div>
+                <p className="text-gray-500">Vínculos com menor estabilidade contratual têm maior propensão ao desligamento.</p>
+                <div className="mt-1.5 text-[10px] text-gray-400">Estágio / Aprendiz → 5 pts · Terceirizado / PJ → 3 pts · CLT → 0 pts</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
+              <div className="rounded-lg py-2 px-3" style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}>
+                🔴 Alto Risco — score ≥ 60<br /><span className="font-normal text-gray-500">múltiplos fatores combinados</span>
+              </div>
+              <div className="rounded-lg py-2 px-3" style={{ backgroundColor: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' }}>
+                🟡 Médio Risco — score 30–59<br /><span className="font-normal text-gray-500">atenção, monitorar evolução</span>
+              </div>
+              <div className="rounded-lg py-2 px-3" style={{ backgroundColor: '#F0FDF4', color: '#16A34A', border: '1px solid #BBF7D0' }}>
+                🟢 Baixo Risco — score &lt; 30<br /><span className="font-normal text-gray-500">perfil estável no momento</span>
+              </div>
+            </div>
+          </div>
+
           {/* KPI mini cards de risco */}
           {!loading && data?.riscoTurnover && (
             <div className="grid grid-cols-3 gap-4">
