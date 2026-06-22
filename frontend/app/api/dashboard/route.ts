@@ -87,6 +87,14 @@ function bucket<T>(items: T[], fn: (i: T) => string, keys: string[]): Record<str
   return r;
 }
 
+// Agrupa departamentos conforme estrutura organizacional da VCI
+function normalizarArea(dep: string | null | undefined): string {
+  if (!dep) return '';
+  if (/opera[çc][oõ]e?s?\s*0?[1-4]/i.test(dep)) return 'Operações';
+  if (/^cont[aá]bil$/i.test(dep) || /^fiscal$/i.test(dep)) return 'Controladoria';
+  return dep;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -100,6 +108,7 @@ export async function GET(request: Request) {
 
     // Opções de filtro (sempre do total)
     const todosAll: Colab[] = await db.all('SELECT * FROM colaboradores');
+    todosAll.forEach(c => { c.departamento = normalizarArea(c.departamento) || c.departamento; });
     const unidadesOpcoes = [...new Set(todosAll.map(c => c.unidade))].filter(Boolean).sort();
     const areasOpcoes    = [...new Set(todosAll.map(c => c.departamento))].filter(Boolean).sort();
     const gestoresOpcoes = [...new Set(
@@ -115,25 +124,27 @@ export async function GET(request: Request) {
       todasDatas.filter(Boolean).map(d => d.substring(0, 7))
     )].sort().reverse();
 
-    // Dataset com filtros aplicados (suporta múltipla seleção via IN)
+    // Dataset com filtros aplicados — área filtrada em JS após normalização
     const whereParts: string[] = [];
     const whereParams: string[] = [];
     if (filtroUnidades.length) {
       whereParts.push(`unidade IN (${filtroUnidades.map(() => '?').join(',')})`);
       whereParams.push(...filtroUnidades);
     }
-    if (filtroAreas.length) {
-      whereParts.push(`departamento IN (${filtroAreas.map(() => '?').join(',')})`);
-      whereParams.push(...filtroAreas);
-    }
     if (filtroGestores.length) {
       whereParts.push(`gestor IN (${filtroGestores.map(() => '?').join(',')})`);
       whereParams.push(...filtroGestores);
     }
     const whereSQL = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-    const todos: Colab[] = await db.all(`SELECT * FROM colaboradores ${whereSQL}`, whereParams);
+    let todos: Colab[] = await db.all(`SELECT * FROM colaboradores ${whereSQL}`, whereParams);
 
     await db.close();
+
+    // Normalizar áreas e aplicar filtro de área em JS (nomes normalizados não existem no DB)
+    todos.forEach(c => { c.departamento = normalizarArea(c.departamento) || c.departamento; });
+    if (filtroAreas.length) {
+      todos = todos.filter(c => filtroAreas.includes(c.departamento));
+    }
 
     const hoje     = new Date();
     const anoAtual = hoje.getFullYear();
