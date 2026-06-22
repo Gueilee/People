@@ -214,26 +214,33 @@ export async function GET(request: Request) {
     }).sort((a, b) => b.taxa - a.taxa);
 
     // ── Ranking Gestores ─────────────────────────────────────────────────────
+    // Apenas gestores que são colaboradores ativos hoje (não desligados)
+    const ativosNomes = new Set(todosAll.filter(c => !c.data_desligamento).map(c => c.nome));
     const gestoresList = [...new Set(
       todos.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
     )];
-    const rankingGestores = gestoresList.map(g => {
-      const equipe   = todos.filter(c => c.gestor === g);
-      const desl     = deslPeriodo.filter(c => c.gestor === g).length;
-      const ativHoje = ativos.filter(c => c.gestor === g).length;
-      const ativInicio = inicioRef
-        ? todos.filter(c => {
-            if (c.gestor !== g) return false;
-            const adm = new Date(c.data_admissao);
-            const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
-            return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
-          }).length
-        : ativHoje;
-      const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
-      return { gestor: g, totalEquipe: equipe.length, ativos: ativInicio, desligados: desl,
-               unidade: equipe[0]?.unidade || '', departamento: equipe[0]?.departamento || '',
-               taxa: +taxa.toFixed(1) };
-    }).filter(g => g.desligados > 0).sort((a, b) => b.desligados - a.desligados).slice(0, 20);
+    const rankingGestores = gestoresList
+      .filter(g => ativosNomes.has(g))
+      .map(g => {
+        const equipe   = todos.filter(c => c.gestor === g);
+        const desl     = deslPeriodo.filter(c => c.gestor === g).length;
+        const ativHoje = ativos.filter(c => c.gestor === g).length;
+        const ativInicio = inicioRef
+          ? todos.filter(c => {
+              if (c.gestor !== g) return false;
+              const adm = new Date(c.data_admissao);
+              const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+              return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
+            }).length
+          : ativHoje;
+        const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
+        return { gestor: g, totalEquipe: equipe.length, ativos: ativInicio, desligados: desl,
+                 unidade: equipe[0]?.unidade || '', departamento: equipe[0]?.departamento || '',
+                 taxa: +taxa.toFixed(1) };
+      })
+      .filter(g => g.desligados > 0)
+      .sort((a, b) => b.taxa - a.taxa)
+      .slice(0, 10);
 
     // ── Tipos de Desligamento ────────────────────────────────────────────────
     const tiposCounts: Record<string, number> = {};

@@ -733,7 +733,7 @@ export default function DashboardRH() {
           {/* Ranking Gestores */}
           <div className="bg-white rounded-2xl shadow-sm p-5 overflow-auto">
             <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>
-              Ranking de Gestores — Desligamentos ({periodoLabel}) — TOP 20
+              Ranking de Gestores — Desligamentos ({periodoLabel})
             </h2>
             {loading
               ? <Skeleton className="h-48 w-full" />
