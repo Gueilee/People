@@ -162,14 +162,15 @@ export async function GET(request: Request) {
       .map(([unidade, count]) => ({ unidade, count }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Tendência mensal ──────────────────────────────────────────────────────
+    // ── Tendência mensal (exclui dissídio/acordo coletivo para não distorcer) ──
+    const reajustesTendencia = reajustes.filter(r => r.tipo_evento !== 'reajuste_coletivo');
     const tendenciaPromocoes = Array.from({ length: Math.min(meses, 24) }, (_, i) => {
       const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(meses, 24) - 1 - i), 1);
       const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(meses, 24) - 1 - i) + 1, 0);
       const miStr = mi.toISOString().split('T')[0];
       const mfStr = mf.toISOString().split('T')[0];
       const prom = promocoes.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
-      const reaj = reajustes.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
+      const reaj = reajustesTendencia.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
       return { mes: fmtMes(mi), promocoes: prom, reajustes: reaj };
     });
 

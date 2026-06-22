@@ -341,7 +341,7 @@ export default function CarreiraPage() {
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-black text-sm uppercase" style={{ color: C.dark }}>
-                  Tendência — Promoções & Reajustes ({periodo}m)
+                  Tendência — Promoções & Reajustes ({periodo}m) <span className="text-[9px] font-normal text-gray-400 normal-case">(excl. dissídio)</span>
                 </h3>
                 <div className="flex gap-3 text-[10px]">
                   <span className="flex items-center gap-1">
