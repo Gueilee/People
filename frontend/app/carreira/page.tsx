@@ -35,6 +35,8 @@ type CarreiraData = {
   topPromovidos: TopPromovido[];
   ultimasPromocoes: UltimaPromo[];
   reajustesPorTipo: ReajTipo[];
+  distribuicaoPorTipo: ReajTipo[];
+  totalAlteracoes: number;
   reajustesPorArea: ReajArea[];
   tempoNaFuncaoFaixas: FaixaTempo[];
   topMerito: TopMerito[];
@@ -57,6 +59,7 @@ const REAJ_CORES: Record<string, string> = {
   reajuste_coletivo: C.blue,
   reajuste_salarial: C.purple,
   reajuste_merito:   C.green,
+  promocao:          C.teal,
 };
 
 // ─── Componentes ─────────────────────────────────────────────────────────────
@@ -178,7 +181,7 @@ function ReajDonut({ data, total }: { data: ReajTipo[]; total: number }) {
           return seg;
         })}
         <text x={cx} y={cy - 8}  textAnchor="middle" fontSize="28" fontWeight="900" fill={C.dark}>{total}</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fontSize="11" fill={C.gray}>reajustes</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fontSize="11" fill={C.gray}>alterações</text>
       </svg>
       {/* Legenda abaixo em grid */}
       <div className="w-full grid grid-cols-1 gap-2">
@@ -516,9 +519,9 @@ export default function CarreiraPage() {
               </h3>
               {loading
                 ? <Skeleton className="h-36 w-full" />
-                : !data?.reajustesPorTipo.length
-                  ? <p className="text-xs text-gray-400 text-center pt-8">Nenhum reajuste no período</p>
-                  : <ReajDonut data={data.reajustesPorTipo} total={kpis?.totalReajustes ?? 0} />
+                : !data?.distribuicaoPorTipo.length
+                  ? <p className="text-xs text-gray-400 text-center pt-8">Nenhuma alteração no período</p>
+                  : <ReajDonut data={data.distribuicaoPorTipo} total={data.totalAlteracoes} />
               }
             </div>
 

@@ -218,6 +218,20 @@ export async function GET(request: Request) {
       }))
       .sort((a, b) => b.count - a.count);
 
+    // ── Distribuição combinada (promoções + reajustes) ────────────────────────
+    const todosPeriodo = [...promPeriodo, ...reajPeriodo];
+    const totalAlteracoes = todosPeriodo.length;
+    const tipoCt: Record<string, number> = {};
+    todosPeriodo.forEach(r => { tipoCt[r.tipo_evento] = (tipoCt[r.tipo_evento] || 0) + 1; });
+    const distribuicaoPorTipo = Object.entries(tipoCt)
+      .map(([tipo, count]) => ({
+        tipo,
+        label: LABEL_TIPO[tipo] || tipo,
+        count,
+        pct: totalAlteracoes ? +((count / totalAlteracoes) * 100).toFixed(1) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
     const reajAreaMap: Record<string, { coletivo: number; merito: number; salarial: number }> = {};
     reajPeriodo.forEach(r => {
       const area = r.area || 'Não informado';
@@ -282,6 +296,8 @@ export async function GET(request: Request) {
       topPromovidos,
       ultimasPromocoes:           ultimasPromocoes.slice(0, 20),
       reajustesPorTipo,
+      distribuicaoPorTipo,
+      totalAlteracoes,
       reajustesPorArea,
       tempoNaFuncaoFaixas:        faixasTempo,
       topMerito,
