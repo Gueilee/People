@@ -275,6 +275,8 @@ function DonutChart({ data, total }: { data: TipoDesl[]; total: number }) {
 
 // ─── Headcount Trend Chart ────────────────────────────────────────────────────
 function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+
   const W = 560, H = 150, padL = 10, padR = 16, padT = 18, padB = 38;
   if (!data.length) return null;
 
@@ -297,11 +299,20 @@ function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }
     linePath += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
   }
 
-  // Ticks a cada 4 pontos para não sobrelotar no espaço menor
   const ticks = data.filter((_, i) => i % 4 === 0 || i === n - 1);
 
+  // Tooltip: posição acima do ponto, mantendo dentro dos limites do viewBox
+  const TW = 68, TH = 28;
+  const tooltip = hovered !== null ? (() => {
+    const [tx, ty] = pts[hovered];
+    const ttx = Math.max(2, Math.min(tx - TW / 2, W - TW - 2));
+    const tty = Math.max(2, ty - TH - 8);
+    return { ttx, tty, cx: tx, cy: ty };
+  })() : null;
+
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+         style={{ overflow: 'visible' }}>
       <defs>
         <linearGradient id="hcGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%"   stopColor="#422c76" stopOpacity={0.22} />
@@ -313,10 +324,35 @@ function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }
       <path d={areaPath} fill="url(#hcGrad)" />
       <path d={linePath} fill="none" stroke="#422c76" strokeWidth={2} strokeLinejoin="round" />
 
+      {/* Linha guia vertical no hover */}
+      {hovered !== null && tooltip && (
+        <line x1={tooltip.cx} y1={padT} x2={tooltip.cx} y2={H - padB}
+          stroke="#422c76" strokeWidth={1} strokeDasharray="3 2" opacity={0.25} />
+      )}
+
+      {/* Pontos visuais */}
       {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={2.5} fill="#422c76" opacity={0.65} />
+        <circle key={`dot-${i}`}
+          cx={x} cy={y}
+          r={hovered === i ? 5 : 2.5}
+          fill={hovered === i ? 'white' : '#422c76'}
+          stroke="#422c76" strokeWidth={hovered === i ? 2 : 0}
+          opacity={hovered === i ? 1 : 0.7}
+        />
       ))}
 
+      {/* Áreas de hover (invisíveis, raio maior para facilitar o toque) */}
+      {pts.map(([x, y], i) => (
+        <circle key={`hit-${i}`}
+          cx={x} cy={y} r={11}
+          fill="transparent"
+          onMouseEnter={() => setHovered(i)}
+          onMouseLeave={() => setHovered(null)}
+          style={{ cursor: 'crosshair' }}
+        />
+      ))}
+
+      {/* Labels dos meses */}
       {ticks.map(d => {
         const i = data.indexOf(d);
         const x = getX(i);
@@ -327,7 +363,8 @@ function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }
         );
       })}
 
-      {(() => {
+      {/* Badge do último ponto (some quando há hover) */}
+      {hovered === null && (() => {
         const last = data[n - 1];
         const [lx, ly] = pts[n - 1];
         return (
@@ -339,6 +376,21 @@ function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }
           </g>
         );
       })()}
+
+      {/* Tooltip de hover */}
+      {hovered !== null && tooltip && (
+        <g>
+          <rect x={tooltip.ttx} y={tooltip.tty} width={TW} height={TH} rx={5} fill="#422c76" />
+          <text x={tooltip.ttx + TW / 2} y={tooltip.tty + 10}
+            textAnchor="middle" fontSize={7} fill="white" opacity={0.75}>
+            {data[hovered].mes}
+          </text>
+          <text x={tooltip.ttx + TW / 2} y={tooltip.tty + 22}
+            textAnchor="middle" fontSize={10} fontWeight="bold" fill="white">
+            {data[hovered].headcount}
+          </text>
+        </g>
+      )}
     </svg>
   );
 }

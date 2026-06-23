@@ -173,14 +173,28 @@ export async function GET(request: Request) {
       });
     }
 
-    // Headcount no início do período selecionado (responde ao 3m/6m/12m)
+    // Data de referência final: hoje OU último dia do mês mais recente selecionado
+    const refEndDate: Date = (() => {
+      if (filtroMeses.length > 0) {
+        const latest = [...filtroMeses].sort().reverse()[0]; // ex: '2025-11'
+        const [y, m] = latest.split('-').map(Number);
+        return new Date(y, m, 0); // último dia desse mês
+      }
+      return hoje;
+    })();
+
+    // Headcount no período selecionado
     const ativosNoPeriodo = inicioRef
       ? todos.filter(c => {
           const adm  = new Date(c.data_admissao);
           const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
           return adm <= inicioRef! && (desl === null || desl > inicioRef!);
         })
-      : ativos;
+      : todos.filter(c => {
+          const adm  = new Date(c.data_admissao);
+          const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+          return adm <= refEndDate && (desl === null || desl >= refEndDate);
+        });
 
     // ── KPIs ──────────────────────────────────────────────────────────────────
     const hMedia      = Math.max((ativos.length + deslPeriodo.length) / 2, 1);
@@ -280,10 +294,10 @@ export async function GET(request: Request) {
       desligados: todosDesl.filter(c => c.unidade === u).length,
     })).sort((a, b) => b.ativos - a.ativos);
 
-    // ── Tendência de Headcount (24 meses) ────────────────────────────────────
+    // ── Tendência de Headcount (24 meses até refEndDate) ─────────────────────
     const tendenciaHeadcount = Array.from({ length: 24 }, (_, i) => {
-      const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (23 - i), 1);
-      const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (23 - i) + 1, 0);
+      const mi = new Date(refEndDate.getFullYear(), refEndDate.getMonth() - (23 - i), 1);
+      const mf = new Date(refEndDate.getFullYear(), refEndDate.getMonth() - (23 - i) + 1, 0);
       const label = mi.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
       const hc = todos.filter(c => {
         const adm  = new Date(c.data_admissao);
