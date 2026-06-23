@@ -21,9 +21,9 @@ export async function GET(request: Request) {
       `SELECT DISTINCT filial FROM ponto_mensal WHERE filial IS NOT NULL AND filial != '' ORDER BY filial`
     );
     const areasRows = await db.all<{ area: string }>(
-      `SELECT DISTINCT c.area FROM colaboradores c
+      `SELECT DISTINCT c.departamento AS area FROM colaboradores c
        INNER JOIN ponto_mensal p ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
-       WHERE c.area IS NOT NULL AND c.area != '' ORDER BY c.area`
+       WHERE c.departamento IS NOT NULL AND c.departamento != '' ORDER BY c.departamento`
     );
     const gestoresRows = await db.all<{ gestor: string }>(
       `SELECT DISTINCT c.gestor FROM colaboradores c
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       params.push(...filtroUnidades);
     }
     if (filtroAreas.length > 0) {
-      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE area IN (${filtroAreas.map(() => '?').join(',')}))`);
+      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE departamento IN (${filtroAreas.map(() => '?').join(',')}))`);
       params.push(...filtroAreas);
     }
     if (filtroGestores.length > 0) {
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       whereTendParams.push(...filtroUnidades);
     }
     if (filtroAreas.length > 0) {
-      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE area IN (${filtroAreas.map(() => '?').join(',')}))`);
+      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE departamento IN (${filtroAreas.map(() => '?').join(',')}))`);
       whereTendParams.push(...filtroAreas);
     }
     if (filtroGestores.length > 0) {
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
       whereJoinParams.push(...filtroUnidades);
     }
     if (filtroAreas.length > 0) {
-      whereJoinParts.push(`c.area IN (${filtroAreas.map(() => '?').join(',')})`);
+      whereJoinParts.push(`c.departamento IN (${filtroAreas.map(() => '?').join(',')})`);
       whereJoinParams.push(...filtroAreas);
     }
     if (filtroGestores.length > 0) {
