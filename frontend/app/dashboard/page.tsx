@@ -275,7 +275,7 @@ function DonutChart({ data, total }: { data: TipoDesl[]; total: number }) {
 
 // ─── Headcount Trend Chart ────────────────────────────────────────────────────
 function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }) {
-  const W = 560, H = 160, padL = 36, padR = 16, padT = 20, padB = 44;
+  const W = 560, H = 150, padL = 10, padR = 16, padT = 18, padB = 38;
   if (!data.length) return null;
 
   const n      = data.length;
@@ -287,10 +287,8 @@ function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }
 
   const pts: [number, number][] = data.map((d, i) => [getX(i), getY(d.headcount)]);
 
-  // Área de preenchimento
   const areaPath = `M ${pts[0][0]},${H - padB} L ${pts.map(([x, y]) => `${x},${y}`).join(' L ')} L ${pts[pts.length - 1][0]},${H - padB} Z`;
 
-  // Linha suave
   let linePath = `M ${pts[0][0]},${pts[0][1]}`;
   for (let i = 1; i < pts.length; i++) {
     const [x0, y0] = pts[i - 1];
@@ -299,50 +297,42 @@ function HeadcountChart({ data }: { data: { mes: string; headcount: number }[] }
     linePath += ` C ${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
   }
 
-  // Ticks de mês a cada 3 pontos
-  const ticks = data.filter((_, i) => i % 3 === 0 || i === n - 1);
+  // Ticks a cada 4 pontos para não sobrelotar no espaço menor
+  const ticks = data.filter((_, i) => i % 4 === 0 || i === n - 1);
 
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="hcGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#422c76" stopOpacity={0.25} />
+          <stop offset="0%"   stopColor="#422c76" stopOpacity={0.22} />
           <stop offset="100%" stopColor="#422c76" stopOpacity={0.02} />
         </linearGradient>
       </defs>
 
-      {/* Linha guia */}
       <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#E5E7EB" strokeWidth={1} />
-
-      {/* Área */}
       <path d={areaPath} fill="url(#hcGrad)" />
-
-      {/* Linha */}
       <path d={linePath} fill="none" stroke="#422c76" strokeWidth={2} strokeLinejoin="round" />
 
-      {/* Pontos + tooltip no hover */}
       {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={3} fill="#422c76" opacity={0.7} />
+        <circle key={i} cx={x} cy={y} r={2.5} fill="#422c76" opacity={0.65} />
       ))}
 
-      {/* Labels dos meses */}
       {ticks.map(d => {
         const i = data.indexOf(d);
         const x = getX(i);
         return (
-          <text key={i} x={x} y={H - padB + 14} textAnchor="middle" fontSize={7.5} fill="#9CA3AF">
+          <text key={i} x={x} y={H - padB + 13} textAnchor="middle" fontSize={7.5} fill="#9CA3AF">
             {d.mes}
           </text>
         );
       })}
 
-      {/* Valor no último ponto */}
       {(() => {
         const last = data[n - 1];
         const [lx, ly] = pts[n - 1];
         return (
           <g>
-            <rect x={lx - 16} y={ly - 16} width={32} height={14} rx={4} fill="#422c76" />
+            <rect x={lx - 16} y={ly - 15} width={32} height={13} rx={4} fill="#422c76" />
             <text x={lx} y={ly - 5} textAnchor="middle" fontSize={8} fontWeight="bold" fill="white">
               {last.headcount}
             </text>
@@ -640,35 +630,34 @@ export default function DashboardRH() {
           </div>
         </section>
 
-        {/* ── Headcount Tendência (full width) ── */}
-        <section className="bg-white rounded-2xl shadow-sm p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>
-                Tendência de Headcount (24 meses)
-              </h2>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                Ativos por mês — responde a todos os filtros
-              </p>
-            </div>
-            {kpis && (
-              <div className="text-right shrink-0">
-                <div className="text-2xl font-black" style={{ color: C.purple }}>{kpis.headcountAtivo}</div>
-                <div className="text-[10px] text-gray-400">ativos ({periodoLabel})</div>
-              </div>
-            )}
-          </div>
-          {loading
-            ? <Skeleton className="h-40 w-full" />
-            : data?.tendenciaHeadcount.length
-              ? <HeadcountChart data={data.tendenciaHeadcount} />
-              : <p className="text-xs text-gray-400 text-center pt-8">Sem dados</p>
-          }
-        </section>
-
-        {/* ── Turnover por Unidade + Headcount por Unidade (só com filtro ativo) ── */}
+        {/* ── Tendência Headcount + Turnover por Unidade ── */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+          {/* Tendência de Headcount */}
+          <div className="bg-white rounded-2xl shadow-sm p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>
+                  Tendência de Headcount (24m)
+                </h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">Ativos por mês — todos os filtros</p>
+              </div>
+              {kpis && (
+                <div className="text-right shrink-0">
+                  <div className="text-xl font-black" style={{ color: C.purple }}>{kpis.headcountAtivo}</div>
+                  <div className="text-[10px] text-gray-400">ativos ({periodoLabel})</div>
+                </div>
+              )}
+            </div>
+            {loading
+              ? <Skeleton className="h-40 w-full" />
+              : data?.tendenciaHeadcount.length
+                ? <HeadcountChart data={data.tendenciaHeadcount} />
+                : <p className="text-xs text-gray-400 text-center pt-8">Sem dados</p>
+            }
+          </div>
+
+          {/* Turnover por Unidade */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Unidade ({periodoLabel})</h2>
             {loading
@@ -690,7 +679,11 @@ export default function DashboardRH() {
             }
           </div>
 
-          {filtrosUnidade.length > 0 && (
+        </section>
+
+        {/* Headcount por Unidade (só com filtro de unidade ativo) */}
+        {filtrosUnidade.length > 0 && (
+          <section>
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Headcount por Unidade</h2>
               {loading
@@ -713,8 +706,8 @@ export default function DashboardRH() {
                   })()
               }
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* ── Turnover por Área + Ranking Gestores ── */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
