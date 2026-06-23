@@ -687,19 +687,11 @@ export default function DashboardRH() {
 
           {/* Tendência de Headcount */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>
-                  Tendência de Headcount (24m)
-                </h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">Ativos por mês — todos os filtros</p>
-              </div>
-              {kpis && (
-                <div className="text-right shrink-0">
-                  <div className="text-xl font-black" style={{ color: C.purple }}>{kpis.headcountAtivo}</div>
-                  <div className="text-[10px] text-gray-400">ativos ({periodoLabel})</div>
-                </div>
-              )}
+            <div className="mb-3">
+              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>
+                Tendência de Headcount (24m)
+              </h2>
+              <p className="text-[10px] text-gray-400 mt-0.5">Ativos por mês — todos os filtros</p>
             </div>
             {loading
               ? <Skeleton className="h-40 w-full" />
