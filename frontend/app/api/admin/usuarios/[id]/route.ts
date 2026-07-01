@@ -38,7 +38,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const token = generateToken();
   await setResetToken(user.id, token, 7 * 24 * 3600);
   try {
-    await sendInviteEmail(user.email, user.nome, token);
+    await sendInviteEmail(user.email, user.nome, token, user.login);
   } catch (err) {
     return NextResponse.json({ erro: `Erro ao enviar e-mail: ${err}` }, { status: 500 });
   }

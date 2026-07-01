@@ -20,5 +20,5 @@ export async function POST(request: Request) {
   }
 
   await setPassword(user.id, senha);
-  return NextResponse.json({ ok: true, mensagem: 'Senha definida com sucesso!' });
+  return NextResponse.json({ ok: true, mensagem: 'Senha definida com sucesso!', login: user.login });
 }

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const token = generateToken();
     await setResetToken(id, token, 7 * 24 * 3600); // 7 dias para convite
     try {
-      await sendInviteEmail(email, nome, token);
+      await sendInviteEmail(email, nome, token, login);
     } catch (err) {
       console.error('Erro ao enviar convite:', err);
     }
