@@ -10,6 +10,19 @@ const NAV = [
   { href: '/recrutamento',  label: 'Recrutamento',         color: '#ff2f69' },
 ];
 
+let _roleCache: { role: string; ts: number } | null = null;
+async function getMyRole(): Promise<string | null> {
+  const now = Date.now();
+  if (_roleCache && now - _roleCache.ts < 5 * 60 * 1000) return _roleCache.role;
+  try {
+    const r = await fetch('/api/auth/me');
+    if (!r.ok) return null;
+    const data = await r.json();
+    _roleCache = { role: data.role, ts: now };
+    return data.role;
+  } catch { return null; }
+}
+
 // ─── Seleção única (usado em /ponto e outros) ────────────────────────────────
 
 export function FilterSelect({
@@ -200,10 +213,21 @@ export function SyncBadge({ label }: { label: string }) {
 
 export function NavHeader({ children }: { children?: React.ReactNode }) {
   const path = usePathname();
-  const active = NAV.find(n => path.startsWith(n.href));
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    getMyRole().then(role => setIsAdmin(role === 'admin'));
+  }, []);
+
+  const allNav = isAdmin
+    ? [...NAV, { href: '/configuracoes', label: 'Configurações', color: '#6B7280' }]
+    : NAV;
+
+  const active = allNav.find(n => path.startsWith(n.href));
   const borderColor = active?.color ?? '#422c76';
 
   async function logout() {
+    _roleCache = null;
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
   }
@@ -222,7 +246,7 @@ export function NavHeader({ children }: { children?: React.ReactNode }) {
 
         {/* Nav tabs */}
         <nav className="flex items-stretch gap-0 flex-1">
-          {NAV.map(item => {
+          {allNav.map(item => {
             const isActive = path.startsWith(item.href);
             return (
               <Link

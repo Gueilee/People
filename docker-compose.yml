@@ -10,11 +10,8 @@ services:
     environment:
       - NODE_ENV=production
       - SESSION_SECRET=${SESSION_SECRET:-vp-prod-vendemmia-2025}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-}
+      - MAILER_URL=${MAILER_URL:-}
+      - APP_URL=${APP_URL:-https://people.vendemm.ia.br}
     volumes:
       - people_db:/app/database
     restart: unless-stopped

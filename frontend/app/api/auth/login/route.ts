@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { ensureUsersTable, findByLogin, verifyPassword } from '@/lib/users';
 
 const SESSION_COOKIE = 'vp_session';
 const SESSION_TOKEN  = process.env.SESSION_SECRET ?? 'vp-auth-ok-2025';
-
-const USUARIOS = [
-  { login: 'admin', senha: 'vendemmia@2025', nome: 'Administrador' },
-];
 
 export async function POST(request: Request) {
   let body: { login?: string; senha?: string };
@@ -17,20 +14,24 @@ export async function POST(request: Request) {
   }
 
   const { login, senha } = body;
-  const user = USUARIOS.find(u => u.login === login && u.senha === senha);
-
-  if (!user) {
-    await new Promise(r => setTimeout(r, 500)); // evita brute-force timing
+  if (!login || !senha) {
     return NextResponse.json({ erro: 'Usuário ou senha inválidos' }, { status: 401 });
   }
 
+  await ensureUsersTable();
+
+  const user = await findByLogin(login);
+
+  if (!user || !user.senha_hash || !verifyPassword(senha, user.senha_hash)) {
+    await new Promise(r => setTimeout(r, 500));
+    return NextResponse.json({ erro: 'Usuário ou senha inválidos' }, { status: 401 });
+  }
+
+  const cookieOpts = { httpOnly: true, sameSite: 'lax' as const, path: '/', maxAge: 60 * 60 * 8 };
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, SESSION_TOKEN, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60 * 8, // 8 horas
-  });
+  cookieStore.set(SESSION_COOKIE, SESSION_TOKEN, cookieOpts);
+  cookieStore.set('vp_uid', String(user.id), cookieOpts);
+  cookieStore.set('vp_role', user.role, cookieOpts);
 
   return NextResponse.json({ ok: true, nome: user.nome });
 }

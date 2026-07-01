@@ -195,9 +195,20 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Esqueci a senha */}
+          <div className="mt-4 text-center">
+            <a
+              href="/recuperar-senha"
+              className="text-xs font-medium hover:underline"
+              style={{ color: '#422c76' }}
+            >
+              Esqueci minha senha
+            </a>
+          </div>
+
           {/* Rodapé */}
           <div
-            className="mt-10 pt-6 text-center"
+            className="mt-8 pt-6 text-center"
             style={{ borderTop: '1px solid #e5e7eb' }}
           >
             <p className="text-[10px] tracking-widest uppercase" style={{ color: '#d1d5db' }}>

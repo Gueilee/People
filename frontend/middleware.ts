@@ -8,8 +8,15 @@ export function middleware(request: NextRequest) {
   const session  = request.cookies.get(SESSION_COOKIE)?.value;
   const { pathname } = request.nextUrl;
 
-  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/carreira') || pathname.startsWith('/colaborador') || pathname.startsWith('/ponto');
-  const isLogin     = pathname === '/login';
+  const isProtected = pathname.startsWith('/dashboard')
+    || pathname.startsWith('/carreira')
+    || pathname.startsWith('/colaborador')
+    || pathname.startsWith('/ponto')
+    || pathname.startsWith('/configuracoes');
+  const isLogin = pathname === '/login';
+  const isPublicAuth = pathname.startsWith('/recuperar-senha') || pathname.startsWith('/definir-senha');
+
+  if (isPublicAuth) return NextResponse.next();
 
   if (isProtected && session !== SESSION_TOKEN) {
     const url = request.nextUrl.clone();
@@ -27,5 +34,15 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/carreira/:path*', '/colaborador/:path*', '/ponto/:path*', '/login'],
+  matcher: [
+    '/dashboard/:path*',
+    '/carreira/:path*',
+    '/colaborador/:path*',
+    '/ponto/:path*',
+    '/configuracoes/:path*',
+    '/configuracoes',
+    '/login',
+    '/recuperar-senha',
+    '/definir-senha',
+  ],
 };
