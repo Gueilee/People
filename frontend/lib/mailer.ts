@@ -30,12 +30,7 @@ function createTransporter() {
 }
 
 function fromAddress() {
-  const mailerUrl = process.env.MAILER_URL;
-  if (mailerUrl) {
-    const url = new URL(mailerUrl);
-    return `"VENDEMMIA PEOPLE" <${url.searchParams.get('username') || 'noreply'}@${url.hostname}>`;
-  }
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER || '';
+  const from = process.env.MAILER_FROM || 'naoresponda@vendemmia.com.br';
   return `"VENDEMMIA PEOPLE" <${from}>`;
 }
 
