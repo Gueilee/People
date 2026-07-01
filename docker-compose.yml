@@ -16,30 +16,67 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
     volumes:
-      - ./frontend/database:/app/database
+      - people_db:/app/database
     restart: unless-stopped
     networks:
       - people_net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
 
   nginx:
     image: nginx:1.25-alpine
     container_name: people_nginx
     ports:
       - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/conf.d/default.conf << 'NGINXEOF'
+        upstream people_app {
+            server app:3000;
+            keepalive 32;
+        }
+        server {
+            listen 80;
+            server_name people.vendemm.ia.br _;
+            client_max_body_size 20M;
+            gzip on;
+            gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
+            real_ip_header    CF-Connecting-IP;
+            set_real_ip_from  0.0.0.0/0;
+            location /_next/static/ {
+                proxy_pass http://people_app;
+                add_header Cache-Control "public, max-age=31536000, immutable";
+            }
+            location / {
+                proxy_pass         http://people_app;
+                proxy_http_version 1.1;
+                proxy_set_header   Upgrade           $http_upgrade;
+                proxy_set_header   Connection        'upgrade';
+                proxy_set_header   Host              $host;
+                proxy_set_header   X-Real-IP         $remote_addr;
+                proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+                proxy_set_header   X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+                proxy_read_timeout 60s;
+            }
+        }
+        NGINXEOF
+        exec nginx -g 'daemon off;'
     depends_on:
       app:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - people_net
+
+volumes:
+  people_db:
 
 networks:
   people_net:
