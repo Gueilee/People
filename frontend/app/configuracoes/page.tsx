@@ -24,7 +24,6 @@ export default function ConfiguracoesPage() {
 
   const [nome, setNome]   = useState('');
   const [email, setEmail] = useState('');
-  const [login, setLogin] = useState('');
   const [role, setRole]   = useState<'admin' | 'viewer'>('viewer');
   const [saving, setSaving] = useState(false);
   const [erro, setErro]   = useState('');
@@ -50,12 +49,12 @@ export default function ConfiguracoesPage() {
       const res = await fetch('/api/admin/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, email, login, role }),
+        body: JSON.stringify({ nome, email, role }),
       });
       const data = await res.json();
       if (!res.ok) { setErro(data.erro ?? 'Erro ao criar usuário'); return; }
       setSucesso(`Usuário criado! E-mail de convite enviado para ${email}.`);
-      setNome(''); setEmail(''); setLogin(''); setRole('viewer');
+      setNome(''); setEmail(''); setRole('viewer');
       setShowForm(false);
       const r2 = await fetch('/api/admin/usuarios');
       setUsers(await r2.json());
@@ -149,13 +148,7 @@ export default function ConfiguracoesPage() {
                     onFocus={e => { e.currentTarget.style.borderColor = C.purple; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66,44,118,0.1)'; }}
                     onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; }} />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: C.gray }}>Login</label>
-                  <input value={login} onChange={e => setLogin(e.target.value.toLowerCase().replace(/\s/g, ''))} required style={inputStyle} placeholder="joaosilva"
-                    onFocus={e => { e.currentTarget.style.borderColor = C.purple; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66,44,118,0.1)'; }}
-                    onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; }} />
-                </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: C.gray }}>Perfil</label>
                   <select value={role} onChange={e => setRole(e.target.value as 'admin' | 'viewer')}
                     style={{ ...inputStyle, cursor: 'pointer' }}>
@@ -189,7 +182,7 @@ export default function ConfiguracoesPage() {
             <table className="w-full">
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  {['Nome', 'E-mail', 'Login', 'Perfil', 'Ações'].map(h => (
+                  {['Nome', 'E-mail', 'Perfil', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider" style={{ color: C.gray }}>{h}</th>
                   ))}
                 </tr>
@@ -201,7 +194,6 @@ export default function ConfiguracoesPage() {
                       <div className="font-semibold text-sm text-gray-800">{u.nome}</div>
                     </td>
                     <td className="px-4 py-3 text-sm" style={{ color: C.gray }}>{u.email || '—'}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-gray-600">{u.login}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
                         style={{

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const token = generateToken();
     await setResetToken(user.id, token, 3600); // 1 hora
     try {
-      await sendResetEmail(user.email!, user.nome, token, user.login);
+      await sendResetEmail(user.email!, user.nome, token);
     } catch (err) {
       console.error('Erro ao enviar email de recuperação:', err);
     }

@@ -89,23 +89,23 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit}>
 
-            {/* Usuário */}
+            {/* E-mail */}
             <div className="mb-4">
               <label
                 className="block text-xs font-semibold mb-1.5 uppercase tracking-wider"
                 style={{ color: '#6b7280' }}
               >
-                Usuário
+                E-mail
               </label>
               <input
-                type="text"
+                type="email"
                 value={login}
                 onChange={e => setLogin(e.target.value)}
                 required
                 autoFocus
-                autoComplete="username"
+                autoComplete="email"
                 style={inputStyle}
-                placeholder="seu usuário"
+                placeholder="seu@email.com"
                 onFocus={e => {
                   e.currentTarget.style.borderColor = '#422c76';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66,44,118,0.1)';

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { ensureUsersTable, findByLogin, verifyPassword } from '@/lib/users';
+import { ensureUsersTable, findByLogin, findByEmail, verifyPassword } from '@/lib/users';
 
 const SESSION_COOKIE = 'vp_session';
 const SESSION_TOKEN  = process.env.SESSION_SECRET ?? 'vp-auth-ok-2025';
@@ -20,7 +20,8 @@ export async function POST(request: Request) {
 
   await ensureUsersTable();
 
-  const user = await findByLogin(login);
+  // Tenta por email primeiro; fallback por login (para conta admin sem email)
+  const user = (await findByEmail(login)) ?? (await findByLogin(login));
 
   if (!user || !user.senha_hash || !verifyPassword(senha, user.senha_hash)) {
     await new Promise(r => setTimeout(r, 500));

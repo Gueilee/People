@@ -13,7 +13,6 @@ function DefinirSenhaForm() {
   const [loading, setLoading]     = useState(false);
   const [mensagem, setMensagem]   = useState('');
   const [erro, setErro]           = useState('');
-  const [userLogin, setUserLogin] = useState('');
 
   useEffect(() => {
     if (!token) setErro('Link inválido. Verifique o e-mail recebido.');
@@ -37,9 +36,8 @@ function DefinirSenhaForm() {
       });
       const data = await res.json();
       if (res.ok) {
-        setUserLogin(data.login ?? '');
         setMensagem('Senha definida com sucesso!');
-        setTimeout(() => router.push('/login'), 4000);
+        setTimeout(() => router.push('/login'), 2500);
       } else {
         setErro(data.erro ?? 'Erro ao definir senha');
       }
@@ -64,18 +62,8 @@ function DefinirSenhaForm() {
       </p>
 
       {mensagem ? (
-        <div>
-          <div className="rounded-xl px-4 py-4 text-sm text-center" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' }}>
-            {mensagem}
-          </div>
-          {userLogin && (
-            <div className="rounded-xl px-4 py-4 mt-3" style={{ background: '#f3f0fa', border: '1.5px solid #d4c8f0' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#6b7280' }}>Anote seu login de acesso</p>
-              <p className="text-xl font-black font-mono text-center" style={{ color: '#422c76' }}>{userLogin}</p>
-              <p className="text-xs text-center mt-1" style={{ color: '#9ca3af' }}>Use este login na tela de acesso</p>
-            </div>
-          )}
-          <p className="text-xs text-center mt-3" style={{ color: '#9ca3af' }}>Redirecionando para o login...</p>
+        <div className="rounded-xl px-4 py-4 text-sm text-center" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' }}>
+          {mensagem}
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
