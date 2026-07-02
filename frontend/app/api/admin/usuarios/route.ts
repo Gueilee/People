@@ -30,20 +30,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
   }
 
-  const { nome, email, login, role } = body;
-  if (!nome || !email || !login) {
-    return NextResponse.json({ erro: 'Nome, e-mail e login são obrigatórios' }, { status: 400 });
+  const { nome, email, role } = body;
+  if (!nome || !email) {
+    return NextResponse.json({ erro: 'Nome e e-mail são obrigatórios' }, { status: 400 });
   }
   if (!['admin', 'viewer'].includes(role || '')) {
     return NextResponse.json({ erro: 'Perfil inválido' }, { status: 400 });
   }
+
+  // Auto-gera login a partir da parte local do e-mail
+  const login = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
 
   try {
     const id = await createUser(nome, email, login, (role as 'admin' | 'viewer'));
     const token = generateToken();
     await setResetToken(id, token, 7 * 24 * 3600); // 7 dias para convite
     try {
-      await sendInviteEmail(email, nome, token, login);
+      await sendInviteEmail(email, nome, token);
     } catch (err) {
       console.error('Erro ao enviar convite:', err);
     }

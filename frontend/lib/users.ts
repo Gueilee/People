@@ -57,9 +57,13 @@ export async function ensureUsersTable() {
   if (!count || count.n === 0) {
     await db.run(
       `INSERT INTO usuarios (nome, email, login, senha_hash, role) VALUES (?, ?, ?, ?, ?)`,
-      ['Administrador', null, 'admin', hashPassword('vendemmia@2025'), 'admin']
+      ['Administrador', 'admin@vendemmia.com.br', 'admin', hashPassword('vendemmia@2025'), 'admin']
     );
   }
+  // Migração: garante email no admin (banco criado antes desta versão)
+  await db.run(
+    `UPDATE usuarios SET email = 'admin@vendemmia.com.br' WHERE login = 'admin' AND email IS NULL`
+  );
   db.save();
   await db.close();
 }
