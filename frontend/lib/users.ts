@@ -8,6 +8,7 @@ export type Usuario = {
   login: string;
   role: 'admin' | 'viewer';
   ativo: number;
+  tem_senha: number;
   created_at: number;
 };
 
@@ -113,10 +114,31 @@ export async function findById(id: number) {
 export async function listUsers(): Promise<Usuario[]> {
   const db = await getDb();
   const rows = await db.all<Usuario>(
-    `SELECT id, nome, email, login, role, ativo, created_at FROM usuarios ORDER BY role DESC, nome ASC`
+    `SELECT id, nome, email, login, role, ativo, created_at,
+            CASE WHEN senha_hash IS NOT NULL THEN 1 ELSE 0 END as tem_senha
+     FROM usuarios ORDER BY ativo DESC, role DESC, nome ASC`
   );
   await db.close();
   return rows;
+}
+
+export async function findByIdAdmin(id: number) {
+  const db = await getDb();
+  const u = await db.get<Usuario & { tem_senha: number }>(
+    `SELECT id, nome, email, login, role, ativo,
+            CASE WHEN senha_hash IS NOT NULL THEN 1 ELSE 0 END as tem_senha
+     FROM usuarios WHERE id = ?`,
+    [id]
+  );
+  await db.close();
+  return u;
+}
+
+export async function reactivateUser(id: number) {
+  const db = await getDb();
+  await db.run(`UPDATE usuarios SET ativo = 1 WHERE id = ?`, [id]);
+  db.save();
+  await db.close();
 }
 
 export async function createUser(nome: string, email: string, login: string, role: 'admin' | 'viewer') {

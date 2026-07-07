@@ -10,10 +10,39 @@ type Usuario = {
   login: string;
   role: 'admin' | 'viewer';
   ativo: number;
+  tem_senha: number;
   created_at: number;
 };
 
 const C = { purple: '#422c76', pink: '#ff2f69', gray: '#6b7280' };
+
+function StatusBadge({ u }: { u: Usuario }) {
+  if (!u.ativo) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+        style={{ background: '#fef2f2', color: '#dc2626' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#dc2626', display: 'inline-block' }} />
+        Desativado
+      </span>
+    );
+  }
+  if (!u.tem_senha) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+        style={{ background: '#fffbeb', color: '#d97706' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#d97706', display: 'inline-block' }} />
+        Pendente
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+      style={{ background: '#f0fdf4', color: '#16a34a' }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
+      Ativo
+    </span>
+  );
+}
 
 export default function ConfiguracoesPage() {
   const router = useRouter();
@@ -28,6 +57,9 @@ export default function ConfiguracoesPage() {
   const [saving, setSaving] = useState(false);
   const [erro, setErro]   = useState('');
   const [sucesso, setSucesso] = useState('');
+
+  const reloadUsers = () =>
+    fetch('/api/admin/usuarios').then(r => r.ok ? r.json() : []).then(setUsers);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -56,29 +88,45 @@ export default function ConfiguracoesPage() {
       setSucesso(`Usuário criado! E-mail de convite enviado para ${email}.`);
       setNome(''); setEmail(''); setRole('viewer');
       setShowForm(false);
-      const r2 = await fetch('/api/admin/usuarios');
-      setUsers(await r2.json());
+      await reloadUsers();
     } catch { setErro('Erro de conexão'); }
     finally { setSaving(false); }
   }
 
   async function handleDelete(id: number, nomeUser: string) {
-    if (!confirm(`Remover o usuário "${nomeUser}"?`)) return;
+    if (!confirm(`Desativar o usuário "${nomeUser}"?\n\nEle não conseguirá mais acessar o sistema, mas pode ser reativado depois.`)) return;
     setErro(''); setSucesso('');
     const res = await fetch(`/api/admin/usuarios/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      setSucesso(`Usuário "${nomeUser}" removido.`);
-      setUsers(u => u.filter(x => x.id !== id));
+      setSucesso(`Usuário "${nomeUser}" desativado.`);
+      await reloadUsers();
     } else {
       const d = await res.json();
-      setErro(d.erro ?? 'Erro ao remover');
+      setErro(d.erro ?? 'Erro ao desativar');
+    }
+  }
+
+  async function handleReactivate(id: number, nomeUser: string) {
+    setErro(''); setSucesso('');
+    const res = await fetch(`/api/admin/usuarios/${id}`, { method: 'PATCH' });
+    if (res.ok) {
+      const d = await res.json();
+      setSucesso(
+        d.convite_enviado
+          ? `"${nomeUser}" reativado e novo convite enviado por e-mail.`
+          : `"${nomeUser}" reativado com sucesso.`
+      );
+      await reloadUsers();
+    } else {
+      const d = await res.json();
+      setErro(d.erro ?? 'Erro ao reativar');
     }
   }
 
   async function handleResendInvite(id: number, nomeUser: string) {
     setErro(''); setSucesso('');
     const res = await fetch(`/api/admin/usuarios/${id}`, { method: 'POST' });
-    if (res.ok) setSucesso(`Convite reenviado para "${nomeUser}".`);
+    if (res.ok) setSucesso(`Novo convite enviado para "${nomeUser}".`);
     else { const d = await res.json(); setErro(d.erro ?? 'Erro ao reenviar'); }
   }
 
@@ -97,6 +145,10 @@ export default function ConfiguracoesPage() {
       </div>
     );
   }
+
+  const ativos    = users.filter(u => u.ativo === 1);
+  const inativos  = users.filter(u => u.ativo === 0);
+  const pendentes = ativos.filter(u => !u.tem_senha).length;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#f8f7f4' }}>
@@ -169,26 +221,40 @@ export default function ConfiguracoesPage() {
           </div>
         )}
 
-        {/* Lista de usuários */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        {/* Resumo */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {[
+            { label: 'Ativos', value: ativos.filter(u => u.tem_senha).length, color: '#16a34a', bg: '#f0fdf4' },
+            { label: 'Pendentes', value: pendentes, color: '#d97706', bg: '#fffbeb' },
+            { label: 'Desativados', value: inativos.length, color: '#dc2626', bg: '#fef2f2' },
+          ].map(card => (
+            <div key={card.label} className="bg-white rounded-xl p-4 shadow-sm" style={{ borderLeft: `3px solid ${card.color}` }}>
+              <div className="text-2xl font-black" style={{ color: card.color }}>{card.value}</div>
+              <div className="text-xs font-semibold mt-0.5" style={{ color: C.gray }}>{card.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Lista de usuários ativos */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="font-bold text-sm" style={{ color: C.purple }}>
-              Usuários ({users.length})
+              Usuários ({ativos.length})
             </h2>
           </div>
-          {users.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm" style={{ color: C.gray }}>Nenhum usuário cadastrado</div>
+          {ativos.length === 0 ? (
+            <div className="px-6 py-10 text-center text-sm" style={{ color: C.gray }}>Nenhum usuário ativo</div>
           ) : (
             <table className="w-full">
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  {['Nome', 'E-mail', 'Perfil', 'Ações'].map(h => (
+                  {['Nome', 'E-mail', 'Perfil', 'Status', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider" style={{ color: C.gray }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {users.map(u => (
+                {ativos.map(u => (
                   <tr key={u.id} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-semibold text-sm text-gray-800">{u.nome}</div>
@@ -203,14 +269,14 @@ export default function ConfiguracoesPage() {
                         {u.role === 'admin' ? 'Admin' : 'Visualizador'}
                       </span>
                     </td>
+                    <td className="px-4 py-3"><StatusBadge u={u} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {u.email && (
+                        {u.email && !u.tem_senha && (
                           <button
                             onClick={() => handleResendInvite(u.id, u.nome)}
-                            title="Reenviar convite"
-                            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-purple-50"
-                            style={{ color: C.purple, borderColor: 'rgba(66,44,118,0.2)' }}
+                            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-amber-50"
+                            style={{ color: '#d97706', borderColor: '#fde68a' }}
                           >
                             Reenviar convite
                           </button>
@@ -218,11 +284,10 @@ export default function ConfiguracoesPage() {
                         {u.id !== me?.id && (
                           <button
                             onClick={() => handleDelete(u.id, u.nome)}
-                            title="Remover usuário"
                             className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-red-50"
                             style={{ color: '#dc2626', borderColor: '#fecaca' }}
                           >
-                            Remover
+                            Desativar
                           </button>
                         )}
                       </div>
@@ -233,6 +298,51 @@ export default function ConfiguracoesPage() {
             </table>
           )}
         </div>
+
+        {/* Usuários desativados */}
+        {inativos.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h2 className="font-bold text-sm" style={{ color: '#dc2626' }}>
+                Desativados ({inativos.length})
+              </h2>
+            </div>
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: '#fef2f2' }}>
+                  {['Nome', 'E-mail', 'Perfil', 'Ações'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider" style={{ color: '#dc2626', opacity: 0.6 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inativos.map(u => (
+                  <tr key={u.id} className="border-t border-red-50">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-sm" style={{ color: '#9ca3af' }}>{u.nome}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: '#d1d5db' }}>{u.email || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                        style={{ background: '#f3f4f6', color: '#9ca3af' }}>
+                        {u.role === 'admin' ? 'Admin' : 'Visualizador'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleReactivate(u.id, u.nome)}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-green-50"
+                        style={{ color: '#16a34a', borderColor: '#bbf7d0' }}
+                      >
+                        {u.tem_senha ? 'Reativar' : 'Reativar e convidar'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
     </div>
   );

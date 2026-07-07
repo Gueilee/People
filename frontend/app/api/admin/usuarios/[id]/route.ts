@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { findById, deleteUser, generateToken, setResetToken } from '@/lib/users';
+import { findById, findByIdAdmin, deleteUser, reactivateUser, generateToken, setResetToken } from '@/lib/users';
 import { sendInviteEmail } from '@/lib/mailer';
 
 const SESSION_TOKEN = process.env.SESSION_SECRET ?? 'vp-auth-ok-2025';
@@ -43,4 +43,29 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ erro: `Erro ao enviar e-mail: ${err}` }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ erro: 'Acesso negado' }, { status: 403 });
+
+  const { id } = await params;
+  const user = await findByIdAdmin(parseInt(id));
+  if (!user) return NextResponse.json({ erro: 'Usuário não encontrado' }, { status: 404 });
+
+  await reactivateUser(user.id);
+
+  // Se ainda não tem senha, envia novo convite junto com a reativação
+  if (!user.tem_senha && user.email) {
+    const token = generateToken();
+    await setResetToken(user.id, token, 7 * 24 * 3600);
+    try {
+      await sendInviteEmail(user.email, user.nome, token);
+    } catch (err) {
+      console.error('Erro ao enviar convite na reativação:', err);
+    }
+    return NextResponse.json({ ok: true, convite_enviado: true });
+  }
+
+  return NextResponse.json({ ok: true, convite_enviado: false });
 }
