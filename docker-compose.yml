@@ -3,9 +3,7 @@ version: '3.9'
 services:
 
   app:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: people-app:latest
     container_name: people_app
     environment:
       - NODE_ENV=production
