@@ -175,9 +175,16 @@ export async function setPassword(id: number, password: string) {
   await db.close();
 }
 
-export async function deleteUser(id: number) {
+export async function deactivateUser(id: number) {
   const db = await getDb();
   await db.run(`UPDATE usuarios SET ativo = 0 WHERE id = ?`, [id]);
+  db.save();
+  await db.close();
+}
+
+export async function deleteUser(id: number) {
+  const db = await getDb();
+  await db.run(`DELETE FROM usuarios WHERE id = ?`, [id]);
   db.save();
   await db.close();
 }

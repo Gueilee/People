@@ -93,16 +93,33 @@ export default function ConfiguracoesPage() {
     finally { setSaving(false); }
   }
 
-  async function handleDelete(id: number, nomeUser: string) {
+  async function handleDeactivate(id: number, nomeUser: string) {
     if (!confirm(`Desativar o usuário "${nomeUser}"?\n\nEle não conseguirá mais acessar o sistema, mas pode ser reativado depois.`)) return;
     setErro(''); setSucesso('');
-    const res = await fetch(`/api/admin/usuarios/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/admin/usuarios/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acao: 'desativar' }),
+    });
     if (res.ok) {
       setSucesso(`Usuário "${nomeUser}" desativado.`);
       await reloadUsers();
     } else {
       const d = await res.json();
       setErro(d.erro ?? 'Erro ao desativar');
+    }
+  }
+
+  async function handleHardDelete(id: number, nomeUser: string) {
+    if (!confirm(`Excluir permanentemente "${nomeUser}"?\n\nEsta ação não pode ser desfeita. O usuário será removido do banco de dados.`)) return;
+    setErro(''); setSucesso('');
+    const res = await fetch(`/api/admin/usuarios/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setSucesso(`Usuário "${nomeUser}" excluído permanentemente.`);
+      await reloadUsers();
+    } else {
+      const d = await res.json();
+      setErro(d.erro ?? 'Erro ao excluir');
     }
   }
 
@@ -282,13 +299,22 @@ export default function ConfiguracoesPage() {
                           </button>
                         )}
                         {u.id !== me?.id && (
-                          <button
-                            onClick={() => handleDelete(u.id, u.nome)}
-                            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-red-50"
-                            style={{ color: '#dc2626', borderColor: '#fecaca' }}
-                          >
-                            Desativar
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleDeactivate(u.id, u.nome)}
+                              className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-orange-50"
+                              style={{ color: '#ea580c', borderColor: '#fed7aa' }}
+                            >
+                              Desativar
+                            </button>
+                            <button
+                              onClick={() => handleHardDelete(u.id, u.nome)}
+                              className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-red-50"
+                              style={{ color: '#dc2626', borderColor: '#fecaca' }}
+                            >
+                              Excluir
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -329,13 +355,22 @@ export default function ConfiguracoesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleReactivate(u.id, u.nome)}
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-green-50"
-                        style={{ color: '#16a34a', borderColor: '#bbf7d0' }}
-                      >
-                        {u.tem_senha ? 'Reativar' : 'Reativar e convidar'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleReactivate(u.id, u.nome)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-green-50"
+                          style={{ color: '#16a34a', borderColor: '#bbf7d0' }}
+                        >
+                          {u.tem_senha ? 'Reativar' : 'Reativar e convidar'}
+                        </button>
+                        <button
+                          onClick={() => handleHardDelete(u.id, u.nome)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:bg-red-50"
+                          style={{ color: '#dc2626', borderColor: '#fecaca' }}
+                        >
+                          Excluir
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
