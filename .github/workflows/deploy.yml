@@ -18,7 +18,7 @@ jobs:
       - name: Empacotar contexto de build (frontend)
         run: |
           cd frontend
-          tar --exclude='.next' --exclude='node_modules' -czf /tmp/build-context.tar.gz .
+          tar --exclude='.next' --exclude='node_modules' --exclude='*.db' -cf /tmp/build-context.tar .
 
       - name: Build image na VM via Portainer API
         env:
@@ -26,7 +26,6 @@ jobs:
           PORTAINER_USER: ${{ secrets.PORTAINER_USER }}
           PORTAINER_PASSWORD: ${{ secrets.PORTAINER_PASSWORD }}
         run: |
-          # Autenticar
           TOKEN=$(curl -sk -X POST "$PORTAINER_URL/api/auth" \
             -H "Content-Type: application/json" \
             -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}" \
@@ -34,32 +33,67 @@ jobs:
 
           echo "Autenticado no Portainer"
 
-          # Enviar contexto e buildar imagem na VM (endpoint 3 = local Docker)
-          curl -sk -X POST \
-            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile" \
+          RESULT=$(curl -sk -X POST \
+            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/x-tar" \
-            --data-binary @/tmp/build-context.tar.gz \
-            | tail -5
+            --data-binary @/tmp/build-context.tar)
 
-          echo "Build concluído"
+          echo "$RESULT" | tail -3
+          echo "$RESULT" | python3 -c "
+          import sys
+          for line in sys.stdin:
+              line=line.strip()
+              if not line: continue
+              try:
+                  import json; d=json.loads(line)
+                  if 'error' in d:
+                      print('BUILD ERROR:', d['error']); exit(1)
+              except: pass
+          print('Build concluido com sucesso')
+          "
 
       - name: Redeploiar stack no Portainer
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           PORTAINER_USER: ${{ secrets.PORTAINER_USER }}
           PORTAINER_PASSWORD: ${{ secrets.PORTAINER_PASSWORD }}
+          PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+          MAILER_URL: ${{ secrets.MAILER_URL }}
         run: |
           TOKEN=$(curl -sk -X POST "$PORTAINER_URL/api/auth" \
             -H "Content-Type: application/json" \
             -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])")
 
-          COMPOSE=$(cat docker-compose.yml | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+          COMPOSE=$(python3 -c "import sys,json; print(json.dumps(open('docker-compose.yml').read()))")
 
-          curl -sk -X PUT \
+          PAYLOAD=$(python3 -c "
+          import json, os
+          payload = {
+            'stackFileContent': open('docker-compose.yml').read(),
+            'prune': True,
+            'pullImage': False,
+            'env': [
+              {'name': 'SESSION_SECRET', 'value': 'vp-prod-vendemmia-2025'},
+              {'name': 'APP_URL',        'value': 'https://people.vendemm.ia.br'},
+              {'name': 'PG_PASSWORD',    'value': os.environ['PG_PASSWORD']},
+              {'name': 'MAILER_URL',     'value': os.environ['MAILER_URL']},
+            ]
+          }
+          print(json.dumps(payload))
+          ")
+
+          RESULT=$(curl -sk -X PUT \
             "$PORTAINER_URL/api/stacks/11?endpointId=3" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"stackFileContent\":$COMPOSE,\"prune\":false,\"pullImage\":false}" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print('Stack atualizada:', d.get('Name','?'))"
+            -d "$PAYLOAD")
+
+          echo "$RESULT" | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          if 'message' in d:
+              print('ERRO:', d['message']); exit(1)
+          print('Stack redesployada:', d.get('Name','?'), '— Status:', d.get('Status','?'))
+          "
