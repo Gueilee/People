@@ -367,7 +367,7 @@ export async function GET(request: Request) {
 
     const spanDetalhes = gestoresAtivos.map(g => {
       const diretos = ativos.filter(c => c.gestor === g).length;
-      const gest    = ativos.find(c => c.nome === g);
+      const gest    = ativos.find(c => c.nome?.toLowerCase() === g?.toLowerCase());
       const faixa   = diretos <= 3 ? 'ate3' : diretos <= 7 ? 'de4a7' : diretos <= 15 ? 'de8a15' : 'acima15';
       return { gestor: g, cargo: gest?.cargo || '', departamento: gest?.departamento || '', unidade: gest?.unidade || '', diretos, faixa };
     }).sort((a, b) => b.diretos - a.diretos);
