@@ -360,7 +360,7 @@ export async function GET(request: Request) {
         totalAtraso:       +(kpiRow?.total_atraso   || 0).toFixed(1),
         saldoBanco:        +(kpiRow?.saldo_banco    || 0).toFixed(1),
         saldoBancoPos:     +(saldoBancoPosRow?.total || 0).toFixed(1),
-        impactoFinanceiro: parseFloat(saldoBancoPosRow?.impacto_financeiro || '0'),
+        impactoFinanceiro: +(saldoBancoPosRow?.impacto_financeiro ?? 0),
         custoHe:           parseFloat(kpiRow?.custo_he        || '0'),
         custoAusencias:    parseFloat(kpiRow?.custo_ausencias || '0'),
         custoNoturno:      parseFloat(kpiRow?.custo_noturno   || '0'),
