@@ -59,6 +59,9 @@ export async function GET(request: Request) {
     const db  = await getDb();
     const all: Historico[] = await db.all('SELECT * FROM historico_cargo_salario ORDER BY nome, data_inicio');
 
+    const ativosRows = await db.all<{ nome: string }>(`SELECT nome FROM colaboradores WHERE status = 'Ativo'`);
+    const ativosSet  = new Set(ativosRows.map(r => r.nome.toUpperCase().trim()));
+
     const gestoresRows = await db.all<{ gestor: string }>(
       `SELECT DISTINCT c.gestor FROM colaboradores c
        INNER JOIN historico_cargo_salario h ON UPPER(TRIM(c.nome)) = UPPER(TRIM(h.nome))
@@ -184,6 +187,7 @@ export async function GET(request: Request) {
       }
     });
     const topPromovidos = Object.entries(promCount)
+      .filter(([nome]) => ativosSet.has(nome.toUpperCase().trim()))
       .map(([nome, d]) => ({ nome, totalPromocoes: d.count, cargo: d.cargo, area: d.area, unidade: d.unidade, ultimaPromocao: d.ultima }))
       .sort((a, b) => b.totalPromocoes - a.totalPromocoes)
       .slice(0, 15);
