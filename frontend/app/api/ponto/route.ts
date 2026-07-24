@@ -142,9 +142,9 @@ export async function GET(request: Request) {
         SUM(ferias)                                        AS total_ferias,
         SUM(afastamento_nao_rem)                           AS total_afastamento,
         MAX(synced_at)                                     AS synced_at,
-        ROUND(SUM(extra_50*valor_hora*1.5 + extra_60*valor_hora*1.6 + extra_100*valor_hora*2.0)::NUMERIC,2) AS custo_he,
-        ROUND(SUM((falta_injustificada+atestado)*valor_hora)::NUMERIC,2)                                    AS custo_ausencias,
-        ROUND(SUM(adicional_noturno*valor_hora*0.20)::NUMERIC,2)                                            AS custo_noturno
+        ROUND(SUM(extra_50*valor_hora*1.5 + extra_60*valor_hora*1.6 + extra_100*valor_hora*2.0)::NUMERIC,2)::FLOAT AS custo_he,
+        ROUND(SUM((falta_injustificada+atestado)*valor_hora)::NUMERIC,2)::FLOAT                                    AS custo_ausencias,
+        ROUND(SUM(adicional_noturno*valor_hora*0.20)::NUMERIC,2)::FLOAT                                            AS custo_noturno
        FROM ponto_mensal ${where}`,
       params
     );
@@ -173,9 +173,9 @@ export async function GET(request: Request) {
         SUM(hora_noturna_reduzida)                     AS hora_noturna_reduzida,
         SUM(dsr)                                       AS dsr,
         COUNT(CASE WHEN banco_horas < 0 THEN 1 END)    AS banco_negativo,
-        ROUND(SUM(extra_50*valor_hora*1.5 + extra_60*valor_hora*1.6 + extra_100*valor_hora*2.0)::NUMERIC,2) AS custo_he,
-        ROUND(SUM((falta_injustificada+atestado)*valor_hora)::NUMERIC,2)                                    AS custo_ausencias,
-        ROUND(SUM(adicional_noturno*valor_hora*0.20)::NUMERIC,2)                                            AS custo_noturno
+        ROUND(SUM(extra_50*valor_hora*1.5 + extra_60*valor_hora*1.6 + extra_100*valor_hora*2.0)::NUMERIC,2)::FLOAT AS custo_he,
+        ROUND(SUM((falta_injustificada+atestado)*valor_hora)::NUMERIC,2)::FLOAT                                    AS custo_ausencias,
+        ROUND(SUM(adicional_noturno*valor_hora*0.20)::NUMERIC,2)::FLOAT                                            AS custo_noturno
        FROM ponto_mensal ${where}
        GROUP BY filial
        ORDER BY filial`,
@@ -254,8 +254,8 @@ export async function GET(request: Request) {
     // ── Saldo positivo de BH por unidade ────────────────────────────────────
     const bhPorUnidadeRows = await db.all<any>(
       `SELECT filial,
-         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END)::NUMERIC, 1)        AS saldo_pos,
-         ROUND(SUM(CASE WHEN acum > 0 THEN acum * vh ELSE 0 END)::NUMERIC, 2)   AS impacto_financeiro,
+         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END)::NUMERIC, 1)::FLOAT        AS saldo_pos,
+         ROUND(SUM(CASE WHEN acum > 0 THEN acum * vh ELSE 0 END)::NUMERIC, 2)::FLOAT   AS impacto_financeiro,
          COUNT(CASE WHEN acum > 0 THEN 1 END)                                    AS count_pos,
          COUNT(DISTINCT nome)                                                     AS total_func
        FROM (
@@ -360,10 +360,10 @@ export async function GET(request: Request) {
         totalAtraso:       +(kpiRow?.total_atraso   || 0).toFixed(1),
         saldoBanco:        +(kpiRow?.saldo_banco    || 0).toFixed(1),
         saldoBancoPos:     +(saldoBancoPosRow?.total || 0).toFixed(1),
-        impactoFinanceiro: +(saldoBancoPosRow?.impacto_financeiro || 0).toFixed(2),
-        custoHe:           +(kpiRow?.custo_he        || 0).toFixed(2),
-        custoAusencias:    +(kpiRow?.custo_ausencias || 0).toFixed(2),
-        custoNoturno:      +(kpiRow?.custo_noturno   || 0).toFixed(2),
+        impactoFinanceiro: parseFloat(saldoBancoPosRow?.impacto_financeiro || '0'),
+        custoHe:           parseFloat(kpiRow?.custo_he        || '0'),
+        custoAusencias:    parseFloat(kpiRow?.custo_ausencias || '0'),
+        custoNoturno:      parseFloat(kpiRow?.custo_noturno   || '0'),
         bancoNegativo:     bancoNegRow?.n            || 0,
         totalNoturno:      +(kpiRow?.total_noturno   || 0).toFixed(1),
         totalHoraNot:      +(kpiRow?.total_hora_not || 0).toFixed(1),
