@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sincroniza dados de ponto do TiqueTaque para o banco SQLite local.
+Sincroniza dados de ponto do TiqueTaque para o banco PostgreSQL (Azure).
 
 Uso:
   python scripts/sync_ponto.py --mes 2026-04
@@ -9,17 +9,26 @@ Uso:
 """
 
 import requests
-import sqlite3
+import psycopg2
 import base64
 import time
 import calendar
 import argparse
+import os
 from datetime import date
 
 TOKEN   = "e7d43df8-9070-4932-8da7-a779fc458290"
 BASE    = "https://api.tiquetaque.com/v2.1"
-DB_PATH = "frontend/database/vendemmia_people.db"
 DELAY   = 1.25   # segundos entre requests (seguro para 60/min)
+
+PG_CONN = {
+    "host":     os.getenv("PG_HOST",     "chico-bento-lake-pg-dev.postgres.database.azure.com"),
+    "user":     os.getenv("PG_USER",     "projetos_admin"),
+    "password": os.getenv("PG_PASSWORD", "projetos_vdm2026#%"),
+    "dbname":   os.getenv("PG_DB",       "vdm_projetos"),
+    "port":     5432,
+    "sslmode":  "require",
+}
 
 HEADERS = {
     "Authorization": "Basic " + base64.b64encode(f"public:{TOKEN}".encode()).decode()
@@ -28,9 +37,10 @@ HEADERS = {
 # ── Banco ────────────────────────────────────────────────────────────────────
 
 def criar_tabela(conn):
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS ponto_mensal (
-            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            id                      SERIAL PRIMARY KEY,
             employee_id             TEXT NOT NULL,
             cpf                     TEXT,
             nome                    TEXT,
@@ -38,27 +48,28 @@ def criar_tabela(conn):
             cargo                   TEXT,
             filial                  TEXT,
             mes                     TEXT NOT NULL,
-            horas_normais           REAL DEFAULT 0,
-            total                   REAL DEFAULT 0,
-            banco_horas             REAL DEFAULT 0,
-            extra_50                REAL DEFAULT 0,
-            extra_60                REAL DEFAULT 0,
-            extra_100               REAL DEFAULT 0,
-            atraso                  REAL DEFAULT 0,
-            falta_injustificada     REAL DEFAULT 0,
-            atestado                REAL DEFAULT 0,
-            abono                   REAL DEFAULT 0,
-            ferias                  REAL DEFAULT 0,
-            afastamento_nao_rem     REAL DEFAULT 0,
-            dispensa_legal          REAL DEFAULT 0,
-            adicional_noturno       REAL DEFAULT 0,
-            hora_noturna_reduzida   REAL DEFAULT 0,
-            dsr                     REAL DEFAULT 0,
-            synced_at               TEXT DEFAULT (datetime('now')),
+            horas_normais           DOUBLE PRECISION DEFAULT 0,
+            total                   DOUBLE PRECISION DEFAULT 0,
+            banco_horas             DOUBLE PRECISION DEFAULT 0,
+            extra_50                DOUBLE PRECISION DEFAULT 0,
+            extra_60                DOUBLE PRECISION DEFAULT 0,
+            extra_100               DOUBLE PRECISION DEFAULT 0,
+            atraso                  DOUBLE PRECISION DEFAULT 0,
+            falta_injustificada     DOUBLE PRECISION DEFAULT 0,
+            atestado                DOUBLE PRECISION DEFAULT 0,
+            abono                   DOUBLE PRECISION DEFAULT 0,
+            ferias                  DOUBLE PRECISION DEFAULT 0,
+            afastamento_nao_rem     DOUBLE PRECISION DEFAULT 0,
+            dispensa_legal          DOUBLE PRECISION DEFAULT 0,
+            adicional_noturno       DOUBLE PRECISION DEFAULT 0,
+            hora_noturna_reduzida   DOUBLE PRECISION DEFAULT 0,
+            dsr                     DOUBLE PRECISION DEFAULT 0,
+            synced_at               TEXT DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(employee_id, mes)
         )
     """)
     conn.commit()
+    cur.close()
 
 # ── TiqueTaque ───────────────────────────────────────────────────────────────
 
@@ -147,7 +158,8 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
         t = r.json().get("totals", {})
         def f(k): return float(t.get(k, 0) or 0)
 
-        conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO ponto_mensal
               (employee_id, cpf, nome, departamento, cargo, filial, mes,
                horas_normais, total, banco_horas,
@@ -156,18 +168,18 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
                ferias, afastamento_nao_rem, dispensa_legal,
                adicional_noturno, hora_noturna_reduzida, dsr,
                synced_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
             ON CONFLICT(employee_id, mes) DO UPDATE SET
-              horas_normais=excluded.horas_normais, total=excluded.total,
-              banco_horas=excluded.banco_horas,
-              extra_50=excluded.extra_50, extra_60=excluded.extra_60, extra_100=excluded.extra_100,
-              atraso=excluded.atraso, falta_injustificada=excluded.falta_injustificada,
-              atestado=excluded.atestado, abono=excluded.abono,
-              ferias=excluded.ferias, afastamento_nao_rem=excluded.afastamento_nao_rem,
-              dispensa_legal=excluded.dispensa_legal,
-              adicional_noturno=excluded.adicional_noturno,
-              hora_noturna_reduzida=excluded.hora_noturna_reduzida,
-              dsr=excluded.dsr, synced_at=datetime('now')
+              horas_normais=EXCLUDED.horas_normais, total=EXCLUDED.total,
+              banco_horas=EXCLUDED.banco_horas,
+              extra_50=EXCLUDED.extra_50, extra_60=EXCLUDED.extra_60, extra_100=EXCLUDED.extra_100,
+              atraso=EXCLUDED.atraso, falta_injustificada=EXCLUDED.falta_injustificada,
+              atestado=EXCLUDED.atestado, abono=EXCLUDED.abono,
+              ferias=EXCLUDED.ferias, afastamento_nao_rem=EXCLUDED.afastamento_nao_rem,
+              dispensa_legal=EXCLUDED.dispensa_legal,
+              adicional_noturno=EXCLUDED.adicional_noturno,
+              hora_noturna_reduzida=EXCLUDED.hora_noturna_reduzida,
+              dsr=EXCLUDED.dsr, synced_at=TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
         """, (
             eid, cpf, nome, dept, cargo, filial, mes,
             f("horas_normais"), f("total"), f("banco_horas"),
@@ -177,6 +189,7 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
             f("adicional_noturno"), f("hora_noturna_reduzida"), f("dsr"),
         ))
         conn.commit()
+        cur.close()
         print(f"  {label} ✅")
         ok += 1
 
@@ -202,7 +215,7 @@ def main():
     hoje = date.today()
     mes_atual = f"{hoje.year:04d}-{hoje.month:02d}"
 
-    p = argparse.ArgumentParser(description="Sync TiqueTaque → SQLite")
+    p = argparse.ArgumentParser(description="Sync TiqueTaque → PostgreSQL")
     p.add_argument("--mes",      help="Mês único (ex: 2026-04)")
     p.add_argument("--historico",action="store_true", help="Histórico completo desde set/2025")
     p.add_argument("--de",       help="Início do intervalo (ex: 2025-09)")
@@ -220,9 +233,9 @@ def main():
 
     print(f"\n🚀 TiqueTaque Sync — {len(meses)} mês(es)")
     print(f"   {meses[0]} → {meses[-1]}")
-    print(f"   Banco: {DB_PATH}\n")
+    print(f"   Banco: {PG_CONN['host']} / {PG_CONN['dbname']}\n")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONN)
     criar_tabela(conn)
 
     print("👥 Buscando funcionários...")
@@ -238,8 +251,7 @@ def main():
         total += sincronizar_mes(conn, funcionarios, filiais, mes)
 
     conn.close()
-    print(f"\n🎉 Sync concluído! {total} registros salvos em {DB_PATH}")
-    print(f"   Próximo passo: git add . && git commit -m 'data: sync ponto {meses[0]}..{meses[-1]}' && git push\n")
+    print(f"\n🎉 Sync concluído! {total} registros salvos no PostgreSQL")
 
 if __name__ == "__main__":
     main()

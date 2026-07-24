@@ -59,7 +59,6 @@ export async function GET(request: Request) {
     const db  = await getDb();
     const all: Historico[] = await db.all('SELECT * FROM historico_cargo_salario ORDER BY nome, data_inicio');
 
-    // Gestores disponíveis (via colaboradores)
     const gestoresRows = await db.all<{ gestor: string }>(
       `SELECT DISTINCT c.gestor FROM colaboradores c
        INNER JOIN historico_cargo_salario h ON UPPER(TRIM(c.nome)) = UPPER(TRIM(h.nome))
@@ -67,26 +66,21 @@ export async function GET(request: Request) {
        ORDER BY c.gestor`
     );
 
-    // Nomes que correspondem ao filtro de gestor
     let nomesGestor: Set<string> | null = null;
     if (filtroGestores.length > 0) {
       const rows = await db.all<{ nome: string }>(
-        `SELECT DISTINCT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map(() => '?').join(',')})`,
+        `SELECT DISTINCT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map((_, i) => `$${i + 1}`).join(',')})`,
         filtroGestores
       );
       nomesGestor = new Set(rows.map(r => r.nome.toUpperCase().trim()));
     }
 
-    await db.close();
-
     if (!all.length) {
       return NextResponse.json({ error: 'Tabela historico_cargo_salario vazia. Execute etl_historico.py.' }, { status: 404 });
     }
 
-    // Normalizar áreas antes de qualquer filtro ou agrupamento
     all.forEach(r => { r.area = normalizarArea(r.area); });
 
-    // ── Opções de filtro (do total histórico) ─────────────────────────────────
     const opcoesFiltro = {
       unidades: [...new Set(all.filter(r => r.unidade).map(r => r.unidade))].sort(),
       areas:    [...new Set(all.filter(r => r.area).map(r => r.area))].sort(),
@@ -96,7 +90,6 @@ export async function GET(request: Request) {
       all.filter(r => r.data_inicio).map(r => r.data_inicio!.substring(0, 7))
     )].sort().reverse();
 
-    // ── Aplicar filtros ───────────────────────────────────────────────────────
     let filtered = all;
     if (filtroUnidades.length > 0) {
       filtered = filtered.filter(r => filtroUnidades.includes(r.unidade));
@@ -115,16 +108,12 @@ export async function GET(request: Request) {
     const inicio = subMonths(hoje, meses);
     const inicioStr = inicio.toISOString().split('T')[0];
 
-    // ── Partição por tipo ─────────────────────────────────────────────────────
     const promocoes   = filtered.filter(r => r.tipo_evento === 'promocao');
     const reajustes   = filtered.filter(r => ['reajuste_merito','reajuste_coletivo','reajuste_salarial'].includes(r.tipo_evento));
-    // Só aplica filtro de período quando não há seleção específica de meses
     const usarPeriodo = filtroMesesArr.length === 0;
     const promPeriodo = usarPeriodo ? promocoes.filter(r => r.data_inicio && r.data_inicio >= inicioStr) : promocoes;
     const reajPeriodo = usarPeriodo ? reajustes.filter(r => r.data_inicio && r.data_inicio >= inicioStr) : reajustes;
 
-    // ── KPIs ─────────────────────────────────────────────────────────────────
-    // Registros do período com duração válida
     const filteredPeriodo = usarPeriodo
       ? filtered.filter(r => r.data_inicio && r.data_inicio >= inicioStr)
       : filtered;
@@ -139,11 +128,9 @@ export async function GET(request: Request) {
       byNome.get(r.nome)!.push(r);
     });
 
-    // Contar apenas quem teve promoção dentro do período selecionado
     const nomesComPromocao = new Set(promPeriodo.map(r => r.nome));
     const totalColabs = byNome.size;
 
-    // Tempo até promoção: calcular só para quem foi promovido no período
     const diasAtePromocao: number[] = [];
     nomesComPromocao.forEach(nome => {
       const registros = byNome.get(nome);
@@ -160,7 +147,6 @@ export async function GET(request: Request) {
       ? Math.round(diasAtePromocao.reduce((s, d) => s + d, 0) / diasAtePromocao.length)
       : 0;
 
-    // ── Promoções por área e unidade ─────────────────────────────────────────
     const promArea: Record<string, number> = {};
     promPeriodo.forEach(r => { promArea[r.area || 'Não informado'] = (promArea[r.area || 'Não informado'] || 0) + 1; });
     const promocoesPorArea = Object.entries(promArea)
@@ -173,7 +159,6 @@ export async function GET(request: Request) {
       .map(([unidade, count]) => ({ unidade, count }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Tendência mensal (exclui dissídio/acordo coletivo para não distorcer) ──
     const reajustesTendencia = reajustes.filter(r => r.tipo_evento !== 'reajuste_coletivo');
     const tendenciaPromocoes = Array.from({ length: Math.min(meses, 24) }, (_, i) => {
       const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(meses, 24) - 1 - i), 1);
@@ -185,7 +170,6 @@ export async function GET(request: Request) {
       return { mes: fmtMes(mi), promocoes: prom, reajustes: reaj };
     });
 
-    // ── Top promovidos ────────────────────────────────────────────────────────
     const promCount: Record<string, { count: number; area: string; unidade: string; cargo: string; ultima: string }> = {};
     promocoes.forEach(r => {
       if (!promCount[r.nome]) {
@@ -204,7 +188,6 @@ export async function GET(request: Request) {
       .sort((a, b) => b.totalPromocoes - a.totalPromocoes)
       .slice(0, 15);
 
-    // ── Últimas promoções ─────────────────────────────────────────────────────
     const ultimasPromocoes: { nome: string; cargo_anterior: string; cargo_novo: string; area: string; unidade: string; data: string; motivo: string }[] = [];
     byNome.forEach((registros, nome) => {
       const sorted = registros.sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''));
@@ -225,7 +208,6 @@ export async function GET(request: Request) {
     });
     ultimasPromocoes.sort((a, b) => b.data.localeCompare(a.data));
 
-    // ── Reajustes ─────────────────────────────────────────────────────────────
     const reajTipo: Record<string, number> = {};
     reajPeriodo.forEach(r => { reajTipo[r.tipo_evento] = (reajTipo[r.tipo_evento] || 0) + 1; });
     const totalReaj = reajPeriodo.length;
@@ -238,7 +220,6 @@ export async function GET(request: Request) {
       }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Distribuição combinada (promoções + reajustes) ────────────────────────
     const todosPeriodo = [...promPeriodo, ...reajPeriodo];
     const totalAlteracoes = todosPeriodo.length;
     const tipoCt: Record<string, number> = {};
@@ -264,7 +245,6 @@ export async function GET(request: Request) {
       .map(([area, d]) => ({ area, ...d, total: d.coletivo + d.merito + d.salarial }))
       .sort((a, b) => b.total - a.total);
 
-    // ── Distribuição tempo na função ──────────────────────────────────────────
     const faixasTempo = [
       { faixa: 'Até 3 meses',    min: 0,    max: 90    },
       { faixa: '3 a 6 meses',    min: 91,   max: 180   },
@@ -277,7 +257,6 @@ export async function GET(request: Request) {
       count: comDuracao.filter(r => r.duracao_dias! >= f.min && r.duracao_dias! <= f.max).length,
     }));
 
-    // ── Top mérito ────────────────────────────────────────────────────────────
     const meritoCt: Record<string, { count: number; area: string; unidade: string }> = {};
     reajustes.filter(r => r.tipo_evento === 'reajuste_merito').forEach(r => {
       if (!meritoCt[r.nome]) meritoCt[r.nome] = { count: 0, area: r.area, unidade: r.unidade };
@@ -288,7 +267,6 @@ export async function GET(request: Request) {
       .sort((a, b) => b.totalReajustes - a.totalReajustes)
       .slice(0, 10);
 
-    // ── Histórico individual ──────────────────────────────────────────────────
     const nomeBusca = searchParams.get('nome');
     let historicoColaborador: Historico[] = [];
     if (nomeBusca) {

@@ -15,7 +15,6 @@ export async function GET(request: Request) {
     const db = await getDb();
 
     if (busca) {
-      // Normaliza para ASCII removendo diacríticos — permite busca sem acento encontrar "THÁLITA" ao digitar "THALITA"
       const buscaNorm = busca.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
       const like = `%${buscaNorm}%`;
 
@@ -30,69 +29,62 @@ export async function GET(request: Request) {
                  'Ó','O'),'Ô','O'),'Õ','O'),
                  'Ú','U'),'Û','U'),
                  'Ç','C')
-               LIKE ?
+               LIKE $1
          ORDER BY
-           CASE WHEN UPPER(nome) LIKE ? THEN 0 ELSE 1 END,
+           CASE WHEN UPPER(nome) LIKE $2 THEN 0 ELSE 1 END,
            nome ASC
          LIMIT 25`,
         [like, `%${busca.toUpperCase()}%`]
       );
-      await db.close();
       return NextResponse.json(rows);
     }
 
     if (id) {
       const colab = await db.get(
-        `SELECT * FROM colaboradores WHERE id_colaborador = ?`,
+        `SELECT * FROM colaboradores WHERE id_colaborador = $1`,
         [id]
       );
       if (!colab) {
-        await db.close();
         return NextResponse.json({ erro: 'Colaborador não encontrado' }, { status: 404 });
       }
 
       const historico = await db.all(
         `SELECT * FROM historico_cargo_salario
-         WHERE nome = ?
+         WHERE nome = $1
          ORDER BY COALESCE(data_inicio, '0000-00-00') ASC`,
         [colab.nome as string]
       );
 
-      // Organograma: subordinados diretos
       const diretosRaw = await db.all(
         `SELECT id_colaborador, nome, cargo, departamento, unidade, status, email
-         FROM colaboradores WHERE gestor = ? ORDER BY cargo, nome`,
+         FROM colaboradores WHERE gestor = $1 ORDER BY cargo, nome`,
         [colab.nome as string]
       );
       const diretos = diretosRaw.map((d: any) => ({ ...d, gravatar_hash: gravatarHash(d.email) }));
       const totalDiretos = diretos.length;
 
-      // Gestor do colaborador (busca por nome)
       const gestorRaw = colab.gestor ? await db.get(
         `SELECT id_colaborador, nome, cargo, departamento, unidade, status, gestor, email
-         FROM colaboradores WHERE nome = ? LIMIT 1`,
+         FROM colaboradores WHERE nome = $1 LIMIT 1`,
         [colab.gestor as string]
       ) ?? null : null;
       const gestorInfo = gestorRaw ? { ...(gestorRaw as any), gravatar_hash: gravatarHash((gestorRaw as any).email) } : null;
 
-      // Gestor do gestor
       const gestorDoGestorRaw = (gestorInfo as any)?.gestor ? await db.get(
         `SELECT id_colaborador, nome, cargo, unidade, status, email
-         FROM colaboradores WHERE nome = ? LIMIT 1`,
+         FROM colaboradores WHERE nome = $1 LIMIT 1`,
         [(gestorInfo as any).gestor as string]
       ) ?? null : null;
       const gestorDoGestor = gestorDoGestorRaw ? { ...(gestorDoGestorRaw as any), gravatar_hash: gravatarHash((gestorDoGestorRaw as any).email) } : null;
 
-      // Colegas de equipe (mesmo gestor)
       const irmaoRaw = colab.gestor ? await db.all(
         `SELECT id_colaborador, nome, cargo, unidade, status, email
-         FROM colaboradores WHERE gestor = ? AND nome != ? AND status = 'Ativo'
+         FROM colaboradores WHERE gestor = $1 AND nome != $2 AND status = 'Ativo'
          ORDER BY cargo, nome LIMIT 8`,
         [colab.gestor as string, colab.nome as string]
       ) : [];
       const irmaos = irmaoRaw.map((d: any) => ({ ...d, gravatar_hash: gravatarHash(d.email) }));
 
-      // Histórico de ponto (TiqueTaque) — join por nome
       const ponto = await db.all(
         `SELECT mes, horas_normais, total, banco_horas,
                 extra_50, extra_60, extra_100,
@@ -100,12 +92,11 @@ export async function GET(request: Request) {
                 ferias, afastamento_nao_rem, adicional_noturno,
                 hora_noturna_reduzida, dsr, dispensa_legal, synced_at
          FROM ponto_mensal
-         WHERE UPPER(TRIM(nome)) = UPPER(TRIM(?))
+         WHERE UPPER(TRIM(nome)) = UPPER(TRIM($1))
          ORDER BY mes DESC`,
         [colab.nome as string]
       );
 
-      await db.close();
       return NextResponse.json({
         colaborador: { ...(colab as any), gravatar_hash: gravatarHash((colab as any).email) },
         historico,
@@ -114,7 +105,6 @@ export async function GET(request: Request) {
       });
     }
 
-    await db.close();
     return NextResponse.json({ erro: 'Informe busca ou id' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ erro: String(err) }, { status: 500 });

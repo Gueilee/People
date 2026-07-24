@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   try {
     const db = await getDb();
 
-    // ── Opções de filtro (sempre do total histórico) ──────────────────────────
+    // ── Opções de filtro ─────────────────────────────────────────────────────
     const mesesRows = await db.all<{ mes: string }>(
       `SELECT DISTINCT mes FROM ponto_mensal ORDER BY mes DESC`
     );
@@ -31,71 +31,82 @@ export async function GET(request: Request) {
        WHERE c.gestor IS NOT NULL AND c.gestor != '' ORDER BY c.gestor`
     );
 
-    // ── Construção do WHERE ──────────────────────────────────────────────────
+    // ── WHERE principal ──────────────────────────────────────────────────────
     const whereParts: string[] = [];
     const params: (string | number)[] = [];
 
     if (filtroMeses.length > 0) {
-      whereParts.push(`mes IN (${filtroMeses.map(() => '?').join(',')})`);
+      const p = params.length + 1;
+      whereParts.push(`mes IN (${filtroMeses.map((_, i) => `$${p + i}`).join(',')})`);
       params.push(...filtroMeses);
     } else if (filtroPeriodo > 0) {
-      whereParts.push(`mes >= strftime('%Y-%m', date('now', '-' || CAST(? AS TEXT) || ' months'))`);
+      whereParts.push(`mes >= TO_CHAR(NOW() - ($${params.length + 1}::TEXT || ' months')::INTERVAL, 'YYYY-MM')`);
       params.push(filtroPeriodo);
     }
     if (filtroUnidades.length > 0) {
-      whereParts.push(`filial IN (${filtroUnidades.map(() => '?').join(',')})`);
+      const p = params.length + 1;
+      whereParts.push(`filial IN (${filtroUnidades.map((_, i) => `$${p + i}`).join(',')})`);
       params.push(...filtroUnidades);
     }
     if (filtroAreas.length > 0) {
-      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE departamento IN (${filtroAreas.map(() => '?').join(',')}))`);
+      const p = params.length + 1;
+      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE departamento IN (${filtroAreas.map((_, i) => `$${p + i}`).join(',')}))`);
       params.push(...filtroAreas);
     }
     if (filtroGestores.length > 0) {
-      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map(() => '?').join(',')}))`);
+      const p = params.length + 1;
+      whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')}))`);
       params.push(...filtroGestores);
     }
 
     const where = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
 
-    // ── WHERE para tendência (sem filtro de mês, mantém série histórica) ─────
+    // ── WHERE tendência (sem filtro de mês, mantém série histórica) ──────────
     const whereTendParts: string[] = [];
     const whereTendParams: (string | number)[] = [];
     if (filtroUnidades.length > 0) {
-      whereTendParts.push(`filial IN (${filtroUnidades.map(() => '?').join(',')})`);
+      const p = whereTendParams.length + 1;
+      whereTendParts.push(`filial IN (${filtroUnidades.map((_, i) => `$${p + i}`).join(',')})`);
       whereTendParams.push(...filtroUnidades);
     }
     if (filtroAreas.length > 0) {
-      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE departamento IN (${filtroAreas.map(() => '?').join(',')}))`);
+      const p = whereTendParams.length + 1;
+      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE departamento IN (${filtroAreas.map((_, i) => `$${p + i}`).join(',')}))`);
       whereTendParams.push(...filtroAreas);
     }
     if (filtroGestores.length > 0) {
-      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map(() => '?').join(',')}))`);
+      const p = whereTendParams.length + 1;
+      whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')}))`);
       whereTendParams.push(...filtroGestores);
     }
     const whereTend = whereTendParts.length > 0 ? `WHERE ${whereTendParts.join(' AND ')}` : '';
 
-    // ── WHERE para absByGestor (JOIN com colaboradores) ───────────────────────
+    // ── WHERE absByGestor (JOIN com colaboradores) ────────────────────────────
     const whereJoinParts: string[] = [
       `c.gestor IS NOT NULL`, `c.gestor != ''`, `c.status = 'Ativo'`
     ];
     const whereJoinParams: (string | number)[] = [];
     if (filtroMeses.length > 0) {
-      whereJoinParts.push(`p.mes IN (${filtroMeses.map(() => '?').join(',')})`);
+      const p = whereJoinParams.length + 1;
+      whereJoinParts.push(`p.mes IN (${filtroMeses.map((_, i) => `$${p + i}`).join(',')})`);
       whereJoinParams.push(...filtroMeses);
     } else if (filtroPeriodo > 0) {
-      whereJoinParts.push(`p.mes >= strftime('%Y-%m', date('now', '-' || CAST(? AS TEXT) || ' months'))`);
+      whereJoinParts.push(`p.mes >= TO_CHAR(NOW() - ($${whereJoinParams.length + 1}::TEXT || ' months')::INTERVAL, 'YYYY-MM')`);
       whereJoinParams.push(filtroPeriodo);
     }
     if (filtroUnidades.length > 0) {
-      whereJoinParts.push(`p.filial IN (${filtroUnidades.map(() => '?').join(',')})`);
+      const p = whereJoinParams.length + 1;
+      whereJoinParts.push(`p.filial IN (${filtroUnidades.map((_, i) => `$${p + i}`).join(',')})`);
       whereJoinParams.push(...filtroUnidades);
     }
     if (filtroAreas.length > 0) {
-      whereJoinParts.push(`c.departamento IN (${filtroAreas.map(() => '?').join(',')})`);
+      const p = whereJoinParams.length + 1;
+      whereJoinParts.push(`c.departamento IN (${filtroAreas.map((_, i) => `$${p + i}`).join(',')})`);
       whereJoinParams.push(...filtroAreas);
     }
     if (filtroGestores.length > 0) {
-      whereJoinParts.push(`c.gestor IN (${filtroGestores.map(() => '?').join(',')})`);
+      const p = whereJoinParams.length + 1;
+      whereJoinParts.push(`c.gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')})`);
       whereJoinParams.push(...filtroGestores);
     }
     const whereJoin = `WHERE ${whereJoinParts.join(' AND ')}`;
@@ -106,8 +117,8 @@ export async function GET(request: Request) {
          SELECT nome, SUM(banco_horas) AS acum
          FROM ponto_mensal ${where}
          GROUP BY nome
-         HAVING acum < 0
-       )`,
+         HAVING SUM(banco_horas) < 0
+       ) t`,
       params
     );
 
@@ -173,7 +184,7 @@ export async function GET(request: Request) {
         SUM(falta_injustificada + atestado)             AS total_ausencia
        FROM ponto_mensal ${where}
        GROUP BY nome, cargo, filial, departamento
-       HAVING total_ausencia > 0
+       HAVING SUM(falta_injustificada + atestado) > 0
        ORDER BY total_ausencia DESC LIMIT 15`,
       params
     );
@@ -187,7 +198,7 @@ export async function GET(request: Request) {
         SUM(extra_50 + extra_60 + extra_100)            AS total_he
        FROM ponto_mensal ${where}
        GROUP BY nome, cargo, filial, departamento
-       HAVING total_he > 0
+       HAVING SUM(extra_50 + extra_60 + extra_100) > 0
        ORDER BY total_he DESC LIMIT 15`,
       params
     );
@@ -197,7 +208,7 @@ export async function GET(request: Request) {
       `SELECT nome, cargo, filial, SUM(banco_horas) AS banco_horas
        FROM ponto_mensal ${where}
        GROUP BY nome, cargo, filial
-       HAVING banco_horas < 0
+       HAVING SUM(banco_horas) < 0
        ORDER BY banco_horas ASC LIMIT 15`,
       params
     );
@@ -207,7 +218,7 @@ export async function GET(request: Request) {
       `SELECT nome, cargo, filial, SUM(banco_horas) AS banco_horas
        FROM ponto_mensal ${where}
        GROUP BY nome, cargo, filial
-       HAVING banco_horas > 0
+       HAVING SUM(banco_horas) > 0
        ORDER BY banco_horas DESC LIMIT 15`,
       params
     );
@@ -217,7 +228,7 @@ export async function GET(request: Request) {
       `SELECT nome, cargo, filial, SUM(atraso) AS atraso
        FROM ponto_mensal ${where}
        GROUP BY nome, cargo, filial
-       HAVING atraso > 0
+       HAVING SUM(atraso) > 0
        ORDER BY atraso DESC LIMIT 15`,
       params
     );
@@ -229,7 +240,7 @@ export async function GET(request: Request) {
         SUM(hora_noturna_reduzida) AS hora_noturna_reduzida
        FROM ponto_mensal ${where}
        GROUP BY nome, cargo, filial
-       HAVING adicional_noturno > 0
+       HAVING SUM(adicional_noturno) > 0
        ORDER BY adicional_noturno DESC LIMIT 10`,
       params
     );
@@ -237,14 +248,14 @@ export async function GET(request: Request) {
     // ── Saldo positivo de BH por unidade ────────────────────────────────────
     const bhPorUnidadeRows = await db.all<any>(
       `SELECT filial,
-         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END), 1) AS saldo_pos,
-         COUNT(CASE WHEN acum > 0 THEN 1 END)                   AS count_pos,
-         COUNT(DISTINCT nome)                                    AS total_func
+         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END)::NUMERIC, 1) AS saldo_pos,
+         COUNT(CASE WHEN acum > 0 THEN 1 END)                             AS count_pos,
+         COUNT(DISTINCT nome)                                              AS total_func
        FROM (
          SELECT filial, nome, SUM(banco_horas) AS acum
          FROM ponto_mensal ${where}
          GROUP BY filial, nome
-       )
+       ) t
        GROUP BY filial ORDER BY filial`,
       params
     );
@@ -253,8 +264,8 @@ export async function GET(request: Request) {
       `SELECT COALESCE(SUM(acum), 0) AS total FROM (
          SELECT nome, SUM(banco_horas) AS acum
          FROM ponto_mensal ${where}
-         GROUP BY nome HAVING acum > 0
-       )`,
+         GROUP BY nome HAVING SUM(banco_horas) > 0
+       ) t`,
       params
     );
 
@@ -270,21 +281,21 @@ export async function GET(request: Request) {
          SELECT nome, SUM(banco_horas) AS acum
          FROM ponto_mensal ${where}
          GROUP BY nome
-       )`,
+       ) t`,
       params
     );
 
     // ── Absenteísmo por gestor ───────────────────────────────────────────────
     const absByGestor = await db.all<any>(
       `SELECT c.gestor,
-        COUNT(DISTINCT p.nome)                              AS funcionarios,
-        ROUND(SUM(p.falta_injustificada + p.atestado), 2)  AS total_ausencia,
-        ROUND(AVG(p.falta_injustificada + p.atestado), 2)  AS media_ausencia
+        COUNT(DISTINCT p.nome)                                              AS funcionarios,
+        ROUND(SUM(p.falta_injustificada + p.atestado)::NUMERIC, 2)         AS total_ausencia,
+        ROUND(AVG(p.falta_injustificada + p.atestado)::NUMERIC, 2)         AS media_ausencia
        FROM ponto_mensal p
        LEFT JOIN colaboradores c ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
        ${whereJoin}
        GROUP BY c.gestor
-       HAVING total_ausencia > 0
+       HAVING ROUND(SUM(p.falta_injustificada + p.atestado)::NUMERIC, 2) > 0
        ORDER BY total_ausencia DESC LIMIT 12`,
       whereJoinParams
     );
@@ -292,10 +303,10 @@ export async function GET(request: Request) {
     // ── Absenteísmo por cargo ────────────────────────────────────────────────
     const absByCargo = await db.all<any>(
       `SELECT cargo,
-        COUNT(DISTINCT nome)                              AS funcionarios,
-        ROUND(SUM(falta_injustificada + atestado), 2)    AS total_ausencia,
-        ROUND(AVG(falta_injustificada + atestado), 2)    AS media_ausencia,
-        ROUND(SUM(extra_50 + extra_60 + extra_100), 2)   AS total_he
+        COUNT(DISTINCT nome)                                            AS funcionarios,
+        ROUND(SUM(falta_injustificada + atestado)::NUMERIC, 2)         AS total_ausencia,
+        ROUND(AVG(falta_injustificada + atestado)::NUMERIC, 2)         AS media_ausencia,
+        ROUND(SUM(extra_50 + extra_60 + extra_100)::NUMERIC, 2)        AS total_he
        FROM ponto_mensal ${where}
        ${where ? 'AND' : 'WHERE'} cargo != ''
        GROUP BY cargo
@@ -307,16 +318,14 @@ export async function GET(request: Request) {
     const tendencia = await db.all<any>(
       `SELECT mes,
         COUNT(DISTINCT nome)                               AS funcionarios,
-        ROUND(SUM(extra_50+extra_60+extra_100), 2)        AS he_total,
-        ROUND(SUM(falta_injustificada+atestado), 2)       AS ausencias,
-        ROUND(SUM(atraso), 2)                             AS atrasos,
-        ROUND(SUM(banco_horas), 2)                        AS saldo_banco
+        ROUND(SUM(extra_50+extra_60+extra_100)::NUMERIC, 2)  AS he_total,
+        ROUND(SUM(falta_injustificada+atestado)::NUMERIC, 2) AS ausencias,
+        ROUND(SUM(atraso)::NUMERIC, 2)                       AS atrasos,
+        ROUND(SUM(banco_horas)::NUMERIC, 2)                  AS saldo_banco
        FROM ponto_mensal ${whereTend}
        GROUP BY mes ORDER BY mes ASC`,
       whereTendParams
     );
-
-    await db.close();
 
     return NextResponse.json({
       filtroMeses,

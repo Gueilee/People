@@ -1,0 +1,65 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Empacotar contexto de build (frontend)
+        run: |
+          cd frontend
+          tar --exclude='.next' --exclude='node_modules' -czf /tmp/build-context.tar.gz .
+
+      - name: Build image na VM via Portainer API
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_USER: ${{ secrets.PORTAINER_USER }}
+          PORTAINER_PASSWORD: ${{ secrets.PORTAINER_PASSWORD }}
+        run: |
+          # Autenticar
+          TOKEN=$(curl -sk -X POST "$PORTAINER_URL/api/auth" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])")
+
+          echo "Autenticado no Portainer"
+
+          # Enviar contexto e buildar imagem na VM (endpoint 3 = local Docker)
+          curl -sk -X POST \
+            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/x-tar" \
+            --data-binary @/tmp/build-context.tar.gz \
+            | tail -5
+
+          echo "Build concluído"
+
+      - name: Redeploiar stack no Portainer
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_USER: ${{ secrets.PORTAINER_USER }}
+          PORTAINER_PASSWORD: ${{ secrets.PORTAINER_PASSWORD }}
+        run: |
+          TOKEN=$(curl -sk -X POST "$PORTAINER_URL/api/auth" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])")
+
+          COMPOSE=$(cat docker-compose.yml | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+
+          curl -sk -X PUT \
+            "$PORTAINER_URL/api/stacks/11?endpointId=3" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"stackFileContent\":$COMPOSE,\"prune\":false,\"pullImage\":false}" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('Stack atualizada:', d.get('Name','?'))"

@@ -10,8 +10,10 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-vp-prod-vendemmia-2025}
       - MAILER_URL=${MAILER_URL:-}
       - APP_URL=${APP_URL:-https://people.vendemm.ia.br}
-    volumes:
-      - people_db:/app/database
+      - PG_HOST=${PG_HOST:-chico-bento-lake-pg-dev.postgres.database.azure.com}
+      - PG_USER=${PG_USER:-projetos_admin}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_DB=${PG_DB:-vdm_projetos}
     restart: unless-stopped
     networks:
       - people_net

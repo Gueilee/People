@@ -25,14 +25,9 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
 
-# Arquivos do build standalone
 COPY --from=builder /app/public                         ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static     ./.next/static
-
-# Banco de dados e WASM (montados como volume em produção)
-COPY --from=builder --chown=nextjs:nodejs /app/database         ./database
-COPY --from=builder --chown=nextjs:nodejs /app/lib/sql-wasm.wasm ./lib/sql-wasm.wasm
 
 USER nextjs
 EXPOSE 3000

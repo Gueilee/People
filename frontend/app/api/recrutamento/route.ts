@@ -45,12 +45,10 @@ export async function GET(request: Request) {
 
     const db   = await getDb();
     const all: Vaga[] = await db.all('SELECT * FROM vagas_recrutamento ORDER BY data_abertura DESC');
-    await db.close();
 
     const hoje = new Date();
     const inicioStr = new Date(hoje.getFullYear(), hoje.getMonth() - filtroMeses, 1).toISOString().split('T')[0];
 
-    // Aplicar filtros
     let lista = all;
     if (filtroStatus.length > 0) lista = lista.filter(v => filtroStatus.includes(v.status || ''));
     if (filtroUnidade)   lista = lista.filter(v => v.unidade === filtroUnidade);
@@ -60,10 +58,8 @@ export async function GET(request: Request) {
         .some(f => (f || '').toLowerCase().includes(busca))
     );
 
-    // Para KPIs e charts usar apenas o período (sem filtros de status/unidade)
     const periodo = all.filter(v => !v.data_abertura || v.data_abertura >= inicioStr);
 
-    // KPIs
     const abertas    = all.filter(v => v.status === 'Aberta').length;
     const congeladas = all.filter(v => v.status === 'Congelada').length;
     const fechadasP  = periodo.filter(v => v.status === 'Fechada').length;
@@ -75,12 +71,10 @@ export async function GET(request: Request) {
     const totalP     = periodo.length;
     const taxaFechamento = totalP > 0 ? +((fechadasP / totalP) * 100).toFixed(1) : 0;
 
-    // Por status (tudo)
     const statusCt: Record<string, number> = {};
     all.forEach(v => { const s = v.status || 'Sem status'; statusCt[s] = (statusCt[s] || 0) + 1; });
     const porStatus = Object.entries(statusCt).map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
 
-    // Por unidade (período)
     const unidCt: Record<string, { total: number; abertas: number; fechadas: number }> = {};
     periodo.forEach(v => {
       const u = v.unidade || 'Não informado';
@@ -93,7 +87,6 @@ export async function GET(request: Request) {
       .map(([unidade, d]) => ({ unidade, ...d }))
       .sort((a, b) => b.total - a.total);
 
-    // Por fonte (período, só fechadas)
     const fonteCt: Record<string, number> = {};
     periodo.filter(v => v.status === 'Fechada').forEach(v => {
       const f = v.fonte || 'Não informado';
@@ -103,14 +96,12 @@ export async function GET(request: Request) {
       .map(([fonte, count]) => ({ fonte, count }))
       .sort((a, b) => b.count - a.count);
 
-    // Por motivo (período)
     const motivoCt: Record<string, number> = {};
     periodo.forEach(v => { const m = v.motivo || 'Não informado'; motivoCt[m] = (motivoCt[m] || 0) + 1; });
     const porMotivo = Object.entries(motivoCt)
       .map(([motivo, count]) => ({ motivo, count }))
       .sort((a, b) => b.count - a.count);
 
-    // SLA por mês (últimos 12m, só fechadas)
     const slaPorMes = Array.from({ length: Math.min(filtroMeses, 12) }, (_, i) => {
       const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(filtroMeses, 12) - 1 - i), 1);
       const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(filtroMeses, 12) - 1 - i) + 1, 0);
@@ -127,7 +118,6 @@ export async function GET(request: Request) {
       return { mes: fmtMes(mi.toISOString()), slaMedia: sla, count: fechadasMes.length };
     });
 
-    // Opções para filtros/select
     const opcoes = {
       responsaveis: [...new Set(all.map(v => v.responsavel).filter(Boolean))].sort() as string[],
       unidades:     [...new Set(all.map(v => v.unidade).filter(Boolean))].sort() as string[],
@@ -164,12 +154,13 @@ export async function POST(request: Request) {
     const sla = calcSla(data_abertura, data_fechamento);
     const db  = await getDb();
 
-    await db.run(
+    const row = await db.get<{ id: number }>(
       `INSERT INTO vagas_recrutamento
         (responsavel, data_abertura, data_fechamento, sla_dias, cargo, novo_colaborador,
          status, motivo, tipo_substituicao, colaborador_substituido,
          centro_custo, unidade, gestor, data_inicio, fonte, observacoes)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       RETURNING id`,
       [responsavel||null, data_abertura||null, data_fechamento||null, sla,
        cargo||null, novo_colaborador||null, status||'Aberta', motivo||null,
        tipo_substituicao||null, colaborador_substituido||null,
@@ -177,11 +168,7 @@ export async function POST(request: Request) {
        data_inicio||null, fonte||null, observacoes||null]
     );
 
-    const id = await db.lastId();
-    db.save();
-    await db.close();
-
-    return NextResponse.json({ ok: true, id }, { status: 201 });
+    return NextResponse.json({ ok: true, id: row?.id ?? 0 }, { status: 201 });
   } catch (err) {
     console.error('[Recrutamento] POST erro:', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -195,8 +182,8 @@ export async function PATCH(request: Request) {
     if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 });
 
     const db = await getDb();
-    const existing = await db.get<Vaga>('SELECT * FROM vagas_recrutamento WHERE id = ?', [id]);
-    if (!existing) { await db.close(); return NextResponse.json({ error: 'Vaga não encontrada' }, { status: 404 }); }
+    const existing = await db.get<Vaga>('SELECT * FROM vagas_recrutamento WHERE id = $1', [id]);
+    if (!existing) return NextResponse.json({ error: 'Vaga não encontrada' }, { status: 404 });
 
     const merged = { ...existing, ...fields };
     const fechamento = data_fechamento !== undefined ? data_fechamento : existing.data_fechamento;
@@ -204,10 +191,10 @@ export async function PATCH(request: Request) {
 
     await db.run(
       `UPDATE vagas_recrutamento SET
-        responsavel=?, data_abertura=?, data_fechamento=?, sla_dias=?, cargo=?, novo_colaborador=?,
-        status=?, motivo=?, tipo_substituicao=?, colaborador_substituido=?,
-        centro_custo=?, unidade=?, gestor=?, data_inicio=?, fonte=?, observacoes=?
-       WHERE id=?`,
+        responsavel=$1, data_abertura=$2, data_fechamento=$3, sla_dias=$4, cargo=$5, novo_colaborador=$6,
+        status=$7, motivo=$8, tipo_substituicao=$9, colaborador_substituido=$10,
+        centro_custo=$11, unidade=$12, gestor=$13, data_inicio=$14, fonte=$15, observacoes=$16
+       WHERE id=$17`,
       [merged.responsavel, merged.data_abertura, fechamento, sla,
        merged.cargo, merged.novo_colaborador, merged.status, merged.motivo,
        merged.tipo_substituicao, merged.colaborador_substituido,
@@ -215,8 +202,6 @@ export async function PATCH(request: Request) {
        merged.data_inicio, merged.fonte, merged.observacoes, id]
     );
 
-    db.save();
-    await db.close();
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[Recrutamento] PATCH erro:', err);

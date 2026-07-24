@@ -41,7 +41,7 @@ export function generateToken(): string {
 export async function ensureUsersTable() {
   const db = await getDb();
   await db.run(`CREATE TABLE IF NOT EXISTS usuarios (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              SERIAL PRIMARY KEY,
     nome            TEXT NOT NULL,
     email           TEXT,
     login           TEXT NOT NULL UNIQUE,
@@ -50,141 +50,112 @@ export async function ensureUsersTable() {
     ativo           INTEGER NOT NULL DEFAULT 1,
     reset_token     TEXT,
     reset_expiry    INTEGER,
-    created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    created_at      INTEGER NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::INTEGER)
   )`);
 
-  // Cria admin padrão se tabela vazia
-  const count = await db.get<{ n: number }>('SELECT COUNT(*) as n FROM usuarios');
-  if (!count || count.n === 0) {
+  const count = await db.get<{ n: string }>('SELECT COUNT(*) as n FROM usuarios');
+  if (!count || parseInt(count.n as unknown as string) === 0) {
     await db.run(
-      `INSERT INTO usuarios (nome, email, login, senha_hash, role) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO usuarios (nome, email, login, senha_hash, role) VALUES ($1, $2, $3, $4, $5)`,
       ['Administrador', 'admin@vendemmia.com.br', 'admin', hashPassword('vendemmia@2025'), 'admin']
     );
   }
-  // Migração: garante email no admin (banco criado antes desta versão)
   await db.run(
     `UPDATE usuarios SET email = 'admin@vendemmia.com.br' WHERE login = 'admin' AND email IS NULL`
   );
-  db.save();
-  await db.close();
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function findByLogin(login: string) {
   const db = await getDb();
-  const u = await db.get<Usuario & { senha_hash: string }>(
-    `SELECT id, nome, email, login, senha_hash, role, ativo FROM usuarios WHERE login = ? AND ativo = 1`,
+  return db.get<Usuario & { senha_hash: string }>(
+    `SELECT id, nome, email, login, senha_hash, role, ativo FROM usuarios WHERE login = $1 AND ativo = 1`,
     [login]
   );
-  await db.close();
-  return u;
 }
 
 export async function findByEmail(email: string) {
   const db = await getDb();
-  const u = await db.get<Usuario & { senha_hash: string }>(
-    `SELECT id, nome, email, login, senha_hash, role, ativo FROM usuarios WHERE LOWER(email) = LOWER(?) AND ativo = 1`,
+  return db.get<Usuario & { senha_hash: string }>(
+    `SELECT id, nome, email, login, senha_hash, role, ativo FROM usuarios WHERE LOWER(email) = LOWER($1) AND ativo = 1`,
     [email]
   );
-  await db.close();
-  return u;
 }
 
 export async function findByToken(token: string) {
   const db = await getDb();
-  const u = await db.get<Usuario & { reset_expiry: number }>(
-    `SELECT id, nome, email, login, role, ativo, reset_expiry FROM usuarios WHERE reset_token = ? AND ativo = 1`,
+  return db.get<Usuario & { reset_expiry: number }>(
+    `SELECT id, nome, email, login, role, ativo, reset_expiry FROM usuarios WHERE reset_token = $1 AND ativo = 1`,
     [token]
   );
-  await db.close();
-  return u;
 }
 
 export async function findById(id: number) {
   const db = await getDb();
-  const u = await db.get<Usuario>(
-    `SELECT id, nome, email, login, role, ativo FROM usuarios WHERE id = ? AND ativo = 1`,
+  return db.get<Usuario>(
+    `SELECT id, nome, email, login, role, ativo FROM usuarios WHERE id = $1 AND ativo = 1`,
     [id]
   );
-  await db.close();
-  return u;
 }
 
 export async function listUsers(): Promise<Usuario[]> {
   const db = await getDb();
-  const rows = await db.all<Usuario>(
+  return db.all<Usuario>(
     `SELECT id, nome, email, login, role, ativo, created_at,
             CASE WHEN senha_hash IS NOT NULL THEN 1 ELSE 0 END as tem_senha
      FROM usuarios ORDER BY ativo DESC, role DESC, nome ASC`
   );
-  await db.close();
-  return rows;
 }
 
 export async function findByIdAdmin(id: number) {
   const db = await getDb();
-  const u = await db.get<Usuario & { tem_senha: number }>(
+  return db.get<Usuario & { tem_senha: number }>(
     `SELECT id, nome, email, login, role, ativo,
             CASE WHEN senha_hash IS NOT NULL THEN 1 ELSE 0 END as tem_senha
-     FROM usuarios WHERE id = ?`,
+     FROM usuarios WHERE id = $1`,
     [id]
   );
-  await db.close();
-  return u;
 }
 
 export async function reactivateUser(id: number) {
   const db = await getDb();
-  await db.run(`UPDATE usuarios SET ativo = 1 WHERE id = ?`, [id]);
-  db.save();
-  await db.close();
+  await db.run(`UPDATE usuarios SET ativo = 1 WHERE id = $1`, [id]);
 }
 
 export async function createUser(nome: string, email: string, login: string, role: 'admin' | 'viewer') {
   const db = await getDb();
-  await db.run(
-    `INSERT INTO usuarios (nome, email, login, role) VALUES (?, ?, ?, ?)`,
+  const row = await db.get<{ id: number }>(
+    `INSERT INTO usuarios (nome, email, login, role) VALUES ($1, $2, $3, $4) RETURNING id`,
     [nome, email, login, role]
   );
-  const id = await db.lastId();
-  db.save();
-  await db.close();
-  return id;
+  return row?.id ?? 0;
 }
 
 export async function setResetToken(id: number, token: string, expirySeconds: number) {
   const expiry = Math.floor(Date.now() / 1000) + expirySeconds;
   const db = await getDb();
   await db.run(
-    `UPDATE usuarios SET reset_token = ?, reset_expiry = ? WHERE id = ?`,
+    `UPDATE usuarios SET reset_token = $1, reset_expiry = $2 WHERE id = $3`,
     [token, expiry, id]
   );
-  db.save();
-  await db.close();
 }
 
 export async function setPassword(id: number, password: string) {
   const hash = hashPassword(password);
   const db = await getDb();
   await db.run(
-    `UPDATE usuarios SET senha_hash = ?, reset_token = NULL, reset_expiry = NULL WHERE id = ?`,
+    `UPDATE usuarios SET senha_hash = $1, reset_token = NULL, reset_expiry = NULL WHERE id = $2`,
     [hash, id]
   );
-  db.save();
-  await db.close();
 }
 
 export async function deactivateUser(id: number) {
   const db = await getDb();
-  await db.run(`UPDATE usuarios SET ativo = 0 WHERE id = ?`, [id]);
-  db.save();
-  await db.close();
+  await db.run(`UPDATE usuarios SET ativo = 0 WHERE id = $1`, [id]);
 }
 
 export async function deleteUser(id: number) {
   const db = await getDb();
-  await db.run(`DELETE FROM usuarios WHERE id = ?`, [id]);
-  db.save();
-  await db.close();
+  await db.run(`DELETE FROM usuarios WHERE id = $1`, [id]);
 }

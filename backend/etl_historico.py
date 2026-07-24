@@ -1,14 +1,20 @@
 """
 ETL: Histórico de Cargos e Salários
-Importa o Excel exportado do Convenia para a tabela historico_cargo_salario no SQLite.
+Importa o Excel exportado do Convenia para a tabela historico_cargo_salario no PostgreSQL.
 """
 import pandas as pd
 from sqlalchemy import create_engine
 import datetime
 import os
+import urllib.parse
 
-DB_PATH = "sqlite:///../database/vendemmia_people.db"
-engine  = create_engine(DB_PATH)
+_pg_password = urllib.parse.quote_plus(os.getenv("PG_PASSWORD", "projetos_vdm2026#%"))
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql+psycopg2://projetos_admin:{_pg_password}"
+    "@chico-bento-lake-pg-dev.postgres.database.azure.com:5432/vdm_projetos?sslmode=require"
+)
+engine = create_engine(DATABASE_URL)
 
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), "..", "Histórico cargos e salários.xlsx")
 

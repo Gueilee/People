@@ -44,24 +44,19 @@ function calcRisco(
       ? Math.floor((hoje.getTime() - new Date(c.data_admissao).getTime()) / 86400000)
       : 9999;
 
-    // ── Tempo de empresa: 0–40 pts (contínuo, decai com o tempo)
-    // Fórmula: 40 * max(0, 1 - dias/540)  →  dia 0 = 40, dia 180 = 27, dia 365 = 13, dia 540+ = 0
     const tempoPts = Math.round(Math.max(0, 40 * (1 - dias / 540)));
     if (dias < 90)        fatores.push('Recém admitido (<3m)');
     else if (dias < 180)  fatores.push('Menos de 6 meses');
     else if (dias < 365)  fatores.push('Menos de 1 ano');
 
-    // ── Turnover da unidade: 0–35 pts proporcional à taxa
     const tu = txUnid[c.unidade] || 0;
-    const unidPts = Math.round(Math.min(35, tu * 0.53));   // 66% → 35, 20% → 11
+    const unidPts = Math.round(Math.min(35, tu * 0.53));
     if (tu > 5) fatores.push(`Unidade ${tu.toFixed(0)}% turn.`);
 
-    // ── Turnover do gestor: 0–20 pts proporcional
     const tg = txGest[c.gestor] || 0;
-    const gestPts = Math.round(Math.min(20, tg * 0.4));    // 50% → 20, 15% → 6
+    const gestPts = Math.round(Math.min(20, tg * 0.4));
     if (tg > 10) fatores.push(tg > 30 ? 'Gestor alto turnover' : 'Gestor médio turnover');
 
-    // ── Vínculo: 0–5 pts
     const vin = (c.vinculo || '').toLowerCase();
     let vinPts = 0;
     if      (vin.includes('estag') || vin.includes('aprendiz'))    { vinPts = 5; fatores.push('Vínculo estágio'); }
@@ -81,18 +76,20 @@ function idade(birthDate: string | null, ref: Date): number | null {
   return Math.floor((ref.getTime() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
 }
 
-function bucket<T>(items: T[], fn: (i: T) => string, keys: string[]): Record<string, number> {
-  const r: Record<string, number> = Object.fromEntries(keys.map(k => [k, 0]));
-  items.forEach(i => { const k = fn(i); if (k in r) r[k]++; });
-  return r;
-}
-
-// Agrupa departamentos conforme estrutura organizacional da VCI
 function normalizarArea(dep: string | null | undefined): string {
   if (!dep) return '';
   if (/opera[çc][oõ]e?s?\s*0?[1-4]/i.test(dep)) return 'Operações';
   if (/^cont[aá]bil$/i.test(dep) || /^fiscal$/i.test(dep)) return 'Controladoria';
   return dep;
+}
+
+// Retorna colaboradores da lista que estavam ativos em uma data específica
+function ativosNaData(lista: Colab[], data: Date): Colab[] {
+  return lista.filter(c => {
+    const adm  = new Date(c.data_admissao);
+    const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
+    return adm <= data && (desl === null || desl >= data);
+  });
 }
 
 export async function GET(request: Request) {
@@ -106,7 +103,6 @@ export async function GET(request: Request) {
 
     const db = await getDb();
 
-    // Opções de filtro (sempre do total)
     const todosAll: Colab[] = await db.all('SELECT * FROM colaboradores');
     todosAll.forEach(c => { c.departamento = normalizarArea(c.departamento) || c.departamento; });
     const unidadesOpcoes = [...new Set(todosAll.map(c => c.unidade))].filter(Boolean).sort();
@@ -115,7 +111,6 @@ export async function GET(request: Request) {
       todosAll.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
     )].sort();
 
-    // Meses disponíveis derivados dos dados (adm + desl)
     const todasDatas = [
       ...todosAll.map(c => c.data_admissao),
       ...todosAll.filter(c => c.data_desligamento).map(c => c.data_desligamento!),
@@ -124,122 +119,110 @@ export async function GET(request: Request) {
       todasDatas.filter(Boolean).map(d => d.substring(0, 7))
     )].sort().reverse();
 
-    // Dataset com filtros aplicados — área filtrada em JS após normalização
     const whereParts: string[] = [];
     const whereParams: string[] = [];
     if (filtroUnidades.length) {
-      whereParts.push(`unidade IN (${filtroUnidades.map(() => '?').join(',')})`);
+      const p = whereParams.length + 1;
+      whereParts.push(`unidade IN (${filtroUnidades.map((_, i) => `$${p + i}`).join(',')})`);
       whereParams.push(...filtroUnidades);
     }
     if (filtroGestores.length) {
-      whereParts.push(`gestor IN (${filtroGestores.map(() => '?').join(',')})`);
+      const p = whereParams.length + 1;
+      whereParts.push(`gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')})`);
       whereParams.push(...filtroGestores);
     }
     const whereSQL = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
     let todos: Colab[] = await db.all(`SELECT * FROM colaboradores ${whereSQL}`, whereParams);
 
-    await db.close();
-
-    // Normalizar áreas e aplicar filtro de área em JS (nomes normalizados não existem no DB)
     todos.forEach(c => { c.departamento = normalizarArea(c.departamento) || c.departamento; });
     if (filtroAreas.length) {
       todos = todos.filter(c => filtroAreas.includes(c.departamento));
     }
 
-    const hoje     = new Date();
-    const anoAtual = hoje.getFullYear();
+    const hoje = new Date();
 
+    // ── Fronteiras do período analisado ───────────────────────────────────────
+    let periodoInicio: Date;
+    let periodoFim: Date;
+
+    if (filtroMeses.length > 0) {
+      const sorted = [...filtroMeses].sort();
+      const [yi, miN] = sorted[0].split('-').map(Number);
+      const [yf, mfN] = sorted[sorted.length - 1].split('-').map(Number);
+      periodoInicio = new Date(yi, miN - 1, 1);       // 1º dia do mês mais antigo selecionado
+      periodoFim    = new Date(yf, mfN, 0);           // último dia do mês mais recente selecionado
+    } else {
+      periodoInicio = subMonths(hoje, meses);
+      periodoFim    = hoje;
+    }
+
+    // Colaboradores ativos HOJE (para diversidade, risco, estrutura — análises do quadro atual)
     const ativos    = todos.filter(c => !c.data_desligamento);
     const todosDesl = todos.filter(c => !!c.data_desligamento);
 
-    // Período: meses específicos (múltiplos) OU janela deslizante
+    // Movimentos no período selecionado
     let deslPeriodo: Colab[];
     let admPeriodo: Colab[];
-    let inicioRef: Date | null = null;
 
     if (filtroMeses.length > 0) {
       const mesesSet = new Set(filtroMeses);
       deslPeriodo = todosDesl.filter(c => mesesSet.has(c.data_desligamento!.substring(0, 7)));
       admPeriodo  = todos.filter(c => mesesSet.has(c.data_admissao.substring(0, 7)));
     } else {
-      inicioRef = subMonths(hoje, meses);
       deslPeriodo = todosDesl.filter(c => {
         const d = new Date(c.data_desligamento!);
-        return d >= inicioRef! && d <= hoje;
+        return d >= periodoInicio && d <= periodoFim;
       });
       admPeriodo = todos.filter(c => {
         const d = new Date(c.data_admissao);
-        return d >= inicioRef! && d <= hoje;
+        return d >= periodoInicio && d <= periodoFim;
       });
     }
 
-    // Data de referência final: hoje OU último dia do mês mais recente selecionado
-    const refEndDate: Date = (() => {
-      if (filtroMeses.length > 0) {
-        const latest = [...filtroMeses].sort().reverse()[0]; // ex: '2025-11'
-        const [y, m] = latest.split('-').map(Number);
-        return new Date(y, m, 0); // último dia desse mês
-      }
-      return hoje;
-    })();
-
-    // Headcount no período selecionado
-    const ativosNoPeriodo = inicioRef
-      ? todos.filter(c => {
-          const adm  = new Date(c.data_admissao);
-          const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
-          return adm <= inicioRef! && (desl === null || desl > inicioRef!);
-        })
-      : todos.filter(c => {
-          const adm  = new Date(c.data_admissao);
-          const desl = c.data_desligamento ? new Date(c.data_desligamento) : null;
-          return adm <= refEndDate && (desl === null || desl >= refEndDate);
-        });
-
-    // ── KPIs ──────────────────────────────────────────────────────────────────
-    const hMedia      = Math.max((ativos.length + deslPeriodo.length) / 2, 1);
+    // Headcount histórico: quem estava ativo no início e no fim do período
+    const ativosNoPeriodoInicio = ativosNaData(todos, periodoInicio);
+    const ativosNoPeriodoFim    = ativosNaData(todos, periodoFim);
+    const hMedia      = Math.max((ativosNoPeriodoInicio.length + ativosNoPeriodoFim.length) / 2, 1);
     const turnoverRate = (((deslPeriodo.length + admPeriodo.length) / 2) / hMedia) * 100;
 
     const tempoMedioAtivos = ativos.length > 0
       ? ativos.reduce((s, c) => s + (hoje.getTime() - new Date(c.data_admissao).getTime()) / (30.44 * 86400000), 0) / ativos.length
       : 0;
 
-    // ── Turnover por Unidade ─────────────────────────────────────────────────
+    // ── Turnover por Unidade ──────────────────────────────────────────────────
     const unidades = [...new Set(todos.map(c => c.unidade))].filter(Boolean);
     const turnoverPorUnidade = unidades.map(u => {
-      const desl     = deslPeriodo.filter(c => c.unidade === u).length;
-      const ativHoje = ativos.filter(c => c.unidade === u).length;
-      const ativInicio = inicioRef
-        ? todos.filter(c => {
-            if (c.unidade !== u) return false;
-            const adm = new Date(c.data_admissao);
-            const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
-            return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
-          }).length
-        : ativHoje;
-      const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
-      return { unidade: u, total: todos.filter(c => c.unidade === u).length, ativos: ativInicio, desligados: desl, taxa: +taxa.toFixed(1) };
+      const desl = deslPeriodo.filter(c => c.unidade === u).length;
+      const hcInicioU = ativosNaData(todos.filter(c => c.unidade === u), periodoInicio).length;
+      const hcFimU    = ativosNaData(todos.filter(c => c.unidade === u), periodoFim).length;
+      const hMediaU   = Math.max((hcInicioU + hcFimU) / 2, 1);
+      const taxa = (desl / hMediaU) * 100;
+      return {
+        unidade: u,
+        total:      todos.filter(c => c.unidade === u).length,
+        ativos:     Math.round(hMediaU),
+        desligados: desl,
+        taxa:       +taxa.toFixed(1),
+      };
     }).sort((a, b) => b.taxa - a.taxa);
 
-    // ── Turnover por Área ────────────────────────────────────────────────────
+    // ── Turnover por Área ─────────────────────────────────────────────────────
     const departamentos = [...new Set(todos.map(c => c.departamento))].filter(Boolean);
     const turnoverPorArea = departamentos.map(dep => {
-      const desl     = deslPeriodo.filter(c => c.departamento === dep).length;
-      const ativHoje = ativos.filter(c => c.departamento === dep).length;
-      const ativInicio = inicioRef
-        ? todos.filter(c => {
-            if (c.departamento !== dep) return false;
-            const adm = new Date(c.data_admissao);
-            const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
-            return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
-          }).length
-        : ativHoje;
-      const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
-      return { departamento: dep, ativos: ativInicio, desligados: desl, taxa: +taxa.toFixed(1) };
+      const desl = deslPeriodo.filter(c => c.departamento === dep).length;
+      const hcInicioD = ativosNaData(todos.filter(c => c.departamento === dep), periodoInicio).length;
+      const hcFimD    = ativosNaData(todos.filter(c => c.departamento === dep), periodoFim).length;
+      const hMediaD   = Math.max((hcInicioD + hcFimD) / 2, 1);
+      const taxa = (desl / hMediaD) * 100;
+      return {
+        departamento: dep,
+        ativos:     Math.round(hMediaD),
+        desligados: desl,
+        taxa:       +taxa.toFixed(1),
+      };
     }).sort((a, b) => b.taxa - a.taxa);
 
-    // ── Ranking Gestores ─────────────────────────────────────────────────────
-    // Apenas gestores que são colaboradores ativos hoje (não desligados)
+    // ── Ranking Gestores ──────────────────────────────────────────────────────
     const ativosNomes = new Set(todosAll.filter(c => !c.data_desligamento).map(c => c.nome));
     const gestoresList = [...new Set(
       todos.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
@@ -247,27 +230,27 @@ export async function GET(request: Request) {
     const rankingGestores = gestoresList
       .filter(g => ativosNomes.has(g))
       .map(g => {
-        const equipe   = todos.filter(c => c.gestor === g);
-        const desl     = deslPeriodo.filter(c => c.gestor === g).length;
-        const ativHoje = ativos.filter(c => c.gestor === g).length;
-        const ativInicio = inicioRef
-          ? todos.filter(c => {
-              if (c.gestor !== g) return false;
-              const adm = new Date(c.data_admissao);
-              const dsl = c.data_desligamento ? new Date(c.data_desligamento) : null;
-              return adm <= inicioRef! && (dsl === null || dsl > inicioRef!);
-            }).length
-          : ativHoje;
-        const taxa = (desl / Math.max((ativInicio + ativHoje) / 2, 1)) * 100;
-        return { gestor: g, totalEquipe: equipe.length, ativos: ativInicio, desligados: desl,
-                 unidade: equipe[0]?.unidade || '', departamento: equipe[0]?.departamento || '',
-                 taxa: +taxa.toFixed(1) };
+        const equipe = todos.filter(c => c.gestor === g);
+        const desl   = deslPeriodo.filter(c => c.gestor === g).length;
+        const hcInicioG = ativosNaData(equipe, periodoInicio).length;
+        const hcFimG    = ativosNaData(equipe, periodoFim).length;
+        const hMediaG   = Math.max((hcInicioG + hcFimG) / 2, 1);
+        const taxa = (desl / hMediaG) * 100;
+        return {
+          gestor: g,
+          totalEquipe:  equipe.length,
+          ativos:       Math.round(hMediaG),
+          desligados:   desl,
+          unidade:      equipe[0]?.unidade || '',
+          departamento: equipe[0]?.departamento || '',
+          taxa:         +taxa.toFixed(1),
+        };
       })
       .filter(g => g.desligados > 0)
       .sort((a, b) => b.taxa - a.taxa)
       .slice(0, 10);
 
-    // ── Tipos de Desligamento ────────────────────────────────────────────────
+    // ── Tipos de Desligamento ─────────────────────────────────────────────────
     const tiposCounts: Record<string, number> = {};
     deslPeriodo.forEach(c => {
       const t = c.tipo_desligamento || 'Nao informado';
@@ -277,7 +260,7 @@ export async function GET(request: Request) {
       .map(([tipo, count]) => ({ tipo, count, pct: +((count / Math.max(deslPeriodo.length, 1)) * 100).toFixed(1) }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Tendência Mensal ─────────────────────────────────────────────────────
+    // ── Tendência Mensal (sempre últimos 12m fixos, para consistência do gráfico) ──
     const tendenciaMensal = Array.from({ length: 12 }, (_, i) => {
       const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (11 - i), 1);
       const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (11 - i) + 1, 0);
@@ -287,17 +270,17 @@ export async function GET(request: Request) {
       return { mes: label, admissoes: adm, desligamentos: desl };
     });
 
-    // ── Headcount por Unidade ────────────────────────────────────────────────
+    // ── Headcount por Unidade (snapshot hoje) ────────────────────────────────
     const headcountPorUnidade = unidades.map(u => ({
       unidade: u,
       ativos:     ativos.filter(c => c.unidade === u).length,
       desligados: todosDesl.filter(c => c.unidade === u).length,
     })).sort((a, b) => b.ativos - a.ativos);
 
-    // ── Tendência de Headcount (24 meses até refEndDate) ─────────────────────
+    // ── Tendência Headcount 24m ───────────────────────────────────────────────
     const tendenciaHeadcount = Array.from({ length: 24 }, (_, i) => {
-      const mi = new Date(refEndDate.getFullYear(), refEndDate.getMonth() - (23 - i), 1);
-      const mf = new Date(refEndDate.getFullYear(), refEndDate.getMonth() - (23 - i) + 1, 0);
+      const mi = new Date(periodoFim.getFullYear(), periodoFim.getMonth() - (23 - i), 1);
+      const mf = new Date(periodoFim.getFullYear(), periodoFim.getMonth() - (23 - i) + 1, 0);
       const label = mi.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
       const hc = todos.filter(c => {
         const adm  = new Date(c.data_admissao);
@@ -307,7 +290,7 @@ export async function GET(request: Request) {
       return { mes: label, headcount: hc };
     });
 
-    // ── Últimos Desligamentos ────────────────────────────────────────────────
+    // ── Últimos Desligamentos ─────────────────────────────────────────────────
     const ultimosDesligamentos = todosDesl
       .sort((a, b) => new Date(b.data_desligamento!).getTime() - new Date(a.data_desligamento!).getTime())
       .slice(0, 15)
@@ -315,17 +298,12 @@ export async function GET(request: Request) {
                    gestor: c.gestor, data_desligamento: c.data_desligamento,
                    tipo_desligamento: c.tipo_desligamento || 'Nao informado', tenure_days: c.tenure_days }));
 
-    // ════════════════════════════════════════════════════════════════════════
-    //  NOVOS INDICADORES
-    // ════════════════════════════════════════════════════════════════════════
-
-    // ── Tenure (tempo de permanência) dos desligados ─────────────────────────
+    // ── Tenure ────────────────────────────────────────────────────────────────
     const deslComTenure  = todosDesl.filter(c => c.tenure_days != null && c.tenure_days >= 0);
     const tenureMedioDias = deslComTenure.length
       ? deslComTenure.reduce((s, c) => s + c.tenure_days!, 0) / deslComTenure.length
       : 0;
 
-    // Distribuição de tenure em faixas
     const tenureFaixas = [
       { faixa: 'Ate 1 mes',    min: 0,   max: 30  },
       { faixa: '1 a 3 meses',  min: 31,  max: 90  },
@@ -338,7 +316,6 @@ export async function GET(request: Request) {
       count: deslComTenure.filter(c => c.tenure_days! >= f.min && c.tenure_days! <= f.max).length,
     }));
 
-    // Tenure por tipo de desligamento
     const tenurePorTipo = Object.entries(
       deslComTenure.reduce<Record<string, number[]>>((acc, c) => {
         const t = c.tipo_desligamento || 'Nao informado';
@@ -352,13 +329,12 @@ export async function GET(request: Request) {
       count: dias.length,
     })).sort((a, b) => b.count - a.count).slice(0, 6);
 
-    // ── Mortalidade Infantil ─────────────────────────────────────────────────
+    // ── Mortalidade Infantil ──────────────────────────────────────────────────
     const mortalidadeInfantil = (() => {
       const base     = deslPeriodo.filter(c => c.tenure_days != null);
       const ate3m    = base.filter(c => c.tenure_days! <= 90).length;
       const de3a6m   = base.filter(c => c.tenure_days! > 90 && c.tenure_days! <= 180).length;
       const total    = base.length;
-      // Por unidade
       const porUnidade = unidades.map(u => {
         const b  = deslPeriodo.filter(c => c.unidade === u && c.tenure_days != null);
         return { unidade: u, ate3m: b.filter(c => c.tenure_days! <= 90).length, total: b.length };
@@ -369,7 +345,7 @@ export async function GET(request: Request) {
                porUnidade };
     })();
 
-    // ── Headcount por Cargo (Top 20) ─────────────────────────────────────────
+    // ── Estrutura (snapshot hoje) ─────────────────────────────────────────────
     const cargosCount: Record<string, number> = {};
     ativos.forEach(c => { const cargo = c.cargo || 'Nao informado'; cargosCount[cargo] = (cargosCount[cargo] || 0) + 1; });
     const headcountPorCargo = Object.entries(cargosCount)
@@ -377,7 +353,6 @@ export async function GET(request: Request) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 20);
 
-    // ── Span of Control ──────────────────────────────────────────────────────
     const gestoresAtivos = [...new Set(
       ativos.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
     )];
@@ -397,15 +372,30 @@ export async function GET(request: Request) {
       return { gestor: g, cargo: gest?.cargo || '', departamento: gest?.departamento || '', unidade: gest?.unidade || '', diretos, faixa };
     }).sort((a, b) => b.diretos - a.diretos);
 
-    // ── Gênero ───────────────────────────────────────────────────────────────
+    // ── Risco (usa ativos hoje por ser análise preditiva do quadro atual) ─────
+    const txUnidMap: Record<string, number> = {};
+    turnoverPorUnidade.forEach(u => { txUnidMap[u.unidade] = u.taxa; });
+    const txGestMap: Record<string, number> = {};
+    rankingGestores.forEach(g => { txGestMap[g.gestor] = g.taxa; });
+    const ativosRisco = (filtroUnidades.length > 0 || filtroAreas.length > 0)
+      ? todosAll.filter(c => !c.data_desligamento)
+      : ativos;
+
+    const riscoLista = calcRisco(ativosRisco, txUnidMap, txGestMap);
+    const riscoTurnover = {
+      alto:  riscoLista.filter(r => r.nivel === 'alto').length,
+      medio: riscoLista.filter(r => r.nivel === 'medio').length,
+      baixo: riscoLista.filter(r => r.nivel === 'baixo').length,
+      top20: riscoLista.slice(0, 20),
+    };
+
+    // ── Diversidade (snapshot hoje) ───────────────────────────────────────────
     const genM = ativos.filter(c => c.gender === 'M').length;
     const genF = ativos.filter(c => c.gender === 'F').length;
     const genND= ativos.filter(c => !c.gender || (c.gender !== 'M' && c.gender !== 'F')).length;
 
-    // Liderança = ativos que aparecem como gestor de outros ativos
     const liderancaSet = new Set(gestoresAtivos);
 
-    // Classificação por tipo de cargo
     function tipoCargoFn(c: Colab): 'lideranca' | 'operacional' | 'administrativo' {
       if (liderancaSet.has(c.nome)) return 'lideranca';
       const cargo = (c.cargo || '').toLowerCase();
@@ -437,7 +427,6 @@ export async function GET(request: Request) {
       porTipoCargo: generoTipoCargo,
     };
 
-    // ── Etnia / Raça ─────────────────────────────────────────────────────────
     const etniasCount: Record<string, number> = {};
     ativos.filter(c => c.etnia).forEach(c => { etniasCount[c.etnia!] = (etniasCount[c.etnia!] || 0) + 1; });
     const distribuicaoEtnia = Object.entries(etniasCount)
@@ -449,7 +438,6 @@ export async function GET(request: Request) {
       ? +((ativos.filter(c => naoBrancas.includes(c.etnia || '')).length / ativos.length) * 100).toFixed(1)
       : 0;
 
-    // ── Pirâmide Etária / Gerações ───────────────────────────────────────────
     const ativosComIdade = ativos.filter(c => c.birth_date);
     const idadeFaixas = [
       { faixa: 'Ate 25 anos',    min: 0,  max: 25 },
@@ -464,7 +452,6 @@ export async function GET(request: Request) {
       total: ativosComIdade.filter(c => { const a = idade(c.birth_date, hoje); return a !== null && a >= f.min && a <= f.max; }).length,
     }));
 
-    // Gerações (por ano de nascimento, ref 2026)
     const geracoes = [
       { nome: 'Gen Z (1997-2012)',       minAno: 2026-29, maxAno: 2026-14 },
       { nome: 'Millennials (1981-1996)', minAno: 2026-45, maxAno: 2026-30 },
@@ -482,43 +469,21 @@ export async function GET(request: Request) {
       ? +(ativosComIdade.reduce((s, c) => s + (idade(c.birth_date, hoje) || 0), 0) / ativosComIdade.length).toFixed(1)
       : 0;
 
-    // ── Vínculo Empregatício ─────────────────────────────────────────────────
     const vinculoCount: Record<string, number> = {};
     ativos.forEach(c => { const v = c.vinculo || 'CLT'; vinculoCount[v] = (vinculoCount[v] || 0) + 1; });
     const distribuicaoVinculo = Object.entries(vinculoCount)
       .map(([vinculo, count]) => ({ vinculo, count, pct: +((count / ativos.length) * 100).toFixed(1) }))
       .sort((a, b) => b.count - a.count);
 
-    // ── Risco de Turnover por Colaborador ────────────────────────────────────
-    const txUnidMap: Record<string, number> = {};
-    turnoverPorUnidade.forEach(u => { txUnidMap[u.unidade] = u.taxa; });
-    const txGestMap: Record<string, number> = {};
-    rankingGestores.forEach(g => { txGestMap[g.gestor] = g.taxa; });
-    // Calcular também sobre todosAll se filtro ativo (contexto completo)
-    const ativosRisco = (filtroUnidades.length > 0 || filtroAreas.length > 0)
-      ? todosAll.filter(c => !c.data_desligamento)
-      : ativos;
-
-    const riscoLista = calcRisco(ativosRisco, txUnidMap, txGestMap);
-    const riscoTurnover = {
-      alto:  riscoLista.filter(r => r.nivel === 'alto').length,
-      medio: riscoLista.filter(r => r.nivel === 'medio').length,
-      baixo: riscoLista.filter(r => r.nivel === 'baixo').length,
-      top20: riscoLista.slice(0, 20),
-    };
-
-    // ── Response ─────────────────────────────────────────────────────────────
     return NextResponse.json({
       periodo: meses,
       atualizadoEm: hoje.toISOString(),
       filtros: { unidades: filtroUnidades, areas: filtroAreas, gestores: filtroGestores, meses: filtroMeses },
       opcoesFiltro: { unidades: unidadesOpcoes, areas: areasOpcoes, gestores: gestoresOpcoes, meses: mesesDisponiveis },
-
-      // Indicadores existentes
       kpis: {
         headcountTotal: todos.length,
-        headcountAtivo: ativosNoPeriodo.length,
-        headcountHoje:  ativos.length,
+        headcountAtivo: ativosNoPeriodoFim.length,   // snapshot no fim do período selecionado
+        headcountHoje:  ativos.length,                // sempre o headcount atual
         desligamentosPeriodo: deslPeriodo.length,
         admissoesPeriodo: admPeriodo.length,
         turnoverRate: +turnoverRate.toFixed(1),
@@ -532,11 +497,7 @@ export async function GET(request: Request) {
       tendenciaHeadcount,
       headcountPorUnidade,
       ultimosDesligamentos,
-
-      // Risco de turnover
       riscoTurnover,
-
-      // Novos indicadores
       tenure: {
         mediaDias: Math.round(tenureMedioDias),
         mediaMeses: +(tenureMedioDias / 30.44).toFixed(1),

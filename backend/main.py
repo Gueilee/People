@@ -5,6 +5,8 @@ import datetime
 import random
 import time
 import unicodedata
+import os
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 API_TOKEN = "244dd481-fbbd-4f95-bb8b-b6617df75403"
@@ -16,8 +18,13 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-DB_PATH = "sqlite:///../database/vendemmia_people.db"
-engine  = create_engine(DB_PATH)
+_pg_password = urllib.parse.quote_plus(os.getenv("PG_PASSWORD", "projetos_vdm2026#%"))
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql+psycopg2://projetos_admin:{_pg_password}"
+    "@chico-bento-lake-pg-dev.postgres.database.azure.com:5432/vdm_projetos?sslmode=require"
+)
+engine = create_engine(DATABASE_URL)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

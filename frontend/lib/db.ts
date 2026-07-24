@@ -1,59 +1,41 @@
-import initSqlJs from 'sql.js';
-import fs from 'fs';
-import path from 'path';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  host:     process.env.PG_HOST     ?? 'chico-bento-lake-pg-dev.postgres.database.azure.com',
+  user:     process.env.PG_USER     ?? 'projetos_admin',
+  password: process.env.PG_PASSWORD ?? 'projetos_vdm2026#%',
+  database: process.env.PG_DB       ?? 'vdm_projetos',
+  port:     5432,
+  ssl:      { rejectUnauthorized: false },
+  max:      10,
+  idleTimeoutMillis: 30000,
+});
 
 type Params = (string | number | null | undefined)[];
 type Row = Record<string, string | number | null>;
 
 export class Database {
-  private _db: initSqlJs.Database;
-
-  constructor(db: initSqlJs.Database) {
-    this._db = db;
-  }
-
   async all<T = Row>(sql: string, params: Params = []): Promise<T[]> {
-    const stmt = this._db.prepare(sql);
-    if (params.length) stmt.bind(params as (string | number | null)[]);
-    const rows: T[] = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject() as unknown as T);
-    }
-    stmt.free();
-    return rows;
+    const result = await pool.query(sql, params as unknown[]);
+    return result.rows as T[];
   }
 
   async get<T = Row>(sql: string, params: Params = []): Promise<T | undefined> {
-    const rows = await this.all<T>(sql, params);
-    return rows[0];
+    const result = await pool.query(sql, params as unknown[]);
+    return result.rows[0] as T | undefined;
   }
 
   async run(sql: string, params: Params = []): Promise<void> {
-    this._db.run(sql, params as (string | number | null)[]);
+    await pool.query(sql, params as unknown[]);
   }
 
-  async lastId(): Promise<number> {
-    const row = await this.get<{ id: number }>('SELECT last_insert_rowid() as id');
-    return row?.id ?? 0;
-  }
-
-  save(): void {
-    const dbPath = path.resolve(process.cwd(), 'database/vendemmia_people.db');
-    const data = this._db.export();
-    fs.writeFileSync(dbPath, Buffer.from(data));
-  }
-
-  async close(): Promise<void> {
-    this._db.close();
-  }
+  // No-ops mantidos para compatibilidade com os call sites existentes
+  save(): void {}
+  async close(): Promise<void> {}
 }
 
+const _db = new Database();
+
 export async function getDb(): Promise<Database> {
-  const wasmPath = path.resolve(process.cwd(), 'lib/sql-wasm.wasm');
-  const wasmBinary = fs.readFileSync(wasmPath);
-  const SQL = await initSqlJs({ wasmBinary });
-  const dbPath = path.resolve(process.cwd(), 'database/vendemmia_people.db');
-  const fileBuffer = fs.readFileSync(dbPath);
-  const db = new SQL.Database(new Uint8Array(fileBuffer));
-  return new Database(db);
+  return _db;
 }

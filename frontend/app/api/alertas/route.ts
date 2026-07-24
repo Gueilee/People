@@ -15,7 +15,6 @@ export async function GET(request: Request) {
 
     const db   = await getDb();
     const rows = await db.all('SELECT unidade, data_desligamento, data_admissao, status FROM colaboradores');
-    await db.close();
 
     const hoje   = new Date();
     const inicio = subMonths(hoje, meses);
@@ -78,7 +77,6 @@ export async function POST(request: Request) {
     // Buscar métricas atuais
     const db   = await getDb();
     const rows = await db.all('SELECT unidade, data_desligamento, data_admissao FROM colaboradores');
-    await db.close();
 
     const hoje   = new Date();
     const inicio = subMonths(hoje, meses);
