@@ -15,6 +15,7 @@ type KPIs = {
   totalAtraso: number;
   saldoBanco: number;
   saldoBancoPos: number;
+  totalNoturno: number;
   impactoFinanceiro: number;
   custoHe: number;
   custoAusencias: number;
