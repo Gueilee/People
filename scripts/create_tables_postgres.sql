@@ -3,13 +3,16 @@
 -- As tabelas colaboradores e historico_cargo_salario são criadas automaticamente pelo pandas to_sql.
 
 CREATE TABLE IF NOT EXISTS usuarios (
-    id        SERIAL PRIMARY KEY,
-    nome      TEXT NOT NULL,
-    email     TEXT UNIQUE NOT NULL,
-    login     TEXT UNIQUE NOT NULL,
-    role      TEXT NOT NULL DEFAULT 'viewer',
-    ativo     INTEGER NOT NULL DEFAULT 1,
-    criado_em INTEGER DEFAULT (EXTRACT(EPOCH FROM NOW())::INTEGER)
+    id           SERIAL PRIMARY KEY,
+    nome         TEXT NOT NULL,
+    email        TEXT,
+    login        TEXT NOT NULL UNIQUE,
+    senha_hash   TEXT,
+    role         TEXT NOT NULL DEFAULT 'viewer',
+    ativo        INTEGER NOT NULL DEFAULT 1,
+    reset_token  TEXT,
+    reset_expiry INTEGER,
+    created_at   INTEGER NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::INTEGER)
 );
 
 CREATE TABLE IF NOT EXISTS vagas_recrutamento (

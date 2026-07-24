@@ -1,4 +1,11 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
+
+// Garante que colunas date/timestamp sempre retornem como string ISO, nunca como Date object.
+// Sem isso, o pg pode retornar Date objects dependendo da versão/configuração,
+// quebrando chamadas como .substring() no código da aplicação.
+types.setTypeParser(1082, (v: string) => v);  // date → 'YYYY-MM-DD'
+types.setTypeParser(1114, (v: string) => v);  // timestamp without time zone → ISO string
+types.setTypeParser(1184, (v: string) => v);  // timestamp with time zone → ISO string
 
 const pool = new Pool({
   host:     process.env.PG_HOST     ?? 'chico-bento-lake-pg-dev.postgres.database.azure.com',
