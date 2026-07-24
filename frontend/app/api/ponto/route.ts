@@ -248,11 +248,12 @@ export async function GET(request: Request) {
     // ── Saldo positivo de BH por unidade ────────────────────────────────────
     const bhPorUnidadeRows = await db.all<any>(
       `SELECT filial,
-         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END)::NUMERIC, 1) AS saldo_pos,
-         COUNT(CASE WHEN acum > 0 THEN 1 END)                             AS count_pos,
-         COUNT(DISTINCT nome)                                              AS total_func
+         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END)::NUMERIC, 1)        AS saldo_pos,
+         ROUND(SUM(CASE WHEN acum > 0 THEN acum * vh ELSE 0 END)::NUMERIC, 2)   AS impacto_financeiro,
+         COUNT(CASE WHEN acum > 0 THEN 1 END)                                    AS count_pos,
+         COUNT(DISTINCT nome)                                                     AS total_func
        FROM (
-         SELECT filial, nome, SUM(banco_horas) AS acum
+         SELECT filial, nome, SUM(banco_horas) AS acum, AVG(valor_hora) AS vh
          FROM ponto_mensal ${where}
          GROUP BY filial, nome
        ) t
@@ -260,9 +261,12 @@ export async function GET(request: Request) {
       params
     );
 
-    const saldoBancoPosRow = await db.get<{ total: number }>(
-      `SELECT COALESCE(SUM(acum), 0) AS total FROM (
-         SELECT nome, SUM(banco_horas) AS acum
+    const saldoBancoPosRow = await db.get<{ total: number; impacto_financeiro: number }>(
+      `SELECT
+         COALESCE(SUM(acum), 0)            AS total,
+         COALESCE(SUM(acum * vh), 0)       AS impacto_financeiro
+       FROM (
+         SELECT nome, SUM(banco_horas) AS acum, AVG(valor_hora) AS vh
          FROM ponto_mensal ${where}
          GROUP BY nome HAVING SUM(banco_horas) > 0
        ) t`,
@@ -350,6 +354,7 @@ export async function GET(request: Request) {
         totalAtraso:       +(kpiRow?.total_atraso   || 0).toFixed(1),
         saldoBanco:        +(kpiRow?.saldo_banco    || 0).toFixed(1),
         saldoBancoPos:     +(saldoBancoPosRow?.total || 0).toFixed(1),
+        impactoFinanceiro: +(saldoBancoPosRow?.impacto_financeiro || 0).toFixed(2),
         bancoNegativo:     bancoNegRow?.n            || 0,
         totalNoturno:      +(kpiRow?.total_noturno   || 0).toFixed(1),
         totalHoraNot:      +(kpiRow?.total_hora_not || 0).toFixed(1),

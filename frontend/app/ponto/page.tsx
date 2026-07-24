@@ -15,6 +15,7 @@ type KPIs = {
   totalAtraso: number;
   saldoBanco: number;
   saldoBancoPos: number;
+  impactoFinanceiro: number;
   bancoNegativo: number;
   totalAbono: number;
   totalFerias: number;
@@ -43,7 +44,7 @@ type TopFalta  = { nome: string; cargo: string; filial: string; departamento: st
 type TopExtra  = { nome: string; cargo: string; filial: string; departamento: string; extra_50: number; extra_60: number; extra_100: number; total_he: number };
 type TopBanco  = { nome: string; cargo: string; filial: string; banco_horas: number };
 type TopAtraso  = { nome: string; cargo: string; filial: string; atraso: number };
-type BhUnidade = { filial: string; saldo_pos: number; count_pos: number; total_func: number };
+type BhUnidade = { filial: string; saldo_pos: number; impacto_financeiro: number; count_pos: number; total_func: number };
 
 type DistBanco = { critico: number; negativo: number; equilibrado: number; positivo: number; excesso: number };
 
@@ -403,8 +404,6 @@ export default function PontoPage() {
   const [unidades,  setUnidades]  = useState<string[]>([]);
   const [areas,     setAreas]     = useState<string[]>([]);
   const [gestores,      setGestores]      = useState<string[]>([]);
-  const [custoMedioHora, setCustoMedioHora] = useState<string>('');
-
   // Fechamento de BH por unidade (calendário fixo)
   function fechamentoBH(filial: string): string {
     const f = filial.toLowerCase();
@@ -672,53 +671,30 @@ export default function PontoPage() {
               {/* Impacto Financeiro */}
               <div className="lg:w-72 shrink-0">
                 <SectionTitle icon="💰">Impacto Financeiro do BH</SectionTitle>
-                <div className="space-y-3">
-                  <div className="rounded-xl p-4" style={{ backgroundColor: `${C.teal}12`, borderLeft: `3px solid ${C.teal}` }}>
-                    <div className="text-[10px] font-bold uppercase text-gray-400 mb-1">Saldo positivo total</div>
-                    <div className="text-2xl font-black" style={{ color: C.teal }}>{fmtH(data.kpis.saldoBancoPos)}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">horas devidas aos colaboradores</div>
-                  </div>
+                {(() => {
+                  const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                  return (
+                    <div className="space-y-3">
+                      <div className="rounded-xl p-4" style={{ backgroundColor: `${C.teal}12`, borderLeft: `3px solid ${C.teal}` }}>
+                        <div className="text-[10px] font-bold uppercase text-gray-400 mb-1">Saldo positivo total</div>
+                        <div className="text-2xl font-black" style={{ color: C.teal }}>{fmtH(data.kpis.saldoBancoPos)}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">horas devidas aos colaboradores</div>
+                      </div>
 
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">
-                      Custo médio por hora (R$)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Ex: 20,00"
-                      value={custoMedioHora}
-                      onChange={e => setCustoMedioHora(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none"
-                      style={{ borderColor: custoMedioHora ? C.teal : undefined }}
-                    />
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      Informe o custo médio (salário ÷ 220h × encargos).
-                    </p>
-                  </div>
-
-                  {custoMedioHora && parseFloat(custoMedioHora) > 0 && (() => {
-                    const custo    = parseFloat(custoMedioHora);
-                    const total    = data.kpis.saldoBancoPos * custo;
-                    const fmtBRL   = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                    return (
                       <div className="rounded-xl p-4 space-y-2" style={{ backgroundColor: `${C.amber}15`, borderLeft: `3px solid ${C.amber}` }}>
-                        <div className="text-[10px] font-bold uppercase" style={{ color: C.amber }}>Passivo estimado</div>
-                        <div className="text-2xl font-black" style={{ color: C.amber }}>{fmtBRL(total)}</div>
-                        <div className="text-[10px] text-gray-500">
-                          {fmtH(data.kpis.saldoBancoPos)} × {fmtBRL(custo)}/h
-                        </div>
-                        {data.bhPorUnidade.map(u => (
+                        <div className="text-[10px] font-bold uppercase" style={{ color: C.amber }}>Passivo financeiro estimado</div>
+                        <div className="text-2xl font-black" style={{ color: C.amber }}>{fmtBRL(data.kpis.impactoFinanceiro)}</div>
+                        <div className="text-[10px] text-gray-500">calculado pelo valor/hora individual de cada colaborador</div>
+                        {data.bhPorUnidade.filter(u => u.impacto_financeiro > 0).map(u => (
                           <div key={u.filial} className="flex justify-between text-[10px] text-gray-500 border-t border-amber-100 pt-1.5">
                             <span>{u.filial}</span>
-                            <span className="font-bold">{fmtBRL(u.saldo_pos * custo)}</span>
+                            <span className="font-bold">{fmtBRL(+u.impacto_financeiro)}</span>
                           </div>
                         ))}
                       </div>
-                    );
-                  })()}
-                </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </Card>

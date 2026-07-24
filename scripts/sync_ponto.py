@@ -64,6 +64,7 @@ def criar_tabela(conn):
             adicional_noturno       DOUBLE PRECISION DEFAULT 0,
             hora_noturna_reduzida   DOUBLE PRECISION DEFAULT 0,
             dsr                     DOUBLE PRECISION DEFAULT 0,
+            valor_hora              DOUBLE PRECISION DEFAULT 0,
             synced_at               TEXT DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(employee_id, mes)
         )
@@ -122,11 +123,12 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
         eid  = emp["_id"]
         nome = emp.get("full_name", "—")
         cpf  = emp.get("cpf", "")
-        ct   = emp.get("contract_data", {})
-        dept = ct.get("department", "")
-        cargo= ct.get("job_role", "")
-        fid  = ct.get("payment_source", "")
-        filial = filiais.get(fid, fid)
+        ct         = emp.get("contract_data", {})
+        dept       = ct.get("department", "")
+        cargo      = ct.get("job_role", "")
+        fid        = ct.get("payment_source", "")
+        filial     = filiais.get(fid, fid)
+        valor_hora = round((ct.get("hour_rate_cents") or 0) / 100, 4)
 
         label = f"[{i+1:3d}/{total}] {nome[:45]:<45}"
 
@@ -167,8 +169,8 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
                atraso, falta_injustificada, atestado, abono,
                ferias, afastamento_nao_rem, dispensa_legal,
                adicional_noturno, hora_noturna_reduzida, dsr,
-               synced_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
+               valor_hora, synced_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
             ON CONFLICT(employee_id, mes) DO UPDATE SET
               horas_normais=EXCLUDED.horas_normais, total=EXCLUDED.total,
               banco_horas=EXCLUDED.banco_horas,
@@ -179,7 +181,8 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
               dispensa_legal=EXCLUDED.dispensa_legal,
               adicional_noturno=EXCLUDED.adicional_noturno,
               hora_noturna_reduzida=EXCLUDED.hora_noturna_reduzida,
-              dsr=EXCLUDED.dsr, synced_at=TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+              dsr=EXCLUDED.dsr, valor_hora=EXCLUDED.valor_hora,
+              synced_at=TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
         """, (
             eid, cpf, nome, dept, cargo, filial, mes,
             f("horas_normais"), f("total"), f("banco_horas"),
@@ -187,6 +190,7 @@ def sincronizar_mes(conn, funcionarios, filiais, mes):
             f("atraso"), f("falta_injustificada"), f("atestado"), f("abono"),
             f("ferias"), f("afastamento_nao_remunerado"), f("dispensa_legal"),
             f("adicional_noturno"), f("hora_noturna_reduzida"), f("dsr"),
+            valor_hora,
         ))
         conn.commit()
         cur.close()

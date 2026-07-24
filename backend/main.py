@@ -162,7 +162,7 @@ def _get_employee(emp_id: str, tentativas: int = 3) -> dict | None:
             if r.status_code == 404:
                 return None
             if r.status_code == 429:
-                time.sleep(2 * (i + 1))
+                time.sleep(8 * (i + 1))
         except requests.exceptions.Timeout:
             time.sleep(1)
         except Exception:
@@ -217,7 +217,7 @@ def buscar_extras_ativos(items: list[dict]) -> dict:
             }
         return None
 
-    resultados = _parallel_fetch(ids, fetch_extra, workers=4)
+    resultados = _parallel_fetch(ids, fetch_extra, workers=2)
     print(f"  Extras ativos: {len(resultados)}/{len(ids)}")
     return resultados
 
