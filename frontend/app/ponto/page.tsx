@@ -16,6 +16,9 @@ type KPIs = {
   saldoBanco: number;
   saldoBancoPos: number;
   impactoFinanceiro: number;
+  custoHe: number;
+  custoAusencias: number;
+  custoNoturno: number;
   bancoNegativo: number;
   totalAbono: number;
   totalFerias: number;
@@ -38,6 +41,9 @@ type PorFilial = {
   hora_noturna_reduzida: number;
   dsr: number;
   banco_negativo: number;
+  custo_he: number;
+  custo_ausencias: number;
+  custo_noturno: number;
 };
 
 type TopFalta  = { nome: string; cargo: string; filial: string; departamento: string; falta_injustificada: number; atestado: number; total_ausencia: number };
@@ -524,6 +530,7 @@ export default function PontoPage() {
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         ) : kpis && (
+          <>
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
             <KpiCard label="Funcionários"    value={kpis.totalFuncionarios}        sub="no período"            color={C.purple} icon="👥" />
             <KpiCard label="HE Total"        value={fmtH(kpis.totalHE)}           sub={`50%:${fmtH(kpis.he50)} 60%:${fmtH(kpis.he60)} 100%:${fmtH(kpis.he100)}`} color={C.amber}  icon="⏱" />
@@ -533,6 +540,49 @@ export default function PontoPage() {
             <KpiCard label="Atrasos"         value={fmtH(kpis.totalAtraso)}       sub="soma do período"       color={C.orange} icon="🕐" />
             <KpiCard label="Banco de Horas"  value={fmtH(kpis.saldoBancoPos)}     sub="saldo positivo acumulado"              color={C.teal}   icon="🏦" />
           </div>
+
+          {/* ── Faixa financeira ── */}
+          {(() => {
+            const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const custoTotal = kpis.custoHe + kpis.custoAusencias + kpis.custoNoturno + kpis.impactoFinanceiro;
+            return (
+              <div className="mt-3 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">💸</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">Impacto Financeiro do Período</span>
+                  <span className="ml-auto text-xs text-white/40">valor/hora individual do TiqueTaque</span>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="rounded-xl p-3 text-center" style={{ backgroundColor: `${C.amber}25` }}>
+                    <div className="text-[9px] font-bold uppercase text-amber-300/80 mb-1">Custo Horas Extras</div>
+                    <div className="text-lg font-black text-amber-300">{fmtBRL(kpis.custoHe)}</div>
+                    <div className="text-[9px] text-white/40 mt-0.5">{fmtH(kpis.totalHE)} trabalhadas</div>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ backgroundColor: `${C.pink}25` }}>
+                    <div className="text-[9px] font-bold uppercase text-pink-300/80 mb-1">Custo Ausências</div>
+                    <div className="text-lg font-black text-pink-300">{fmtBRL(kpis.custoAusencias)}</div>
+                    <div className="text-[9px] text-white/40 mt-0.5">{fmtH(kpis.totalAusencias)} horas</div>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ backgroundColor: '#7c3aed25' }}>
+                    <div className="text-[9px] font-bold uppercase mb-1" style={{ color: '#a78bfa' }}>Adicional Noturno</div>
+                    <div className="text-lg font-black" style={{ color: '#a78bfa' }}>{fmtBRL(kpis.custoNoturno)}</div>
+                    <div className="text-[9px] text-white/40 mt-0.5">{fmtH(kpis.totalNoturno)} horas</div>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ backgroundColor: `${C.teal}25` }}>
+                    <div className="text-[9px] font-bold uppercase text-teal-300/80 mb-1">Passivo Banco Horas</div>
+                    <div className="text-lg font-black text-teal-300">{fmtBRL(kpis.impactoFinanceiro)}</div>
+                    <div className="text-[9px] text-white/40 mt-0.5">{fmtH(kpis.saldoBancoPos)} horas</div>
+                  </div>
+                  <div className="rounded-xl p-3 text-center lg:col-span-1 col-span-2" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                    <div className="text-[9px] font-bold uppercase text-white/60 mb-1">Total Impacto Estimado</div>
+                    <div className="text-lg font-black text-white">{fmtBRL(custoTotal)}</div>
+                    <div className="text-[9px] text-white/40 mt-0.5">no período selecionado</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          </>
         )}
 
         {/* ── Por Filial ── */}
@@ -544,7 +594,7 @@ export default function PontoPage() {
               {data.porFilial.map((f, i) => (
                 <BarH key={f.filial} label={f.filial} value={f.extra_total} max={maxFilialHE}
                       color={PALETTE[i % PALETTE.length]}
-                      subLabel={`${f.funcionarios} func · 50%:${fmtH(f.extra_50)} 60%:${fmtH(f.extra_60)} 100%:${fmtH(f.extra_100)}`} />
+                      subLabel={`${f.funcionarios} func · 50%:${fmtH(f.extra_50)} 60%:${fmtH(f.extra_60)} 100%:${fmtH(f.extra_100)} · ${(+f.custo_he).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`} />
               ))}
             </Card>
 
@@ -553,12 +603,69 @@ export default function PontoPage() {
               {data.porFilial.map((f, i) => (
                 <BarH key={f.filial} label={f.filial} value={f.ausencias} max={maxFilialAbs}
                       color={PALETTE[i % PALETTE.length]}
-                      subLabel={`Faltas: ${fmtH(f.faltas)} · Atestados: ${fmtH(f.atestados)}`} />
+                      subLabel={`Faltas: ${fmtH(f.faltas)} · Atestados: ${fmtH(f.atestados)} · ${(+f.custo_ausencias).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`} />
               ))}
             </Card>
           </div>
         )}
 
+        {/* ── Painel Financeiro por Filial ── */}
+        {!loading && data && data.porFilial.length > 0 && (() => {
+          const fmtBRL = (v: number) => (+v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const filiais = data.porFilial.map(f => ({
+            ...f,
+            passivo_bh: data.bhPorUnidade.find(u => u.filial === f.filial)?.impacto_financeiro ?? 0,
+            total: (+f.custo_he) + (+f.custo_ausencias) + (+f.custo_noturno) +
+                   (data.bhPorUnidade.find(u => u.filial === f.filial)?.impacto_financeiro ?? 0),
+          }));
+          const maxTotal = Math.max(...filiais.map(f => f.total), 1);
+          return (
+            <Card>
+              <SectionTitle icon="📊">Painel Financeiro por Filial</SectionTitle>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400 border-b text-right">
+                      <th className="text-left pb-2 font-semibold w-36">Filial</th>
+                      <th className="pb-2 font-semibold" style={{ color: C.amber }}>Custo HE</th>
+                      <th className="pb-2 font-semibold" style={{ color: C.pink }}>Custo Ausências</th>
+                      <th className="pb-2 font-semibold" style={{ color: '#a78bfa' }}>Adic. Noturno</th>
+                      <th className="pb-2 font-semibold" style={{ color: C.teal }}>Passivo BH</th>
+                      <th className="pb-2 font-semibold text-gray-600">Total Estimado</th>
+                      <th className="pb-2 w-32"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filiais.map((f, i) => (
+                      <tr key={f.filial} className="border-b border-gray-50 hover:bg-gray-50/60">
+                        <td className="py-2.5 font-semibold text-gray-700">{f.filial}</td>
+                        <td className="py-2.5 text-right font-mono" style={{ color: C.amber }}>{fmtBRL(f.custo_he)}</td>
+                        <td className="py-2.5 text-right font-mono" style={{ color: C.pink }}>{fmtBRL(f.custo_ausencias)}</td>
+                        <td className="py-2.5 text-right font-mono" style={{ color: '#a78bfa' }}>{fmtBRL(f.custo_noturno)}</td>
+                        <td className="py-2.5 text-right font-mono" style={{ color: C.teal }}>{fmtBRL(f.passivo_bh)}</td>
+                        <td className="py-2.5 text-right font-mono font-bold text-gray-700">{fmtBRL(f.total)}</td>
+                        <td className="py-2.5 pl-3">
+                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${(f.total / maxTotal) * 100}%`, backgroundColor: PALETTE[i % PALETTE.length] }} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-gray-200 font-bold">
+                      <td className="pt-3 text-gray-700">Total</td>
+                      <td className="pt-3 text-right font-mono" style={{ color: C.amber }}>{fmtBRL(filiais.reduce((s,f)=>s+(+f.custo_he),0))}</td>
+                      <td className="pt-3 text-right font-mono" style={{ color: C.pink }}>{fmtBRL(filiais.reduce((s,f)=>s+(+f.custo_ausencias),0))}</td>
+                      <td className="pt-3 text-right font-mono" style={{ color: '#a78bfa' }}>{fmtBRL(filiais.reduce((s,f)=>s+(+f.custo_noturno),0))}</td>
+                      <td className="pt-3 text-right font-mono" style={{ color: C.teal }}>{fmtBRL(filiais.reduce((s,f)=>s+f.passivo_bh,0))}</td>
+                      <td className="pt-3 text-right font-mono text-gray-700">{fmtBRL(filiais.reduce((s,f)=>s+f.total,0))}</td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* ── Top Faltas + Top Extras ── */}
         {!loading && data && (
