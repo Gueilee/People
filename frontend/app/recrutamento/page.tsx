@@ -21,6 +21,9 @@ type Vaga = {
   data_inicio: string | null;
   fonte: string | null;
   observacoes: string | null;
+  quantidade_vagas: number | null;
+  faixa_salarial: string | null;
+  modelo_contratacao: string | null;
 };
 
 type KPIs = {
@@ -75,8 +78,10 @@ const MOTIVO_CORES: Record<string, string> = {
   'Substituição': C.pink, 'Aumento de Quadro': C.blue, 'Vaga Nova': C.teal,
 };
 
-const OPCOES_MOTIVO    = ['Substituição', 'Aumento de Quadro', 'Vaga Nova'];
-const OPCOES_TIPO_SUB  = ['Pedido de demissão', 'Desligamento', 'Término de Experiência', 'Promoção Interna', 'Encerramento de Contrato', 'Transferência', 'Troca de Turno', 'Outro'];
+const OPCOES_MOTIVO    = ['Aumento de quadro', 'Substituição'];
+const OPCOES_TIPO_SUB  = ['Desligamento', 'Pedido de demissão', 'Transferência', 'Afastamento'];
+const OPCOES_FILIAIS   = ['Garuva', 'Itapevi', 'Navegantes – CD 1', 'Navegantes – CD 2', 'Vila Olímpia'];
+const OPCOES_MODELO    = ['CLT', 'PJ', 'Estágio', 'Temporário'];
 const OPCOES_STATUS    = ['Aberta', 'Fechada', 'Congelada', 'Cancelada'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -211,210 +216,263 @@ function SlaChart({ data }: { data: SlaMes[] }) {
   );
 }
 
+// ─── Helpers de formulário ────────────────────────────────────────────────────
+function SectionHeader({ n, title }: { n: number; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <span className="w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center text-white shrink-0"
+            style={{ backgroundColor: C.purple }}>{n}</span>
+      <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: C.purple }}>{title}</span>
+    </div>
+  );
+}
+
+function Pills({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map(opt => (
+        <button key={opt} type="button" onClick={() => onChange(opt)}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-all"
+          style={{
+            backgroundColor: value === opt ? C.pink : 'white',
+            borderColor:     value === opt ? C.pink : '#E5E7EB',
+            color:           value === opt ? 'white' : '#4B5563',
+          }}>
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Modal Nova/Editar Vaga ───────────────────────────────────────────────────
 const EMPTY_FORM = {
-  cargo: '', responsavel: '', status: 'Aberta', motivo: '',
-  tipo_substituicao: '', colaborador_substituido: '', centro_custo: '',
-  unidade: '', gestor: '', data_abertura: hoje(), data_fechamento: '',
-  novo_colaborador: '', data_inicio: '', fonte: '', observacoes: '',
+  cargo: '', centro_custo: '', gestor: '', unidade: '',
+  quantidade_vagas: '1', data_abertura: hoje(),
+  motivo: '', colaborador_substituido: '', tipo_substituicao: '',
+  faixa_salarial: '', modelo_contratacao: '',
+  responsavel: '', status: 'Aberta', fonte: '',
+  data_fechamento: '', novo_colaborador: '', data_inicio: '', observacoes: '',
 };
 
 type FormState = typeof EMPTY_FORM;
 
-function VagaModal({
-  vaga, opcoes, onClose, onSaved,
-}: {
-  vaga: Vaga | null;
-  opcoes: Opcoes;
-  onClose: () => void;
-  onSaved: () => void;
+function VagaModal({ vaga, opcoes, onClose, onSaved }: {
+  vaga: Vaga | null; opcoes: Opcoes; onClose: () => void; onSaved: () => void;
 }) {
   const isEdit = !!vaga;
   const [form, setForm] = useState<FormState>(() =>
     vaga ? {
-      cargo:                vaga.cargo || '',
-      responsavel:          vaga.responsavel || '',
-      status:               vaga.status || 'Aberta',
-      motivo:               vaga.motivo || '',
-      tipo_substituicao:    vaga.tipo_substituicao || '',
+      cargo:                  vaga.cargo || '',
+      centro_custo:           vaga.centro_custo || '',
+      gestor:                 vaga.gestor || '',
+      unidade:                vaga.unidade || '',
+      quantidade_vagas:       String(vaga.quantidade_vagas ?? 1),
+      data_abertura:          vaga.data_abertura?.split('T')[0] || hoje(),
+      motivo:                 vaga.motivo || '',
       colaborador_substituido: vaga.colaborador_substituido || '',
-      centro_custo:         vaga.centro_custo || '',
-      unidade:              vaga.unidade || '',
-      gestor:               vaga.gestor || '',
-      data_abertura:        vaga.data_abertura?.split('T')[0] || hoje(),
-      data_fechamento:      vaga.data_fechamento?.split('T')[0] || '',
-      novo_colaborador:     vaga.novo_colaborador || '',
-      data_inicio:          vaga.data_inicio?.split('T')[0] || '',
-      fonte:                vaga.fonte || '',
-      observacoes:          vaga.observacoes || '',
+      tipo_substituicao:      vaga.tipo_substituicao || '',
+      faixa_salarial:         vaga.faixa_salarial || '',
+      modelo_contratacao:     vaga.modelo_contratacao || '',
+      responsavel:            vaga.responsavel || '',
+      status:                 vaga.status || 'Aberta',
+      fonte:                  vaga.fonte || '',
+      data_fechamento:        vaga.data_fechamento?.split('T')[0] || '',
+      novo_colaborador:       vaga.novo_colaborador || '',
+      data_inicio:            vaga.data_inicio?.split('T')[0] || '',
+      observacoes:            vaga.observacoes || '',
     } : { ...EMPTY_FORM }
   );
   const [saving, setSaving] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro]     = useState('');
 
-  const f = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+  const set  = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
+  const pick = (k: keyof FormState) => (v: string) => setForm(p => ({ ...p, [k]: v }));
 
   async function handleSave() {
-    if (!form.cargo.trim()) { setErro('Cargo é obrigatório.'); return; }
-    if (!form.responsavel) { setErro('Responsável é obrigatório.'); return; }
+    if (!form.cargo.trim())       { setErro('Cargo é obrigatório.'); return; }
+    if (!form.gestor.trim())      { setErro('Gestor responsável é obrigatório.'); return; }
+    if (!form.unidade)            { setErro('Selecione a unidade.'); return; }
+    if (!form.motivo)             { setErro('Informe o motivo de abertura.'); return; }
+    if (!form.modelo_contratacao) { setErro('Selecione o modelo de contratação.'); return; }
     setSaving(true); setErro('');
     try {
-      const url    = '/api/recrutamento';
-      const method = isEdit ? 'PATCH' : 'POST';
-      const body   = isEdit ? { id: vaga!.id, ...form } : form;
-      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch('/api/recrutamento', {
+        method:  isEdit ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(isEdit ? { id: vaga!.id, ...form } : form),
+      });
       if (!res.ok) throw new Error(await res.text());
       onSaved();
-    } catch (e) {
-      setErro(String(e));
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { setErro(String(e)); }
+    finally     { setSaving(false); }
   }
 
-  const isSub = form.motivo === 'Substituição';
+  const isSub     = form.motivo === 'Substituição';
   const isFechada = form.status === 'Fechada';
-
-  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-white';
-  const labelCls = 'block text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1';
+  const inputCls  = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white';
+  const labelCls  = 'block text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4"
+         style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
-        {/* Header do modal */}
+
+        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
             <h2 className="text-base font-black" style={{ color: C.pink }}>
-              {isEdit ? `Editar Vaga — ${vaga!.cargo || 'sem título'}` : 'Nova Vaga de Seleção'}
+              {isEdit ? `Editar Vaga — ${vaga!.cargo || 'sem título'}` : 'Abertura de Vaga'}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">{isEdit ? 'Atualize os dados da vaga' : 'Preencha os dados para abrir a vaga'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isEdit ? 'Atualize os dados da vaga' : 'Preencha o formulário de solicitação de seleção'}
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">×</button>
         </div>
 
         {/* Body */}
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-5 space-y-6 max-h-[75vh] overflow-y-auto">
 
-          {/* Linha 1: Cargo + Responsável */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Cargo *</label>
-              <input className={inputCls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
-                placeholder="Ex: Auxiliar de Logística" value={form.cargo} onChange={f('cargo')} />
-            </div>
-            <div>
-              <label className={labelCls}>Responsável *</label>
-              <select className={inputCls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties} value={form.responsavel} onChange={f('responsavel')}>
-                <option value="">Selecione...</option>
-                {opcoes.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
-                <option value="__outro">Outro</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Linha 2: Status + Motivo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Status</label>
-              <select className={inputCls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties} value={form.status} onChange={f('status')}>
-                {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Motivo de Abertura</label>
-              <select className={inputCls} value={form.motivo} onChange={f('motivo')}>
-                <option value="">Selecione...</option>
-                {OPCOES_MOTIVO.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Substituição: campos condicionais */}
-          {isSub && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl border border-pink-100" style={{ backgroundColor: '#FFF5F7' }}>
-              <div>
-                <label className={labelCls}>Tipo de Substituição</label>
-                <select className={inputCls} value={form.tipo_substituicao} onChange={f('tipo_substituicao')}>
-                  <option value="">Selecione...</option>
-                  {OPCOES_TIPO_SUB.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Colaborador Substituído</label>
-                <input className={inputCls} placeholder="Nome do colaborador" value={form.colaborador_substituido} onChange={f('colaborador_substituido')} />
-              </div>
-            </div>
-          )}
-
-          {/* Linha 3: Centro de Custo + Unidade */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Centro de Custo</label>
-              <select className={inputCls} value={form.centro_custo} onChange={f('centro_custo')}>
-                <option value="">Selecione...</option>
-                {opcoes.centrosCusto.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Unidade</label>
-              <select className={inputCls} value={form.unidade} onChange={f('unidade')}>
-                <option value="">Selecione...</option>
-                {opcoes.unidades.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Linha 4: Gestor + Fonte */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Gestor Imediato</label>
-              <input className={inputCls} placeholder="Nome do gestor" value={form.gestor} onChange={f('gestor')} />
-            </div>
-            <div>
-              <label className={labelCls}>Fonte de Contratação</label>
-              <select className={inputCls} value={form.fonte} onChange={f('fonte')}>
-                <option value="">Selecione...</option>
-                {opcoes.fontes.map(f2 => <option key={f2} value={f2}>{f2}</option>)}
-                <option value="WhatsApp">WhatsApp</option>
-                <option value="LinkedIn">LinkedIn</option>
-                <option value="SINE">SINE</option>
-                <option value="Gupy">Gupy</option>
-                <option value="Indicação">Indicação</option>
-                <option value="Interno">Interno</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Linha 5: Datas */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <label className={labelCls}>Abertura</label>
-              <input type="date" className={inputCls} value={form.data_abertura} onChange={f('data_abertura')} />
-            </div>
-            <div>
-              <label className={labelCls}>Fechamento</label>
-              <input type="date" className={inputCls} value={form.data_fechamento} onChange={f('data_fechamento')} />
-            </div>
-            <div>
-              <label className={labelCls}>Início Previsto</label>
-              <input type="date" className={inputCls} value={form.data_inicio} onChange={f('data_inicio')} />
-            </div>
-          </div>
-
-          {/* Se fechada: quem foi contratado */}
-          {isFechada && (
-            <div className="p-3 rounded-xl border border-green-100" style={{ backgroundColor: '#F0FDF4' }}>
-              <label className={labelCls} style={{ color: '#16A34A' }}>Colaborador Contratado</label>
-              <input className={inputCls} placeholder="Nome de quem foi contratado" value={form.novo_colaborador} onChange={f('novo_colaborador')} />
-            </div>
-          )}
-
-          {/* Observações */}
+          {/* ── Seção 1: Dados da Vaga ─────────────────────────────────────── */}
           <div>
-            <label className={labelCls}>Observações</label>
-            <textarea className={`${inputCls} resize-none`} rows={3} placeholder="Notas adicionais sobre a vaga..." value={form.observacoes} onChange={f('observacoes')} />
+            <SectionHeader n={1} title="Dados da Vaga" />
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Cargo *</label>
+                  <input className={inputCls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
+                    placeholder="Ex: Auxiliar de Logística" value={form.cargo} onChange={set('cargo')} />
+                </div>
+                <div>
+                  <label className={labelCls}>Centro de Custo</label>
+                  <input className={inputCls} placeholder="Ex: CD Garuva" value={form.centro_custo} onChange={set('centro_custo')} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Gestor Responsável *</label>
+                  <input className={inputCls} placeholder="Nome do gestor" value={form.gestor} onChange={set('gestor')} />
+                </div>
+                <div>
+                  <label className={labelCls}>Quantidade de Vagas</label>
+                  <input type="number" min="1" className={inputCls}
+                    value={form.quantidade_vagas} onChange={set('quantidade_vagas')} />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Filial / Unidade *</label>
+                <Pills options={OPCOES_FILIAIS} value={form.unidade} onChange={pick('unidade')} />
+              </div>
+              <div>
+                <label className={labelCls}>Data de Abertura</label>
+                <input type="date" className={`${inputCls} w-auto`} value={form.data_abertura} onChange={set('data_abertura')} />
+              </div>
+            </div>
           </div>
+
+          {/* ── Seção 2: Motivo da Contratação ─────────────────────────────── */}
+          <div>
+            <SectionHeader n={2} title="Motivo da Contratação" />
+            <div className="space-y-3">
+              <div>
+                <label className={labelCls}>Tipo *</label>
+                <Pills options={OPCOES_MOTIVO} value={form.motivo} onChange={pick('motivo')} />
+              </div>
+              {isSub && (
+                <div className="p-3 rounded-xl border border-pink-100 space-y-3" style={{ backgroundColor: '#FFF5F7' }}>
+                  <div>
+                    <label className={labelCls}>Colaborador Substituído</label>
+                    <input className={inputCls} placeholder="Nome do colaborador"
+                      value={form.colaborador_substituido} onChange={set('colaborador_substituido')} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Motivo da Substituição</label>
+                    <Pills options={OPCOES_TIPO_SUB} value={form.tipo_substituicao} onChange={pick('tipo_substituicao')} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Seção 3: Condições da Contratação ──────────────────────────── */}
+          <div>
+            <SectionHeader n={3} title="Condições da Contratação" />
+            <div className="space-y-3">
+              <div>
+                <label className={labelCls}>Faixa Salarial Aprovada</label>
+                <input className={inputCls}
+                  placeholder="Ex: R$ 2.000 – R$ 2.500 (conforme Plano de Cargos e Salários)"
+                  value={form.faixa_salarial} onChange={set('faixa_salarial')} />
+              </div>
+              <div>
+                <label className={labelCls}>Modelo de Contratação *</label>
+                <Pills options={OPCOES_MODELO} value={form.modelo_contratacao} onChange={pick('modelo_contratacao')} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Seção 4: Acompanhamento RH (somente edição) ────────────────── */}
+          {isEdit && (
+            <div className="p-4 rounded-xl border border-dashed border-purple-200" style={{ backgroundColor: '#FAF8FF' }}>
+              <SectionHeader n={4} title="Acompanhamento RH" />
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Responsável RH</label>
+                    <select className={inputCls} value={form.responsavel} onChange={set('responsavel')}>
+                      <option value="">Selecione...</option>
+                      {opcoes.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Status</label>
+                    <select className={inputCls} value={form.status} onChange={set('status')}>
+                      {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Fonte de Contratação</label>
+                    <select className={inputCls} value={form.fonte} onChange={set('fonte')}>
+                      <option value="">Selecione...</option>
+                      {['WhatsApp', 'LinkedIn', 'SINE', 'Gupy', 'Indicação', 'Interno'].map(f2 => (
+                        <option key={f2} value={f2}>{f2}</option>
+                      ))}
+                      {opcoes.fontes
+                        .filter(f2 => !['WhatsApp','LinkedIn','SINE','Gupy','Indicação','Interno'].includes(f2))
+                        .map(f2 => <option key={f2} value={f2}>{f2}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Data de Fechamento</label>
+                    <input type="date" className={inputCls} value={form.data_fechamento} onChange={set('data_fechamento')} />
+                  </div>
+                </div>
+                {isFechada && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls} style={{ color: '#16A34A' }}>Colaborador Contratado</label>
+                      <input className={inputCls} placeholder="Nome de quem foi contratado"
+                        value={form.novo_colaborador} onChange={set('novo_colaborador')} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Início Previsto</label>
+                      <input type="date" className={inputCls} value={form.data_inicio} onChange={set('data_inicio')} />
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className={labelCls}>Observações</label>
+                  <textarea className={`${inputCls} resize-none`} rows={3}
+                    placeholder="Notas adicionais sobre a vaga..."
+                    value={form.observacoes} onChange={set('observacoes')} />
+                </div>
+              </div>
+            </div>
+          )}
 
           {erro && <p className="text-xs text-red-500 font-semibold">{erro}</p>}
         </div>
@@ -424,8 +482,7 @@ function VagaModal({
           <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">
             Cancelar
           </button>
-          <button
-            onClick={handleSave} disabled={saving}
+          <button onClick={handleSave} disabled={saving}
             className="px-5 py-2 text-sm font-bold text-white rounded-xl transition-all hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: C.pink }}>
             {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Abrir Vaga'}

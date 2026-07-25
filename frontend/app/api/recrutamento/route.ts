@@ -19,8 +19,45 @@ type Vaga = {
   data_inicio: string | null;
   fonte: string | null;
   observacoes: string | null;
+  quantidade_vagas: number | null;
+  faixa_salarial: string | null;
+  modelo_contratacao: string | null;
   criado_em: string | null;
 };
+
+let _tableReady = false;
+async function ensureTable(db: Awaited<ReturnType<typeof getDb>>) {
+  if (_tableReady) return;
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS vagas_recrutamento (
+      id                      SERIAL PRIMARY KEY,
+      responsavel             TEXT,
+      data_abertura           DATE,
+      data_fechamento         DATE,
+      sla_dias                INTEGER,
+      cargo                   TEXT,
+      novo_colaborador        TEXT,
+      status                  TEXT DEFAULT 'Aberta',
+      motivo                  TEXT,
+      tipo_substituicao       TEXT,
+      colaborador_substituido TEXT,
+      centro_custo            TEXT,
+      unidade                 TEXT,
+      gestor                  TEXT,
+      data_inicio             DATE,
+      fonte                   TEXT,
+      observacoes             TEXT,
+      quantidade_vagas        INTEGER DEFAULT 1,
+      faixa_salarial          TEXT,
+      modelo_contratacao      TEXT,
+      criado_em               TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS quantidade_vagas    INTEGER DEFAULT 1`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS faixa_salarial     TEXT`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS modelo_contratacao TEXT`);
+  _tableReady = true;
+}
 
 function fmtMes(iso: string) {
   const d = new Date(iso);
@@ -44,6 +81,7 @@ export async function GET(request: Request) {
     const busca           = (searchParams.get('busca') || '').toLowerCase();
 
     const db   = await getDb();
+    await ensureTable(db);
     const all: Vaga[] = await db.all('SELECT * FROM vagas_recrutamento ORDER BY data_abertura DESC');
 
     const hoje = new Date();
@@ -149,23 +187,28 @@ export async function POST(request: Request) {
       responsavel, data_abertura, data_fechamento, cargo, novo_colaborador,
       status, motivo, tipo_substituicao, colaborador_substituido,
       centro_custo, unidade, gestor, data_inicio, fonte, observacoes,
+      quantidade_vagas, faixa_salarial, modelo_contratacao,
     } = body;
 
     const sla = calcSla(data_abertura, data_fechamento);
     const db  = await getDb();
+    await ensureTable(db);
 
     const row = await db.get<{ id: number }>(
       `INSERT INTO vagas_recrutamento
         (responsavel, data_abertura, data_fechamento, sla_dias, cargo, novo_colaborador,
          status, motivo, tipo_substituicao, colaborador_substituido,
-         centro_custo, unidade, gestor, data_inicio, fonte, observacoes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         centro_custo, unidade, gestor, data_inicio, fonte, observacoes,
+         quantidade_vagas, faixa_salarial, modelo_contratacao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        RETURNING id`,
       [responsavel||null, data_abertura||null, data_fechamento||null, sla,
        cargo||null, novo_colaborador||null, status||'Aberta', motivo||null,
        tipo_substituicao||null, colaborador_substituido||null,
        centro_custo||null, unidade||null, gestor||null,
-       data_inicio||null, fonte||null, observacoes||null]
+       data_inicio||null, fonte||null, observacoes||null,
+       quantidade_vagas ? parseInt(quantidade_vagas) : 1,
+       faixa_salarial||null, modelo_contratacao||null]
     );
 
     return NextResponse.json({ ok: true, id: row?.id ?? 0 }, { status: 201 });
@@ -182,6 +225,7 @@ export async function PATCH(request: Request) {
     if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 });
 
     const db = await getDb();
+    await ensureTable(db);
     const existing = await db.get<Vaga>('SELECT * FROM vagas_recrutamento WHERE id = $1', [id]);
     if (!existing) return NextResponse.json({ error: 'Vaga não encontrada' }, { status: 404 });
 
@@ -193,13 +237,16 @@ export async function PATCH(request: Request) {
       `UPDATE vagas_recrutamento SET
         responsavel=$1, data_abertura=$2, data_fechamento=$3, sla_dias=$4, cargo=$5, novo_colaborador=$6,
         status=$7, motivo=$8, tipo_substituicao=$9, colaborador_substituido=$10,
-        centro_custo=$11, unidade=$12, gestor=$13, data_inicio=$14, fonte=$15, observacoes=$16
-       WHERE id=$17`,
+        centro_custo=$11, unidade=$12, gestor=$13, data_inicio=$14, fonte=$15, observacoes=$16,
+        quantidade_vagas=$17, faixa_salarial=$18, modelo_contratacao=$19
+       WHERE id=$20`,
       [merged.responsavel, merged.data_abertura, fechamento, sla,
        merged.cargo, merged.novo_colaborador, merged.status, merged.motivo,
        merged.tipo_substituicao, merged.colaborador_substituido,
        merged.centro_custo, merged.unidade, merged.gestor,
-       merged.data_inicio, merged.fonte, merged.observacoes, id]
+       merged.data_inicio, merged.fonte, merged.observacoes,
+       merged.quantidade_vagas ?? 1, merged.faixa_salarial, merged.modelo_contratacao,
+       id]
     );
 
     return NextResponse.json({ ok: true });

@@ -183,6 +183,11 @@ def criar_tabela(conn):
 def salvar_lote(conn, registros: list):
     if not registros:
         return
+    # Dedup por (employee_id, data_inicio) dentro do mesmo lote
+    seen = {}
+    for r in registros:
+        seen[(r["employee_id"], r["data_inicio"])] = r
+    registros = list(seen.values())
     cur = conn.cursor()
     psycopg2.extras.execute_values(cur, """
         INSERT INTO historico_cargo_salario
