@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (!nome || !email) {
     return NextResponse.json({ erro: 'Nome e e-mail são obrigatórios' }, { status: 400 });
   }
-  if (!['admin', 'viewer'].includes(role || '')) {
+  if (!['admin', 'viewer', 'rh', 'requisitante'].includes(role || '')) {
     return NextResponse.json({ erro: 'Perfil inválido' }, { status: 400 });
   }
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   const login = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
 
   try {
-    const id = await createUser(nome, email, login, (role as 'admin' | 'viewer'));
+    const id = await createUser(nome, email, login, (role as 'admin' | 'viewer' | 'rh' | 'requisitante'));
     const token = generateToken();
     await setResetToken(id, token, 7 * 24 * 3600); // 7 dias para convite
     try {

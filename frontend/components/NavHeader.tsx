@@ -213,15 +213,20 @@ export function SyncBadge({ label }: { label: string }) {
 
 export function NavHeader({ children }: { children?: React.ReactNode }) {
   const path = usePathname();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    getMyRole().then(role => setIsAdmin(role === 'admin'));
+    getMyRole().then(role => setUserRole(role));
   }, []);
 
-  const allNav = isAdmin
-    ? [...NAV, { href: '/configuracoes', label: 'Configurações', color: '#6B7280' }]
-    : NAV;
+  const isAdmin        = userRole === 'admin';
+  const isRequisitante = userRole === 'requisitante';
+
+  const allNav = isRequisitante
+    ? []
+    : isAdmin
+      ? [...NAV, { href: '/configuracoes', label: 'Configurações', color: '#6B7280' }]
+      : NAV;
 
   const active = allNav.find(n => path.startsWith(n.href));
   const borderColor = active?.color ?? '#422c76';
@@ -230,6 +235,22 @@ export function NavHeader({ children }: { children?: React.ReactNode }) {
     _roleCache = null;
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
+  }
+
+  // Requisitante vê header mínimo: logo + botão sair
+  if (isRequisitante) {
+    return (
+      <header className="sticky top-0 z-50 bg-white"
+        style={{ boxShadow: '0 2px 16px 0 rgba(66,44,118,0.10)', borderBottom: '3px solid #ff2f69' }}>
+        <div className="max-w-screen-2xl mx-auto px-6 flex items-center justify-between" style={{ minHeight: 68 }}>
+          <img src="/logo.png" alt="Vendemmia People" className="h-14 w-auto" />
+          <button onClick={logout}
+            className="text-[11px] font-semibold text-gray-400 hover:text-gray-700 border border-gray-200 hover:border-gray-400 px-3 py-1 rounded-full transition-all cursor-pointer">
+            Sair
+          </button>
+        </div>
+      </header>
+    );
   }
 
   return (

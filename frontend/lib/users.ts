@@ -6,7 +6,7 @@ export type Usuario = {
   nome: string;
   email: string;
   login: string;
-  role: 'admin' | 'viewer';
+  role: 'admin' | 'viewer' | 'rh' | 'requisitante';
   ativo: number;
   tem_senha: number;
   created_at: number;
@@ -123,7 +123,7 @@ export async function reactivateUser(id: number) {
   await db.run(`UPDATE usuarios SET ativo = 1 WHERE id = $1`, [id]);
 }
 
-export async function createUser(nome: string, email: string, login: string, role: 'admin' | 'viewer') {
+export async function createUser(nome: string, email: string, login: string, role: 'admin' | 'viewer' | 'rh' | 'requisitante') {
   const db = await getDb();
   const row = await db.get<{ id: number }>(
     `INSERT INTO usuarios (nome, email, login, role) VALUES ($1, $2, $3, $4) RETURNING id`,

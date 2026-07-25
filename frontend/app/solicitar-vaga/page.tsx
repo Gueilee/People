@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { NavHeader } from '@/components/NavHeader';
 
 const C = { pink: '#ff2f69', purple: '#422c76', dark: '#414042', white: '#faf9f5' };
 
@@ -157,6 +158,21 @@ export default function SolicitarVagaPage() {
   const [saving, setSaving]   = useState(false);
   const [erro, setErro]       = useState('');
   const [sucesso, setSucesso] = useState(false);
+  const [meRole, setMeRole]   = useState<string | null>(null);
+
+  // Se for requisitante, pré-preenche o gestor com os dados da sessão
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        setMeRole(data.role);
+        if (data.role === 'requisitante') {
+          setForm(p => ({ ...p, gestor: data.nome || '', gestor_email: data.email || '' }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const set  = (k: keyof typeof EMPTY) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -188,7 +204,9 @@ export default function SolicitarVagaPage() {
 
   if (sucesso) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ backgroundColor: C.white }}>
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: C.white }}>
+      {meRole === 'requisitante' && <NavHeader />}
+      <div className="flex-1 flex flex-col items-center justify-center px-4">
         <div className="bg-white rounded-3xl shadow-lg p-10 max-w-md w-full text-center">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
                style={{ backgroundColor: '#F0FDF4' }}>
@@ -201,12 +219,13 @@ export default function SolicitarVagaPage() {
             Sua solicitação foi registrada com sucesso.<br />
             O time de RH dará continuidade ao processo e entrará em contato em breve.
           </p>
-          <button onClick={() => { setForm({ ...EMPTY }); setSucesso(false); }}
+          <button onClick={() => { setForm(p => ({ ...EMPTY, gestor: p.gestor, gestor_email: p.gestor_email })); setSucesso(false); }}
             className="text-sm font-bold px-6 py-3 rounded-xl text-white transition-all hover:opacity-90 shadow-sm"
             style={{ backgroundColor: C.pink }}>
             Nova solicitação
           </button>
         </div>
+      </div>
       </div>
     );
   }
@@ -215,9 +234,13 @@ export default function SolicitarVagaPage() {
     <div className="min-h-screen pb-16" style={{ backgroundColor: C.white }}>
 
       {/* Topo */}
-      <div className="bg-white border-b border-gray-100 shadow-sm px-6 py-3 flex items-center">
-        <img src="/logo.png" alt="Vendemmia People" className="h-10 w-auto" />
-      </div>
+      {meRole === 'requisitante' ? (
+        <NavHeader />
+      ) : (
+        <div className="bg-white border-b border-gray-100 shadow-sm px-6 py-3 flex items-center">
+          <img src="/logo.png" alt="Vendemmia People" className="h-10 w-auto" />
+        </div>
+      )}
 
       {/* Conteúdo */}
       <div className="max-w-2xl mx-auto px-4 pt-8">
@@ -253,11 +276,25 @@ export default function SolicitarVagaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Gestor Responsável *</label>
-                  <GestorAutocomplete
-                    value={form.gestor}
-                    emailValue={form.gestor_email}
-                    onChange={(nome, email) => setForm(p => ({ ...p, gestor: nome, gestor_email: email }))}
-                  />
+                  {meRole === 'requisitante' ? (
+                    <div className={`${inputCls} bg-gray-50 text-gray-700`} style={{ '--tw-ring-color': C.pink } as React.CSSProperties}>
+                      {form.gestor || '...'}
+                      {form.gestor_email && (
+                        <p className="mt-0.5 text-[11px] text-green-600 font-semibold flex items-center gap-1">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 13l4 4L19 7" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          {form.gestor_email}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <GestorAutocomplete
+                      value={form.gestor}
+                      emailValue={form.gestor_email}
+                      onChange={(nome, email) => setForm(p => ({ ...p, gestor: nome, gestor_email: email }))}
+                    />
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>Quantidade de Vagas</label>

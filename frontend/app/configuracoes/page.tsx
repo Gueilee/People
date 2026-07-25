@@ -8,13 +8,30 @@ type Usuario = {
   nome: string;
   email: string | null;
   login: string;
-  role: 'admin' | 'viewer';
+  role: 'admin' | 'viewer' | 'rh' | 'requisitante';
   ativo: number;
   tem_senha: number;
   created_at: number;
 };
 
 const C = { purple: '#422c76', pink: '#ff2f69', gray: '#6b7280' };
+
+const ROLE_META: Record<string, { label: string; bg: string; color: string }> = {
+  admin:        { label: 'Admin',        bg: 'rgba(66,44,118,0.1)', color: '#422c76' },
+  rh:           { label: 'RH',           bg: '#eff6ff',             color: '#2563eb' },
+  viewer:       { label: 'RH',           bg: '#eff6ff',             color: '#2563eb' },
+  requisitante: { label: 'Requisitante', bg: '#fff7ed',             color: '#ea580c' },
+};
+
+function RoleBadge({ role, muted }: { role: string; muted?: boolean }) {
+  const meta = ROLE_META[role] ?? { label: role, bg: '#f3f4f6', color: '#6b7280' };
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+      style={{ background: muted ? '#f3f4f6' : meta.bg, color: muted ? '#9ca3af' : meta.color }}>
+      {meta.label}
+    </span>
+  );
+}
 
 function StatusBadge({ u }: { u: Usuario }) {
   if (!u.ativo) {
@@ -53,7 +70,7 @@ export default function ConfiguracoesPage() {
 
   const [nome, setNome]   = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole]   = useState<'admin' | 'viewer'>('viewer');
+  const [role, setRole]   = useState<'admin' | 'viewer' | 'rh' | 'requisitante'>('rh');
   const [saving, setSaving] = useState(false);
   const [erro, setErro]   = useState('');
   const [sucesso, setSucesso] = useState('');
@@ -86,7 +103,7 @@ export default function ConfiguracoesPage() {
       const data = await res.json();
       if (!res.ok) { setErro(data.erro ?? 'Erro ao criar usuário'); return; }
       setSucesso(`Usuário criado! E-mail de convite enviado para ${email}.`);
-      setNome(''); setEmail(''); setRole('viewer');
+      setNome(''); setEmail(''); setRole('rh');
       setShowForm(false);
       await reloadUsers();
     } catch { setErro('Erro de conexão'); }
@@ -219,10 +236,11 @@ export default function ConfiguracoesPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: C.gray }}>Perfil</label>
-                  <select value={role} onChange={e => setRole(e.target.value as 'admin' | 'viewer')}
+                  <select value={role} onChange={e => setRole(e.target.value as 'admin' | 'viewer' | 'rh' | 'requisitante')}
                     style={{ ...inputStyle, cursor: 'pointer' }}>
-                    <option value="viewer">Visualizador</option>
-                    <option value="admin">Administrador</option>
+                    <option value="rh">RH — Acesso completo ao sistema</option>
+                    <option value="requisitante">Requisitante — Apenas abertura de vagas</option>
+                    <option value="admin">Administrador — Acesso total + configurações</option>
                   </select>
                 </div>
               </div>
@@ -278,13 +296,7 @@ export default function ConfiguracoesPage() {
                     </td>
                     <td className="px-4 py-3 text-sm" style={{ color: C.gray }}>{u.email || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
-                        style={{
-                          background: u.role === 'admin' ? 'rgba(66,44,118,0.1)' : '#f3f4f6',
-                          color: u.role === 'admin' ? C.purple : C.gray,
-                        }}>
-                        {u.role === 'admin' ? 'Admin' : 'Visualizador'}
-                      </span>
+                      <RoleBadge role={u.role} />
                     </td>
                     <td className="px-4 py-3"><StatusBadge u={u} /></td>
                     <td className="px-4 py-3">
@@ -349,10 +361,7 @@ export default function ConfiguracoesPage() {
                     </td>
                     <td className="px-4 py-3 text-sm" style={{ color: '#d1d5db' }}>{u.email || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
-                        style={{ background: '#f3f4f6', color: '#9ca3af' }}>
-                        {u.role === 'admin' ? 'Admin' : 'Visualizador'}
-                      </span>
+                      <RoleBadge role={u.role} muted />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
