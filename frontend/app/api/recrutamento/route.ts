@@ -56,6 +56,8 @@ async function ensureTable(db: Awaited<ReturnType<typeof getDb>>) {
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS quantidade_vagas    INTEGER DEFAULT 1`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS faixa_salarial     TEXT`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS modelo_contratacao TEXT`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS num_convocados     INTEGER`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS num_compareceu     INTEGER`);
   _tableReady = true;
 }
 
@@ -188,6 +190,7 @@ export async function POST(request: Request) {
       status, motivo, tipo_substituicao, colaborador_substituido,
       centro_custo, unidade, gestor, data_inicio, fonte, observacoes,
       quantidade_vagas, faixa_salarial, modelo_contratacao,
+      num_convocados, num_compareceu,
     } = body;
 
     const sla = calcSla(data_abertura, data_fechamento);
@@ -199,8 +202,9 @@ export async function POST(request: Request) {
         (responsavel, data_abertura, data_fechamento, sla_dias, cargo, novo_colaborador,
          status, motivo, tipo_substituicao, colaborador_substituido,
          centro_custo, unidade, gestor, data_inicio, fonte, observacoes,
-         quantidade_vagas, faixa_salarial, modelo_contratacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         quantidade_vagas, faixa_salarial, modelo_contratacao,
+         num_convocados, num_compareceu)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        RETURNING id`,
       [responsavel||null, data_abertura||null, data_fechamento||null, sla,
        cargo||null, novo_colaborador||null, status||'Aberta', motivo||null,
@@ -208,7 +212,9 @@ export async function POST(request: Request) {
        centro_custo||null, unidade||null, gestor||null,
        data_inicio||null, fonte||null, observacoes||null,
        quantidade_vagas ? parseInt(quantidade_vagas) : 1,
-       faixa_salarial||null, modelo_contratacao||null]
+       faixa_salarial||null, modelo_contratacao||null,
+       num_convocados ? parseInt(num_convocados) : null,
+       num_compareceu ? parseInt(num_compareceu) : null]
     );
 
     return NextResponse.json({ ok: true, id: row?.id ?? 0 }, { status: 201 });
@@ -238,14 +244,16 @@ export async function PATCH(request: Request) {
         responsavel=$1, data_abertura=$2, data_fechamento=$3, sla_dias=$4, cargo=$5, novo_colaborador=$6,
         status=$7, motivo=$8, tipo_substituicao=$9, colaborador_substituido=$10,
         centro_custo=$11, unidade=$12, gestor=$13, data_inicio=$14, fonte=$15, observacoes=$16,
-        quantidade_vagas=$17, faixa_salarial=$18, modelo_contratacao=$19
-       WHERE id=$20`,
+        quantidade_vagas=$17, faixa_salarial=$18, modelo_contratacao=$19,
+        num_convocados=$20, num_compareceu=$21
+       WHERE id=$22`,
       [merged.responsavel, merged.data_abertura, fechamento, sla,
        merged.cargo, merged.novo_colaborador, merged.status, merged.motivo,
        merged.tipo_substituicao, merged.colaborador_substituido,
        merged.centro_custo, merged.unidade, merged.gestor,
        merged.data_inicio, merged.fonte, merged.observacoes,
        merged.quantidade_vagas ?? 1, merged.faixa_salarial, merged.modelo_contratacao,
+       merged.num_convocados ?? null, merged.num_compareceu ?? null,
        id]
     );
 

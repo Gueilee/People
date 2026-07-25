@@ -24,6 +24,8 @@ type Vaga = {
   quantidade_vagas: number | null;
   faixa_salarial: string | null;
   modelo_contratacao: string | null;
+  num_convocados: number | null;
+  num_compareceu: number | null;
 };
 
 type KPIs = {
@@ -83,6 +85,8 @@ const OPCOES_TIPO_SUB  = ['Desligamento', 'Pedido de demissão', 'Transferência
 const OPCOES_FILIAIS   = ['Garuva', 'Itapevi', 'Navegantes – CD 1', 'Navegantes – CD 2', 'Vila Olímpia'];
 const OPCOES_MODELO    = ['CLT', 'PJ', 'Estágio', 'Temporário'];
 const OPCOES_STATUS    = ['Aberta', 'Fechada', 'Congelada', 'Cancelada'];
+const RESPONSAVEIS_RH  = ['Camile Fernandes', 'Denise Oliveira', 'Gabriela Santos', 'Hellen Gomes', 'Julia Barbosa', 'Rafaela Marques'];
+const UNIDADES_SC      = ['Garuva', 'Navegantes – CD 1', 'Navegantes – CD 2'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtData = (iso: string | null) => {
@@ -253,6 +257,7 @@ const EMPTY_FORM = {
   faixa_salarial: '', modelo_contratacao: '',
   responsavel: '', status: 'Aberta', fonte: '',
   data_fechamento: '', novo_colaborador: '', data_inicio: '', observacoes: '',
+  num_convocados: '', num_compareceu: '',
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -281,6 +286,8 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
       novo_colaborador:       vaga.novo_colaborador || '',
       data_inicio:            vaga.data_inicio?.split('T')[0] || '',
       observacoes:            vaga.observacoes || '',
+      num_convocados:         String(vaga.num_convocados ?? ''),
+      num_compareceu:         String(vaga.num_compareceu ?? ''),
     } : { ...EMPTY_FORM }
   );
   const [saving, setSaving] = useState(false);
@@ -417,33 +424,18 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
           {isEdit && (
             <div className="p-4 rounded-xl border border-dashed border-purple-200" style={{ backgroundColor: '#FAF8FF' }}>
               <SectionHeader n={4} title="Acompanhamento RH" />
-              <div className="space-y-3">
+              <div className="space-y-4">
+
+                <div>
+                  <label className={labelCls}>Responsável pelo Processo</label>
+                  <Pills options={RESPONSAVEIS_RH} value={form.responsavel} onChange={pick('responsavel')} />
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Responsável RH</label>
-                    <select className={inputCls} value={form.responsavel} onChange={set('responsavel')}>
-                      <option value="">Selecione...</option>
-                      {opcoes.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
                   <div>
                     <label className={labelCls}>Status</label>
                     <select className={inputCls} value={form.status} onChange={set('status')}>
                       {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Fonte de Contratação</label>
-                    <select className={inputCls} value={form.fonte} onChange={set('fonte')}>
-                      <option value="">Selecione...</option>
-                      {['WhatsApp', 'LinkedIn', 'SINE', 'Gupy', 'Indicação', 'Interno'].map(f2 => (
-                        <option key={f2} value={f2}>{f2}</option>
-                      ))}
-                      {opcoes.fontes
-                        .filter(f2 => !['WhatsApp','LinkedIn','SINE','Gupy','Indicação','Interno'].includes(f2))
-                        .map(f2 => <option key={f2} value={f2}>{f2}</option>)}
                     </select>
                   </div>
                   <div>
@@ -451,10 +443,11 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
                     <input type="date" className={inputCls} value={form.data_fechamento} onChange={set('data_fechamento')} />
                   </div>
                 </div>
+
                 {isFechada && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className={labelCls} style={{ color: '#16A34A' }}>Colaborador Contratado</label>
+                      <label className={labelCls} style={{ color: '#16A34A' }}>Nome do Colaborador Contratado</label>
                       <input className={inputCls} placeholder="Nome de quem foi contratado"
                         value={form.novo_colaborador} onChange={set('novo_colaborador')} />
                     </div>
@@ -464,12 +457,48 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
                     </div>
                   </div>
                 )}
+
+                <div>
+                  <label className={labelCls}>Fonte de Contratação</label>
+                  <select className={inputCls} value={form.fonte} onChange={set('fonte')}>
+                    <option value="">Selecione...</option>
+                    {['WhatsApp', 'LinkedIn', 'SINE', 'Gupy', 'Indicação', 'Interno'].map(f2 => (
+                      <option key={f2} value={f2}>{f2}</option>
+                    ))}
+                    {opcoes.fontes
+                      .filter(f2 => !['WhatsApp','LinkedIn','SINE','Gupy','Indicação','Interno'].includes(f2))
+                      .map(f2 => <option key={f2} value={f2}>{f2}</option>)}
+                  </select>
+                </div>
+
+                {/* Campos exclusivos para contratações em SC */}
+                {UNIDADES_SC.includes(form.unidade) && (
+                  <div className="p-3 rounded-xl border border-purple-100" style={{ backgroundColor: '#F5F3FF' }}>
+                    <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: C.purple }}>
+                      Contratação SC — Dados de Processo Seletivo
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Nº de Convocados</label>
+                        <input type="number" min="0" className={inputCls}
+                          placeholder="0" value={form.num_convocados} onChange={set('num_convocados')} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Nº de Compareceram</label>
+                        <input type="number" min="0" className={inputCls}
+                          placeholder="0" value={form.num_compareceu} onChange={set('num_compareceu')} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className={labelCls}>Observações</label>
                   <textarea className={`${inputCls} resize-none`} rows={3}
                     placeholder="Notas adicionais sobre a vaga..."
                     value={form.observacoes} onChange={set('observacoes')} />
                 </div>
+
               </div>
             </div>
           )}
