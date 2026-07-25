@@ -7,6 +7,12 @@ const OPCOES_MOTIVO   = ['Aumento de quadro', 'Substituição'];
 const OPCOES_TIPO_SUB = ['Desligamento', 'Pedido de demissão', 'Transferência', 'Afastamento'];
 const OPCOES_FILIAIS  = ['Garuva', 'Itapevi', 'Navegantes – CD 1', 'Navegantes – CD 2', 'Vila Olímpia'];
 const OPCOES_MODELO   = ['CLT', 'PJ', 'Estágio', 'Temporário'];
+const OPCOES_CC = [
+  'OPERAÇÃO VCI', 'OPERAÇÃO ARMAZEM - NVG', 'OPERAÇÃO ARMAZEM - ITV', 'OPERAÇÃO ARMAZEM - GRV',
+  'OPERAÇÃO TRANSPORTE', 'COMERCIAL', 'INFRAESTRUTURA', 'PROJETOS/QUALIDADE', 'COMPRAS',
+  'MARKETING', 'TI', 'FINANCEIRO - ADM', 'RH', 'JURIDICO', 'DIRETORIA',
+  'EXECUTIVO ARMAZEM', 'EXECUTIVO COMERCIO', 'TI - ANALYTICS',
+];
 
 const hoje = () => new Date().toISOString().split('T')[0];
 
@@ -52,7 +58,7 @@ export default function SolicitarVagaPage() {
   const [sucesso, setSucesso] = useState(false);
 
   const set  = (k: keyof typeof EMPTY) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
   const pick = (k: keyof typeof EMPTY) => (v: string) => setForm(p => ({ ...p, [k]: v }));
 
   async function handleSubmit() {
@@ -137,8 +143,10 @@ export default function SolicitarVagaPage() {
                 </div>
                 <div>
                   <label className={labelCls}>Centro de Custo</label>
-                  <input className={inputCls} placeholder="Ex: CD Garuva"
-                    value={form.centro_custo} onChange={set('centro_custo')} />
+                  <select className={inputCls} value={form.centro_custo} onChange={set('centro_custo')}>
+                    <option value="">Selecione...</option>
+                    {OPCOES_CC.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

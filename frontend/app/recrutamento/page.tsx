@@ -87,6 +87,15 @@ const OPCOES_MODELO    = ['CLT', 'PJ', 'Estágio', 'Temporário'];
 const OPCOES_STATUS    = ['Aberta', 'Fechada', 'Congelada', 'Cancelada'];
 const RESPONSAVEIS_RH  = ['Camile Fernandes', 'Denise Oliveira', 'Gabriela Santos', 'Hellen Gomes', 'Julia Barbosa', 'Rafaela Marques'];
 const UNIDADES_SC      = ['Garuva', 'Navegantes – CD 1', 'Navegantes – CD 2'];
+const OPCOES_CC = [
+  'OPERAÇÃO VCI', 'OPERAÇÃO ARMAZEM - NVG', 'OPERAÇÃO ARMAZEM - ITV', 'OPERAÇÃO ARMAZEM - GRV',
+  'OPERAÇÃO TRANSPORTE', 'COMERCIAL', 'INFRAESTRUTURA', 'PROJETOS/QUALIDADE', 'COMPRAS',
+  'MARKETING', 'TI', 'FINANCEIRO - ADM', 'RH', 'JURIDICO', 'DIRETORIA',
+  'EXECUTIVO ARMAZEM', 'EXECUTIVO COMERCIO', 'TI - ANALYTICS',
+];
+const OPCOES_FONTE = [
+  'Gupy', 'Indicação', 'LinkedIn', 'Processo Seletivo Interno', 'SINE', 'Terceirizada', 'WhatsApp',
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtData = (iso: string | null) => {
@@ -354,7 +363,10 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
                 </div>
                 <div>
                   <label className={labelCls}>Centro de Custo</label>
-                  <input className={inputCls} placeholder="Ex: CD Garuva" value={form.centro_custo} onChange={set('centro_custo')} />
+                  <select className={inputCls} value={form.centro_custo} onChange={set('centro_custo')}>
+                    <option value="">Selecione...</option>
+                    {OPCOES_CC.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -462,12 +474,7 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
                   <label className={labelCls}>Fonte de Contratação</label>
                   <select className={inputCls} value={form.fonte} onChange={set('fonte')}>
                     <option value="">Selecione...</option>
-                    {['WhatsApp', 'LinkedIn', 'SINE', 'Gupy', 'Indicação', 'Interno'].map(f2 => (
-                      <option key={f2} value={f2}>{f2}</option>
-                    ))}
-                    {opcoes.fontes
-                      .filter(f2 => !['WhatsApp','LinkedIn','SINE','Gupy','Indicação','Interno'].includes(f2))
-                      .map(f2 => <option key={f2} value={f2}>{f2}</option>)}
+                    {OPCOES_FONTE.map(f2 => <option key={f2} value={f2}>{f2}</option>)}
                   </select>
                 </div>
 
