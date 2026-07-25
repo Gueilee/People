@@ -198,22 +198,39 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 }
 
 // ─── Gráfico de linha histórico ───────────────────────────────────────────────
+type VisKeys = { he: boolean; abs: boolean; atr: boolean };
+
 function TendenciaChart({ data }: { data: Tendencia[] }) {
+  const [vis, setVis] = useState<VisKeys>({ he: true, abs: true, atr: true });
+
+  function toggleLine(k: keyof VisKeys) {
+    setVis(prev => {
+      const next = { ...prev, [k]: !prev[k] };
+      // garante que pelo menos uma linha fique visível
+      if (!next.he && !next.abs && !next.atr) return prev;
+      return next;
+    });
+  }
+
   // W grande → proporção ~6.5:1 → em tela 1200px a altura fica ~185px (proporcional)
   const W = 1000, H = 155, padL = 32, padR = 20, padT = 30, padB = 36;
   const n = data.length;
   if (n === 0) return <div className="text-xs text-gray-400 text-center py-8">Sem dados históricos</div>;
 
-  const maxAll = Math.max(...data.flatMap(d => [d.he_total, d.ausencias, d.atrasos]), 1);
-  const getX   = (i: number) => padL + (i / Math.max(n - 1, 1)) * (W - padL - padR);
-  const getY   = (v: number) => padT + (1 - v / maxAll) * (H - padT - padB);
-  const axisY  = H - padB;
-
-  const SERIES = [
+  const ALL_SERIES = [
     { key: 'he',  vals: data.map(d => d.he_total),  color: C.amber, name: 'HE total' },
     { key: 'abs', vals: data.map(d => d.ausencias), color: C.pink,  name: 'Ausências' },
     { key: 'atr', vals: data.map(d => d.atrasos),   color: C.blue,  name: 'Atrasos' },
-  ];
+  ] as const;
+
+  const SERIES = ALL_SERIES.filter(s => vis[s.key as keyof VisKeys]);
+
+  const maxAll = Math.max(
+    ...SERIES.flatMap(s => s.vals), 1
+  );
+  const getX   = (i: number) => padL + (i / Math.max(n - 1, 1)) * (W - padL - padR);
+  const getY   = (v: number) => padT + (1 - v / maxAll) * (H - padT - padB);
+  const axisY  = H - padB;
 
   function smooth(vals: number[]): string {
     const pts: [number, number][] = vals.map((v, i) => [getX(i), getY(v)]);
@@ -271,14 +288,28 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
 
   return (
     <div>
-      {/* Legenda */}
-      <div className="flex items-center gap-5 mb-2">
-        {SERIES.map(s => (
-          <span key={s.key} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
-            <span className="inline-block w-4 h-[1.5px] rounded-full" style={{ backgroundColor: s.color }} />
-            {s.name}
-          </span>
-        ))}
+      {/* Toggles de linha */}
+      <div className="flex items-center gap-2 mb-3">
+        {ALL_SERIES.map(s => {
+          const active = vis[s.key as keyof VisKeys];
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => toggleLine(s.key as keyof VisKeys)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer"
+              style={{
+                backgroundColor: active ? `${s.color}18` : 'transparent',
+                borderColor:     active ? s.color : '#E5E7EB',
+                color:           active ? s.color : '#9CA3AF',
+              }}
+            >
+              <span className="inline-block w-3 h-[2px] rounded-full"
+                    style={{ backgroundColor: active ? s.color : '#D1D5DB' }} />
+              {s.name}
+            </button>
+          );
+        })}
       </div>
 
       {/* overflow:hidden — todos os elementos estão dentro do viewBox */}
