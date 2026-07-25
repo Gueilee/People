@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const C = { pink: '#ff2f69', purple: '#422c76', dark: '#414042', white: '#faf9f5' };
 
@@ -26,6 +26,107 @@ function SectionHeader({ n, title }: { n: number; title: string }) {
   );
 }
 
+type ColabSugestao = { nome: string; email: string | null; cargo: string | null; unidade: string | null };
+
+function GestorAutocomplete({
+  value, emailValue, onChange,
+}: {
+  value: string;
+  emailValue: string;
+  onChange: (nome: string, email: string) => void;
+}) {
+  const [query, setQuery]           = useState(value);
+  const [sugestoes, setSugestoes]   = useState<ColabSugestao[]>([]);
+  const [aberto, setAberto]         = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const wrapRef                     = useRef<HTMLDivElement>(null);
+  const timerRef                    = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Busca com debounce 300ms
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (query.length < 2) { setSugestoes([]); setAberto(false); return; }
+    timerRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res  = await fetch(`/api/colaboradores/busca?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        setSugestoes(data);
+        setAberto(data.length > 0);
+      } catch { setSugestoes([]); }
+      finally  { setLoading(false); }
+    }, 300);
+  }, [query]);
+
+  function selecionar(s: ColabSugestao) {
+    setQuery(s.nome);
+    setSugestoes([]);
+    setAberto(false);
+    onChange(s.nome, s.email || '');
+  }
+
+  const inputCls = 'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 bg-white';
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="relative">
+        <input
+          className={inputCls}
+          style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
+          placeholder="Digite o nome do gestor..."
+          value={query}
+          onChange={e => { setQuery(e.target.value); onChange(e.target.value, ''); }}
+          onFocus={() => sugestoes.length > 0 && setAberto(true)}
+          autoComplete="off"
+        />
+        {loading && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-pink-400 rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
+
+      {/* E-mail confirmado */}
+      {emailValue && (
+        <p className="mt-1 text-[11px] text-green-600 font-semibold flex items-center gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+            <path d="M5 13l4 4L19 7" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {emailValue}
+        </p>
+      )}
+
+      {/* Dropdown de sugestões */}
+      {aberto && sugestoes.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          {sugestoes.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => selecionar(s)}
+              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">{s.nome}</p>
+              <p className="text-[11px] text-gray-400 truncate">
+                {[s.cargo, s.unidade].filter(Boolean).join(' · ')}
+                {s.email ? <span className="ml-1 text-green-600"> · {s.email}</span> : ''}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Pills({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -45,7 +146,7 @@ function Pills({ options, value, onChange }: { options: string[]; value: string;
 }
 
 const EMPTY = {
-  cargo: '', centro_custo: '', gestor: '', unidade: '',
+  cargo: '', centro_custo: '', gestor: '', gestor_email: '', unidade: '',
   quantidade_vagas: '1', data_abertura: hoje(),
   motivo: '', colaborador_substituido: '', tipo_substituicao: '',
   faixa_salarial: '', modelo_contratacao: '',
@@ -152,8 +253,11 @@ export default function SolicitarVagaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Gestor Responsável *</label>
-                  <input className={inputCls} placeholder="Nome do gestor"
-                    value={form.gestor} onChange={set('gestor')} />
+                  <GestorAutocomplete
+                    value={form.gestor}
+                    emailValue={form.gestor_email}
+                    onChange={(nome, email) => setForm(p => ({ ...p, gestor: nome, gestor_email: email }))}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Quantidade de Vagas</label>

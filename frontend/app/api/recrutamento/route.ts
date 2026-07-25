@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { sendVagaAbertaEmail } from '@/lib/mailer';
 
 type Vaga = {
   id: number;
@@ -73,6 +74,7 @@ async function ensureTable(db: Awaited<ReturnType<typeof getDb>>) {
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS num_convocados     INTEGER`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS num_compareceu     INTEGER`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS sla_meta_dias      INTEGER`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS gestor_email       TEXT`);
   _tableReady = true;
 }
 
@@ -227,7 +229,7 @@ export async function POST(request: Request) {
     const {
       responsavel, data_abertura, data_fechamento, cargo, novo_colaborador,
       status, motivo, tipo_substituicao, colaborador_substituido,
-      centro_custo, unidade, gestor, data_inicio, fonte, observacoes,
+      centro_custo, unidade, gestor, gestor_email, data_inicio, fonte, observacoes,
       quantidade_vagas, faixa_salarial, modelo_contratacao,
       num_convocados, num_compareceu,
     } = body;
@@ -241,15 +243,15 @@ export async function POST(request: Request) {
       `INSERT INTO vagas_recrutamento
         (responsavel, data_abertura, data_fechamento, sla_dias, cargo, novo_colaborador,
          status, motivo, tipo_substituicao, colaborador_substituido,
-         centro_custo, unidade, gestor, data_inicio, fonte, observacoes,
+         centro_custo, unidade, gestor, gestor_email, data_inicio, fonte, observacoes,
          quantidade_vagas, faixa_salarial, modelo_contratacao,
          num_convocados, num_compareceu, sla_meta_dias)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING id`,
       [responsavel||null, data_abertura||null, data_fechamento||null, sla,
        cargo||null, novo_colaborador||null, status||'Aberta', motivo||null,
        tipo_substituicao||null, colaborador_substituido||null,
-       centro_custo||null, unidade||null, gestor||null,
+       centro_custo||null, unidade||null, gestor||null, gestor_email||null,
        data_inicio||null, fonte||null, observacoes||null,
        quantidade_vagas ? parseInt(quantidade_vagas) : 1,
        faixa_salarial||null, modelo_contratacao||null,
@@ -257,6 +259,23 @@ export async function POST(request: Request) {
        num_compareceu ? parseInt(num_compareceu) : null,
        sla_meta_dias]
     );
+
+    // Disparar e-mail de notificação (não bloqueia a resposta)
+    sendVagaAbertaEmail({
+      cargo:                 cargo        || '',
+      unidade:               unidade      || '',
+      gestor:                gestor       || '',
+      gestor_email:          gestor_email || null,
+      motivo:                motivo       || '',
+      tipo_substituicao:     tipo_substituicao     || null,
+      colaborador_substituido: colaborador_substituido || null,
+      modelo_contratacao:    modelo_contratacao || '',
+      faixa_salarial:        faixa_salarial || null,
+      data_abertura:         data_abertura  || '',
+      quantidade_vagas:      quantidade_vagas || 1,
+      centro_custo:          centro_custo || null,
+      observacoes:           observacoes  || null,
+    }).catch(err => console.error('[Recrutamento] Erro ao enviar e-mail:', err));
 
     return NextResponse.json({ ok: true, id: row?.id ?? 0 }, { status: 201 });
   } catch (err) {

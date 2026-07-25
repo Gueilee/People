@@ -159,6 +159,140 @@ export async function sendInviteEmail(to: string, nome: string, token: string) {
   });
 }
 
+const RH_EMAILS = [
+  'gppereira@vendemmia.com.br',
+  'cfernandes@vendemmia.com.br',
+  'doliveira@vendemmia.com.br',
+  'glima@vendemmia.com.br',
+  'hfernandes@vendemmia.com.br',
+  'jbarbosa@vendemmia.com.br',
+  'rmarques@vendemmia.com.br',
+  'jnetto@vendemmia.com.br',
+];
+
+type VagaEmailData = {
+  cargo: string;
+  unidade: string;
+  gestor: string;
+  gestor_email?: string | null;
+  motivo: string;
+  tipo_substituicao?: string | null;
+  colaborador_substituido?: string | null;
+  modelo_contratacao: string;
+  faixa_salarial?: string | null;
+  data_abertura: string;
+  quantidade_vagas?: number | string;
+  centro_custo?: string | null;
+  observacoes?: string | null;
+};
+
+function fmtDataBR(iso: string | null) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+export async function sendVagaAbertaEmail(vaga: VagaEmailData) {
+  const transporter = createTransporter();
+
+  const recipients = [...RH_EMAILS];
+  if (vaga.gestor_email && !recipients.includes(vaga.gestor_email)) {
+    recipients.push(vaga.gestor_email);
+  }
+
+  const isSub = vaga.motivo === 'Substituição';
+
+  const content = `
+    <p style="margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#ff2f69;">Nova solicitação de vaga</p>
+    <h1 style="margin:0 0 6px;font-size:26px;font-weight:900;color:#1f2937;line-height:1.2;">${vaga.cargo}</h1>
+    <p style="margin:0 0 24px;font-size:14px;color:#6b7280;">Solicitado por <strong style="color:#422c76;">${vaga.gestor}</strong> · ${fmtDataBR(vaga.data_abertura)}</p>
+
+    <!-- DETALHES PRINCIPAIS -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;border:1.5px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:0;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            ${[
+              ['📍 Unidade / Filial',    vaga.unidade           || '—'],
+              ['💼 Cargo',               vaga.cargo             || '—'],
+              ['📋 Centro de Custo',     vaga.centro_custo      || '—'],
+              ['🔢 Quantidade de Vagas', String(vaga.quantidade_vagas || 1)],
+              ['📄 Modelo de Contratação', vaga.modelo_contratacao || '—'],
+              ['💰 Faixa Salarial',      vaga.faixa_salarial    || '—'],
+              ['📅 Data de Abertura',    fmtDataBR(vaga.data_abertura)],
+            ].map(([label, value], idx) => `
+              <tr style="background-color:${idx % 2 === 0 ? '#fafafa' : '#ffffff'};">
+                <td style="padding:11px 18px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#9ca3af;width:44%;border-bottom:1px solid #f3f4f6;">${label}</td>
+                <td style="padding:11px 18px;font-size:13px;font-weight:600;color:#1f2937;border-bottom:1px solid #f3f4f6;">${value}</td>
+              </tr>
+            `).join('')}
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- MOTIVO -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:${isSub ? '16px' : '24px'};border-radius:10px;overflow:hidden;">
+      <tr>
+        <td style="background-color:${isSub ? '#fff7ed' : '#f0fdf4'};border:1.5px solid ${isSub ? '#fed7aa' : '#bbf7d0'};border-radius:10px;padding:14px 18px;">
+          <p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${isSub ? '#9a3412' : '#14532d'};">Motivo da abertura</p>
+          <p style="margin:0;font-size:14px;font-weight:700;color:${isSub ? '#c2410c' : '#15803d'};">${vaga.motivo}</p>
+        </td>
+      </tr>
+    </table>
+
+    ${isSub ? `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="background-color:#fafafa;border:1.5px solid #e5e7eb;border-radius:10px;padding:14px 18px;">
+          <p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;">Substituindo</p>
+          <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#1f2937;">${vaga.colaborador_substituido || '—'}</p>
+          <p style="margin:0;font-size:12px;color:#6b7280;">Motivo: ${vaga.tipo_substituicao || '—'}</p>
+        </td>
+      </tr>
+    </table>
+    ` : ''}
+
+    ${vaga.observacoes ? `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="background-color:#fafafa;border:1.5px solid #e5e7eb;border-radius:10px;padding:14px 18px;">
+          <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;">Observações</p>
+          <p style="margin:0;font-size:13px;color:#374151;line-height:1.6;">${vaga.observacoes}</p>
+        </td>
+      </tr>
+    </table>
+    ` : ''}
+
+    <!-- CTA -->
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="border-radius:10px;background-color:#422c76;box-shadow:0 4px 14px rgba(66,44,118,0.3);">
+          <a href="${baseUrl}/recrutamento" target="_blank"
+             style="display:inline-block;padding:13px 28px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">
+            Abrir no sistema →
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="height:1px;background-color:#f3f4f6;font-size:1px;line-height:1px;">&nbsp;</td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:12px;color:#9ca3af;line-height:1.7;">
+      Esta notificação foi gerada automaticamente pelo sistema de Recrutamento &amp; Seleção.<br/>
+      A vaga já está registrada e aguarda atribuição de responsável pelo time de RH.
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: fromAddress(),
+    to: recipients.join(', '),
+    subject: `🚀 Nova vaga aberta: ${vaga.cargo} — ${vaga.unidade}`,
+    html: emailShell(content),
+  });
+}
+
 export async function sendResetEmail(to: string, nome: string, token: string) {
   const link = `${baseUrl}/definir-senha?token=${token}`;
   const transporter = createTransporter();
