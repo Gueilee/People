@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
 type Vaga = {
@@ -29,13 +29,13 @@ type Vaga = {
 };
 
 function detectarSLAMeta(cargo: string): number {
-  const c = (cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  if (/\bgerente\b|\btrader\b/.test(c))                                           return 90;
-  if (/\bespecialista\b|\bcoordenador\b/.test(c))                                 return 60;
-  if (/\banalista\b|\bengenheiro\b|\bdesenvolvedor\b|\bdeveloper\b|\bsdr\b/.test(c)) return 30;
-  if (/empilhadeira/.test(c))                                                     return 25;
-  if (/\bmotorista\b|\bauxiliar\b|\bconferente\b/.test(c))                        return 20;
-  if (/estagiario|jovem\s*aprendiz|\bassistente\b/.test(c))                       return 15;
+  const c = (cargo || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\bgerente\b|\btrader\b/.test(c))                                                return 90;
+  if (/\bespecialista\b|\bcoordenador\b/.test(c))                                      return 60;
+  if (/\banalista\b|\bengenheiro\b|\bdesenvolvedor\b|\bdeveloper\b|\bsdr\b/.test(c))   return 30;
+  if (/empilhadeira/.test(c))                                                          return 25;
+  if (/\bmotorista\b|\bauxiliar\b|\bconferente\b/.test(c))                             return 20;
+  if (/estagiario|jovem\s*aprendiz|\bassistente\b/.test(c))                            return 15;
   return 30;
 }
 
@@ -99,6 +99,16 @@ export async function GET(request: Request) {
 
     const db   = await getDb();
     await ensureTable(db);
+
+    // Backfill: atribui sla_meta_dias para vagas antigas que não têm o valor
+    const semSla = await db.all<{ id: number; cargo: string }>(
+      'SELECT id, cargo FROM vagas_recrutamento WHERE sla_meta_dias IS NULL AND cargo IS NOT NULL'
+    );
+    for (const row of semSla) {
+      await db.run('UPDATE vagas_recrutamento SET sla_meta_dias = $1 WHERE id = $2',
+        [detectarSLAMeta(row.cargo), row.id]);
+    }
+
     const all: Vaga[] = await db.all('SELECT * FROM vagas_recrutamento ORDER BY data_abertura DESC');
 
     const hoje = new Date();
@@ -181,7 +191,7 @@ export async function GET(request: Request) {
       fontes:       [...new Set(all.map(v => v.fonte).filter(Boolean))].sort() as string[],
     };
 
-    // ── SLA Performance ────────────────────────────────────────────────────────
+    // â”€â”€ SLA Performance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const fechadasComSLA = all.filter(v => v.status === 'Fechada' && v.sla_dias != null && v.sla_meta_dias != null);
     const dentroPrazo    = fechadasComSLA.filter(v => (v.sla_dias ?? 0) <= (v.sla_meta_dias ?? 0));
     const eficienciaSLA  = fechadasComSLA.length > 0

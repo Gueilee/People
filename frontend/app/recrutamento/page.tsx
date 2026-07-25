@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { NavHeader } from '@/components/NavHeader';
 
@@ -235,8 +235,19 @@ function SlaChart({ data }: { data: SlaMes[] }) {
 // ─── SLA Cell ─────────────────────────────────────────────────────────────────
 const HOJE_MS = () => Date.now();
 
+function calcSLAMetaClient(cargo: string | null): number {
+  const c = (cargo || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\bgerente\b|\btrader\b/.test(c))                                                return 90;
+  if (/\bespecialista\b|\bcoordenador\b/.test(c))                                      return 60;
+  if (/\banalista\b|\bengenheiro\b|\bdesenvolvedor\b|\bdeveloper\b|\bsdr\b/.test(c))   return 30;
+  if (/empilhadeira/.test(c))                                                          return 25;
+  if (/\bmotorista\b|\bauxiliar\b|\bconferente\b/.test(c))                             return 20;
+  if (/estagiario|jovem\s*aprendiz|\bassistente\b/.test(c))                            return 15;
+  return 30;
+}
+
 function SlaCell({ v }: { v: Vaga }) {
-  const meta = v.sla_meta_dias;
+  const meta = v.sla_meta_dias ?? calcSLAMetaClient(v.cargo);
   if (!meta || !v.data_abertura) return <span className="text-gray-300 text-xs">—</span>;
 
   const abertura      = new Date(v.data_abertura).getTime();
