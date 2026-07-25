@@ -15,7 +15,7 @@ type KPIs = {
 
 type PromArea     = { area: string; count: number };
 type PromUnidade  = { unidade: string; count: number };
-type Tendencia    = { mes: string; promocoes: number; reajustes: number };
+type Tendencia    = { mes: string; promocoes: number; reajustes: number; dissidio: number };
 type TopPromovido = { nome: string; totalPromocoes: number; cargo: string; area: string; unidade: string; ultimaPromocao: string };
 type UltimaPromo  = { nome: string; cargo_anterior: string; cargo_novo: string; area: string; unidade: string; data: string; motivo: string };
 type ReajTipo     = { tipo: string; label: string; count: number; pct: number };
@@ -117,36 +117,60 @@ function DataLabelC({ x, y, val, color, above }: { x:number; y:number; val:numbe
   );
 }
 
-function TrendChart({ data }: { data: Tendencia[] }) {
+type TrendVis = { prom: boolean; reaj: boolean; dis: boolean };
+
+function TrendChart({ data, vis }: { data: Tendencia[]; vis: TrendVis }) {
   const W = 560, H = 175, padL = 28, padR = 28, padT = 30, padB = 34;
   const n = data.length;
   if (n < 2) return <p className="text-xs text-gray-400 text-center pt-8">Dados insuficientes</p>;
-  const maxVal = Math.max(...data.flatMap(d => [d.promocoes, d.reajustes]), 1);
+
+  const vals: number[] = [];
+  data.forEach(d => {
+    if (vis.prom) vals.push(d.promocoes);
+    if (vis.reaj) vals.push(d.reajustes);
+    if (vis.dis)  vals.push(d.dissidio ?? 0);
+  });
+  const maxVal = Math.max(...vals, 1);
+
   const getX = (i: number) => padL + (i / (n - 1)) * (W - padL - padR);
   const getY = (v: number) => padT + (1 - v / maxVal) * (H - padT - padB);
 
   const ptsProm: [number, number][] = data.map((d, i) => [getX(i), getY(d.promocoes)]);
   const ptsReaj: [number, number][] = data.map((d, i) => [getX(i), getY(d.reajustes)]);
+  const ptsDis:  [number, number][] = data.map((d, i) => [getX(i), getY(d.dissidio ?? 0)]);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
-      {/* Eixo X */}
       <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#E5E7EB" strokeWidth="1" />
-      {/* Curvas suaves */}
-      <path d={smoothPathC(ptsReaj)} fill="none" stroke={C.blue}   strokeWidth="2.5" strokeLinecap="round" />
-      <path d={smoothPathC(ptsProm)} fill="none" stroke={C.purple} strokeWidth="2.5" strokeLinecap="round" />
+
+      {vis.dis  && <path d={smoothPathC(ptsDis)}  fill="none" stroke={C.amber}  strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 3" />}
+      {vis.reaj && <path d={smoothPathC(ptsReaj)} fill="none" stroke={C.blue}   strokeWidth="2.5" strokeLinecap="round" />}
+      {vis.prom && <path d={smoothPathC(ptsProm)} fill="none" stroke={C.purple} strokeWidth="2.5" strokeLinecap="round" />}
+
       {data.map((d, i) => {
         const [px, py] = ptsProm[i];
         const [rx, ry] = ptsReaj[i];
-        // ponto mais alto (menor Y) recebe rótulo acima; o outro, abaixo
-        const promAbove = py <= ry;
+        const [dx, dy] = ptsDis[i];
+        // Posiciona rótulos: acima se é o menor Y (mais alto na tela)
+        const ysVis: number[] = [];
+        if (vis.prom) ysVis.push(py);
+        if (vis.reaj) ysVis.push(ry);
+        if (vis.dis)  ysVis.push(dy);
+        const minY = Math.min(...ysVis);
         return (
           <g key={i}>
-            <DataLabelC x={px} y={py} val={d.promocoes} color={C.purple} above={promAbove} />
-            <DataLabelC x={rx} y={ry} val={d.reajustes}  color={C.blue}   above={!promAbove} />
-            <circle cx={px} cy={py} r="4" fill="white" stroke={C.purple} strokeWidth="2" />
-            <circle cx={rx} cy={ry} r="4" fill="white" stroke={C.blue}   strokeWidth="2" />
-            {/* Tick */}
+            {vis.prom && <>
+              <DataLabelC x={px} y={py} val={d.promocoes}       color={C.purple} above={py === minY} />
+              <circle cx={px} cy={py} r="4" fill="white" stroke={C.purple} strokeWidth="2" />
+            </>}
+            {vis.reaj && <>
+              <DataLabelC x={rx} y={ry} val={d.reajustes}       color={C.blue}   above={ry === minY && ry !== py} />
+              <circle cx={rx} cy={ry} r="4" fill="white" stroke={C.blue}   strokeWidth="2" />
+            </>}
+            {vis.dis && <>
+              <DataLabelC x={dx} y={dy} val={d.dissidio ?? 0}   color={C.amber}  above={dy === minY && dy !== py && dy !== ry} />
+              <circle cx={dx} cy={dy} r="4" fill="white" stroke={C.amber}  strokeWidth="2" />
+            </>}
             <line x1={getX(i)} y1={H - padB} x2={getX(i)} y2={H - padB + 4} stroke="#D1D5DB" strokeWidth="1" />
             {(n <= 12 || i % 2 === 0) && (
               <text x={getX(i)} y={H - padB + 15} textAnchor="middle" fontSize="8.5" fill={C.gray}>{d.mes}</text>
@@ -233,6 +257,7 @@ export default function CarreiraPage() {
   const [unidades,   setUnidades]   = useState<string[]>([]);
   const [areas,      setAreas]      = useState<string[]>([]);
   const [gestores,   setGestores]   = useState<string[]>([]);
+  const [trendVis,   setTrendVis]   = useState<TrendVis>({ prom: true, reaj: true, dis: true });
 
   const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[]) => {
     setLoading(true);
@@ -339,22 +364,38 @@ export default function CarreiraPage() {
 
             {/* Tendência mensal */}
             <div className="bg-white rounded-2xl shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-sm uppercase" style={{ color: C.dark }}>
-                  Tendência — Promoções & Reajustes ({periodo}m) <span className="text-[9px] font-normal text-gray-400 normal-case">(excl. dissídio)</span>
+              <div className="mb-3">
+                <h3 className="font-black text-sm uppercase mb-2" style={{ color: C.dark }}>
+                  Tendência — Promoções & Reajustes ({periodo}m)
                 </h3>
-                <div className="flex gap-3 text-[10px]">
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.purple }} /> Promoções
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.blue }} /> Reajustes
-                  </span>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    { key: 'prom' as const, label: 'Promoções', color: C.purple },
+                    { key: 'reaj' as const, label: 'Reajustes', color: C.blue },
+                    { key: 'dis'  as const, label: 'Dissídio',  color: C.amber },
+                  ]).map(({ key, label, color }) => {
+                    const ativo = trendVis[key];
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setTrendVis(v => ({ ...v, [key]: !v[key] }))}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-semibold transition-all"
+                        style={{
+                          borderColor:     ativo ? color : '#E5E7EB',
+                          color:           ativo ? color : '#9CA3AF',
+                          backgroundColor: ativo ? `${color}12` : 'transparent',
+                        }}>
+                        <span className="w-5 h-[2px] rounded inline-block transition-all"
+                              style={{ backgroundColor: ativo ? color : '#D1D5DB' }} />
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               {loading
                 ? <Skeleton className="h-36 w-full" />
-                : <TrendChart data={data?.tendenciaPromocoes ?? []} />
+                : <TrendChart data={data?.tendenciaPromocoes ?? []} vis={trendVis} />
               }
             </div>
 

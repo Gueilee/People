@@ -226,7 +226,7 @@ def salvar_lote(conn, registros: list):
 def main():
     agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print("=" * 58)
-    print("  Sync Histórico Cargos/Salários  —  Convenia → PostgreSQL")
+    print("  Sync Historico Cargos/Salarios  -  Convenia -> PostgreSQL")
     print(f"  {agora}")
     print("=" * 58)
 

@@ -30,7 +30,7 @@ echo. >> "%LOGFILE%"
 echo [1/3] Convenia API... >> "%LOGFILE%"
 echo [1/3] Convenia API...
 cd /d "%PROJETO%\backend"
-"%PYTHON%" main.py >> "%LOGFILE%" 2>&1
+"%PYTHON%" -u main.py >> "%LOGFILE%" 2>&1
 if %errorlevel% neq 0 (
     echo [ERRO] Convenia falhou - codigo %errorlevel% >> "%LOGFILE%"
     echo [ERRO] Convenia falhou
@@ -39,17 +39,17 @@ if %errorlevel% neq 0 (
     echo [OK] Convenia concluido
 )
 
-:: ---- 2. Historico Cargos (Excel) ----
+:: ---- 2. Historico Cargos (API Convenia) ----
 echo. >> "%LOGFILE%"
-echo [2/3] ETL Historico... >> "%LOGFILE%"
-echo [2/3] ETL Historico...
-"%PYTHON%" etl_historico.py >> "%LOGFILE%" 2>&1
+echo [2/3] Historico Cargos e Salarios (API)... >> "%LOGFILE%"
+echo [2/3] Historico Cargos e Salarios (API)...
+"%PYTHON%" -u sync_historico.py >> "%LOGFILE%" 2>&1
 if %errorlevel% neq 0 (
-    echo [ERRO] ETL Historico falhou - codigo %errorlevel% >> "%LOGFILE%"
-    echo [ERRO] ETL Historico falhou
+    echo [ERRO] Historico falhou - codigo %errorlevel% >> "%LOGFILE%"
+    echo [ERRO] Historico falhou
 ) else (
-    echo [OK] ETL Historico concluido >> "%LOGFILE%"
-    echo [OK] ETL Historico concluido
+    echo [OK] Historico concluido >> "%LOGFILE%"
+    echo [OK] Historico concluido
 )
 
 :: ---- 3. TiqueTaque Ponto (mes anterior + mes atual) ----
@@ -59,7 +59,7 @@ echo [3/3] TiqueTaque Ponto (2 meses)...
 cd /d "%PROJETO%"
 for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM"') do set MESATUAL=%%i
 for /f %%i in ('powershell -Command "(Get-Date).AddMonths(-1).ToString('yyyy-MM')"') do set MESANTERIOR=%%i
-"%PYTHON%" scripts\sync_ponto.py --de %MESANTERIOR% --ate %MESATUAL% >> "%LOGFILE%" 2>&1
+"%PYTHON%" -u scripts\sync_ponto.py --de %MESANTERIOR% --ate %MESATUAL% >> "%LOGFILE%" 2>&1
 if %errorlevel% neq 0 (
     echo [ERRO] TiqueTaque falhou - codigo %errorlevel% >> "%LOGFILE%"
     echo [ERRO] TiqueTaque falhou

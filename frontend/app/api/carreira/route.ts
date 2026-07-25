@@ -163,14 +163,16 @@ export async function GET(request: Request) {
       .sort((a, b) => b.count - a.count);
 
     const reajustesTendencia = reajustes.filter(r => r.tipo_evento !== 'reajuste_coletivo');
+    const dissidiosTendencia  = reajustes.filter(r => r.tipo_evento === 'reajuste_coletivo');
     const tendenciaPromocoes = Array.from({ length: Math.min(meses, 24) }, (_, i) => {
       const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(meses, 24) - 1 - i), 1);
       const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(meses, 24) - 1 - i) + 1, 0);
       const miStr = mi.toISOString().split('T')[0];
       const mfStr = mf.toISOString().split('T')[0];
-      const prom = promocoes.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
-      const reaj = reajustesTendencia.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
-      return { mes: fmtMes(mi), promocoes: prom, reajustes: reaj };
+      const prom    = promocoes.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
+      const reaj    = reajustesTendencia.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
+      const dissidio = dissidiosTendencia.filter(r => r.data_inicio && r.data_inicio >= miStr && r.data_inicio <= mfStr).length;
+      return { mes: fmtMes(mi), promocoes: prom, reajustes: reaj, dissidio };
     });
 
     const promCount: Record<string, { count: number; area: string; unidade: string; cargo: string; ultima: string }> = {};
