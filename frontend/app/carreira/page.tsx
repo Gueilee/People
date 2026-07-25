@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { NavHeader, MultiFilterSelect, PeriodButtons, FilterTag, SyncBadge } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, FilterTag, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -284,39 +284,20 @@ export default function CarreiraPage() {
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
       <NavHeader>
-        <MultiFilterSelect
-          values={filtrosMes}
-          onChange={setFiltrosMes}
-          label="Todos os meses"
-          options={data?.mesesDisponiveis ?? []}
-          color={C.teal}
-        />
-        <PeriodButtons value={periodo} onChange={setPeriodo} color={C.teal} />
-        <MultiFilterSelect
-          values={unidades}
-          onChange={setUnidades}
-          label="Todas as unidades"
-          options={data?.opcoesFiltro.unidades ?? []}
-          color={C.teal}
-        />
-        <MultiFilterSelect
-          values={areas}
-          onChange={setAreas}
-          label="Todas as áreas"
-          options={data?.opcoesFiltro.areas ?? []}
-          color={C.teal}
-        />
-        <MultiFilterSelect
-          values={gestores}
-          onChange={setGestores}
-          label="Todos os gestores"
-          options={data?.opcoesFiltro.gestores ?? []}
-          color={C.teal}
-        />
+        <MultiFilterSelect values={filtrosMes} onChange={setFiltrosMes} label="Período"
+          options={data?.mesesDisponiveis ?? []} color={C.teal} />
+        <span className="w-px h-4 bg-gray-300 mx-1" />
+        <MultiFilterSelect values={unidades} onChange={setUnidades} label="Unidade"
+          options={data?.opcoesFiltro.unidades ?? []} color={C.teal} />
+        <MultiFilterSelect values={areas} onChange={setAreas} label="Área"
+          options={data?.opcoesFiltro.areas ?? []} color={C.teal} />
+        <MultiFilterSelect values={gestores} onChange={setGestores} label="Gestor"
+          options={data?.opcoesFiltro.gestores ?? []} color={C.teal} />
         {(filtrosMes.length > 0 || unidades.length > 0 || areas.length > 0 || gestores.length > 0) && (
           <FilterTag label="limpar filtros" onClear={() => { setFiltrosMes([]); setUnidades([]); setAreas([]); setGestores([]); }} />
         )}
-        {atualizado && <SyncBadge label={`Atualizado: ${atualizado}`} />}
+        <span className="flex-1" />
+        {atualizado && <SyncBadge label={`Sync: ${atualizado}`} />}
       </NavHeader>
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">

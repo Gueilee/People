@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { NavHeader, MultiFilterSelect, PeriodButtons, SyncBadge, FilterTag } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, SyncBadge, FilterTag } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type KPIs = {
@@ -551,42 +551,35 @@ export default function DashboardRH() {
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
       <NavHeader>
-        {/* Meses (múltipla seleção) */}
         <MultiFilterSelect
           values={filtrosMes}
           onChange={setFiltrosMes}
-          label="Todos os meses"
+          label="Período"
           options={data?.opcoesFiltro.meses ?? []}
           color={C.purple}
           labelFn={fmtMesLabel}
         />
 
-        {/* Período — visível só quando nenhum mês específico selecionado */}
-        {filtrosMes.length === 0 && (
-          <PeriodButtons value={periodo} onChange={setPeriodo} color={C.purple} />
-        )}
+        <span className="w-px h-4 bg-gray-300 mx-1" />
 
-        {/* Divisor */}
-        <span className="w-px h-5 bg-gray-200" />
-
-        <MultiFilterSelect values={filtrosUnidade} onChange={setFiltrosUnidade} label="Todas as unidades"
+        <MultiFilterSelect values={filtrosUnidade} onChange={setFiltrosUnidade} label="Unidade"
           options={data?.opcoesFiltro.unidades ?? []} color={C.purple} />
-        <MultiFilterSelect values={filtrosArea}    onChange={setFiltrosArea}    label="Todas as áreas"
+        <MultiFilterSelect values={filtrosArea}    onChange={setFiltrosArea}    label="Área"
           options={data?.opcoesFiltro.areas ?? []} color={C.purple} />
-        <MultiFilterSelect values={filtrosGestor}  onChange={setFiltrosGestor}  label="Todos os gestores"
+        <MultiFilterSelect values={filtrosGestor}  onChange={setFiltrosGestor}  label="Gestor"
           options={data?.opcoesFiltro.gestores ?? []} color={C.purple} />
 
-        {/* Tag "limpar tudo" quando qualquer filtro ativo */}
         {(filtrosMes.length > 0 || filtrosUnidade.length > 0 || filtrosArea.length > 0 || filtrosGestor.length > 0) && (
           <FilterTag label="limpar filtros" onClear={() => {
             setFiltrosMes([]); setFiltrosUnidade([]); setFiltrosArea([]); setFiltrosGestor([]);
           }} />
         )}
 
-        {/* Alertas */}
+        <span className="flex-1" />
+
         <button
           onClick={() => { setAlertaOpen(o => !o); if (!alertaInfo) verificarAlerta(); }}
-          className="relative text-[11px] font-bold px-3 py-1 rounded-full border-2 transition-all cursor-pointer"
+          className="relative text-[11px] font-bold px-3 py-1.5 rounded-full border-2 transition-all cursor-pointer"
           style={{ borderColor: C.amber, color: C.amber }}
           title="Configurar alertas por email"
         >

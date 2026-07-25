@@ -254,15 +254,16 @@ export function NavHeader({ children }: { children?: React.ReactNode }) {
   }
 
   return (
-    <header
-      className="sticky top-0 z-50 bg-white"
-      style={{ boxShadow: '0 2px 16px 0 rgba(66,44,118,0.10)', borderBottom: `3px solid ${borderColor}` }}
-    >
-      <div className="max-w-screen-2xl mx-auto px-6 flex items-stretch justify-between gap-2" style={{ minHeight: 68 }}>
+    <header className="sticky top-0 z-50 bg-white" style={{ boxShadow: '0 2px 20px 0 rgba(66,44,118,0.08)' }}>
 
+      {/* ── Barra principal: logo + nav + sair ─────────────────────────── */}
+      <div
+        className="max-w-screen-2xl mx-auto px-6 flex items-stretch justify-between"
+        style={{ minHeight: 64, borderBottom: `3px solid ${borderColor}` }}
+      >
         {/* Logo */}
-        <div className="flex items-center shrink-0 pr-4" style={{ borderRight: '1.5px solid #F3F4F6' }}>
-          <img src="/logo.png" alt="Vendemmia People" className="h-14 w-auto" />
+        <div className="flex items-center shrink-0 pr-6" style={{ borderRight: '1.5px solid #F3F4F6' }}>
+          <img src="/logo.png" alt="Vendemmia People" className="h-12 w-auto" />
         </div>
 
         {/* Nav tabs */}
@@ -286,18 +287,26 @@ export function NavHeader({ children }: { children?: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Filtros + ações da página */}
-        <div className="flex items-center gap-2 flex-wrap py-2 pl-4" style={{ borderLeft: '1.5px solid #F3F4F6' }}>
-          {children}
+        {/* Sair */}
+        <div className="flex items-center pl-6" style={{ borderLeft: '1.5px solid #F3F4F6' }}>
           <button
             onClick={logout}
-            className="text-[11px] font-semibold text-gray-400 hover:text-gray-700 border border-gray-200 hover:border-gray-400 px-3 py-1 rounded-full transition-all cursor-pointer whitespace-nowrap"
+            className="text-[11px] font-semibold text-gray-400 hover:text-gray-700 border border-gray-200 hover:border-gray-400 px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap"
           >
             Sair
           </button>
         </div>
-
       </div>
+
+      {/* ── Barra de filtros (quando a página passa children) ───────────── */}
+      {children && (
+        <div className="bg-gray-50 border-b border-gray-100">
+          <div className="max-w-screen-2xl mx-auto px-6 py-2 flex items-center gap-2 flex-wrap">
+            {children}
+          </div>
+        </div>
+      )}
+
     </header>
   );
 }

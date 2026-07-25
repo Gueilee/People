@@ -107,8 +107,14 @@ export async function GET(request: Request) {
     todosAll.forEach(c => { c.departamento = normalizarArea(c.departamento) || c.departamento; });
     const unidadesOpcoes = [...new Set(todosAll.map(c => c.unidade))].filter(Boolean).sort();
     const areasOpcoes    = [...new Set(todosAll.map(c => c.departamento))].filter(Boolean).sort();
+    const _semAcento = (s: string) =>
+      s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    const _gestorExcluido = (g: string) => {
+      const n = _semAcento(g);
+      return !g || n === 'nao informado' || n === 'sem gestor' || n === '' || n === '-';
+    };
     const gestoresOpcoes = [...new Set(
-      todosAll.filter(c => c.gestor && c.gestor !== 'Nao informado').map(c => c.gestor)
+      todosAll.filter(c => c.gestor && !_gestorExcluido(c.gestor)).map(c => c.gestor)
     )].sort();
 
     const todasDatas = [
