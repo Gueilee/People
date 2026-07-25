@@ -570,17 +570,33 @@ export default function RecrutamentoPage() {
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Cabeçalho ─────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="space-y-3">
           <div>
             <h1 className="text-xl font-black" style={{ color: C.pink }}>Recrutamento & Seleção</h1>
             <p className="text-sm text-gray-500 mt-0.5">Gestão de vagas e pipeline de contratação</p>
           </div>
-          <button
-            onClick={() => { setEditVaga(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-sm hover:opacity-90 transition-all"
-            style={{ backgroundColor: C.pink }}>
-            + Nova Vaga
-          </button>
+          {/* Banner: link do formulário público para compartilhar com gestores */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border"
+               style={{ backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
+                    stroke="#422c76" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
+                    stroke="#422c76" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: C.purple }}>
+                Link para abertura de vagas — compartilhe com os gestores
+              </p>
+              <p className="text-xs text-gray-500 truncate">people.vendemm.ia.br/solicitar-vaga</p>
+            </div>
+            <button
+              onClick={() => navigator.clipboard.writeText('https://people.vendemm.ia.br/solicitar-vaga')}
+              className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all hover:bg-purple-50 shrink-0"
+              style={{ color: C.purple, borderColor: '#C4B5FD' }}>
+              Copiar link
+            </button>
+          </div>
         </div>
 
         {/* ── KPI cards ─────────────────────────────────────────────────────── */}
@@ -661,7 +677,7 @@ export default function RecrutamentoPage() {
                   <table className="w-full text-xs min-w-[800px]">
                     <thead>
                       <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
-                        {['Status', 'Cargo', 'Responsável', 'Unidade', 'Gestor', 'Abertura', 'SLA', 'Fonte', 'Contratado', ''].map(h => (
+                        {['Status', 'Cargo', 'Resp. RH', 'Unidade', 'Gestor', 'Abertura', 'SLA', 'Fonte', 'Contratado', 'Acomp. RH'].map(h => (
                           <th key={h} className="pb-2 pr-3 text-left font-bold">{h}</th>
                         ))}
                       </tr>
@@ -683,9 +699,9 @@ export default function RecrutamentoPage() {
                           <td className="py-2">
                             <button
                               onClick={() => openEdit(v)}
-                              className="text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors hover:bg-pink-50"
-                              style={{ color: C.pink, borderColor: '#FFC0CB' }}>
-                              Editar
+                              className="text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors hover:bg-purple-50 whitespace-nowrap"
+                              style={{ color: C.purple, borderColor: '#C4B5FD' }}>
+                              Preencher RH
                             </button>
                           </td>
                         </tr>
