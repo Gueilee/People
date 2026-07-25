@@ -27,6 +27,7 @@ type Vaga = {
   num_convocados: number | null;
   num_compareceu: number | null;
   sla_meta_dias: number | null;
+  salario_real: string | null;
 };
 
 type KPIs = {
@@ -328,6 +329,66 @@ function Pills({ options, value, onChange }: { options: string[]; value: string;
   );
 }
 
+// ─── Helpers de salário ───────────────────────────────────────────────────────
+function fmtSal(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return 'R$ ' + parseInt(digits, 10).toLocaleString('pt-BR');
+}
+
+function parseSalRange(v: string): [string, string] {
+  if (!v) return ['', ''];
+  const parts = v.split('–').map(p => p.trim());
+  return [parts[0] || '', parts[1] || ''];
+}
+
+function SalarioRangeField({ initialValue, onChange }: {
+  initialValue: string;
+  onChange: (v: string) => void;
+}) {
+  const [parsed] = useState<[string, string]>(() => parseSalRange(initialValue));
+  const [de,  setDe]  = useState(parsed[0]);
+  const [ate, setAte] = useState(parsed[1]);
+
+  function handle(raw: string, setter: (v: string) => void, other: string, isMin: boolean) {
+    const fmt = fmtSal(raw);
+    setter(fmt);
+    const a = isMin ? fmt : other;
+    const b = isMin ? other : fmt;
+    if (a && b) onChange(`${a} – ${b}`);
+    else if (a) onChange(a);
+    else if (b) onChange(b);
+    else onChange('');
+  }
+
+  const cls = 'flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white';
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <input className={cls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
+          placeholder="R$ 2.000" value={de} inputMode="numeric"
+          onChange={e => handle(e.target.value, setDe, ate, true)} />
+        <span className="text-gray-400 font-bold text-sm shrink-0">–</span>
+        <input className={cls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
+          placeholder="R$ 3.500" value={ate} inputMode="numeric"
+          onChange={e => handle(e.target.value, setAte, de, false)} />
+      </div>
+    </div>
+  );
+}
+
+function SalarioSingleField({ value, onChange, placeholder }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+}) {
+  const cls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white';
+  return (
+    <input className={cls} style={{ '--tw-ring-color': '#16A34A' } as React.CSSProperties}
+      placeholder={placeholder ?? 'R$ 2.800'}
+      value={value} inputMode="numeric"
+      onChange={e => onChange(fmtSal(e.target.value))} />
+  );
+}
+
 // ─── Modal Nova/Editar Vaga ───────────────────────────────────────────────────
 const EMPTY_FORM = {
   cargo: '', centro_custo: '', gestor: '', unidade: '',
@@ -336,7 +397,7 @@ const EMPTY_FORM = {
   faixa_salarial: '', modelo_contratacao: '',
   responsavel: '', status: 'Aberta', fonte: '',
   data_fechamento: '', novo_colaborador: '', data_inicio: '', observacoes: '',
-  num_convocados: '', num_compareceu: '',
+  num_convocados: '', num_compareceu: '', salario_real: '',
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -367,6 +428,7 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
       observacoes:            vaga.observacoes || '',
       num_convocados:         String(vaga.num_convocados ?? ''),
       num_compareceu:         String(vaga.num_compareceu ?? ''),
+      salario_real:           vaga.salario_real || '',
     } : { ...EMPTY_FORM }
   );
   const [saving, setSaving] = useState(false);
@@ -490,10 +552,16 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
             <SectionHeader n={3} title="Condições da Contratação" />
             <div className="space-y-3">
               <div>
-                <label className={labelCls}>Faixa Salarial Aprovada</label>
-                <input className={inputCls}
-                  placeholder="Ex: R$ 2.000 – R$ 2.500 (conforme Plano de Cargos e Salários)"
-                  value={form.faixa_salarial} onChange={set('faixa_salarial')} />
+                <label className={labelCls}>Faixa Salarial Aprovada — De / Até</label>
+                <SalarioRangeField
+                  initialValue={form.faixa_salarial}
+                  onChange={v => setForm(p => ({ ...p, faixa_salarial: v }))}
+                />
+                {form.faixa_salarial && (
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Registrado como: <span className="font-semibold text-gray-600">{form.faixa_salarial}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Modelo de Contratação *</label>
@@ -527,15 +595,35 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
                 </div>
 
                 {isFechada && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls} style={{ color: '#16A34A' }}>Nome do Colaborador Contratado</label>
-                      <input className={inputCls} placeholder="Nome de quem foi contratado"
-                        value={form.novo_colaborador} onChange={set('novo_colaborador')} />
+                  <div className="p-3 rounded-xl border border-green-100 space-y-3" style={{ backgroundColor: '#F0FDF4' }}>
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#16A34A' }}>
+                      Dados do Fechamento
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls} style={{ color: '#16A34A' }}>Colaborador Contratado</label>
+                        <input className={inputCls} placeholder="Nome de quem foi contratado"
+                          value={form.novo_colaborador} onChange={set('novo_colaborador')} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Início Previsto</label>
+                        <input type="date" className={inputCls} value={form.data_inicio} onChange={set('data_inicio')} />
+                      </div>
                     </div>
                     <div>
-                      <label className={labelCls}>Início Previsto</label>
-                      <input type="date" className={inputCls} value={form.data_inicio} onChange={set('data_inicio')} />
+                      <label className={labelCls} style={{ color: '#16A34A' }}>Salário Real Fechado</label>
+                      <SalarioSingleField
+                        value={form.salario_real}
+                        onChange={v => setForm(p => ({ ...p, salario_real: v }))}
+                        placeholder="R$ 2.800"
+                      />
+                      {form.faixa_salarial && form.salario_real && (
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          Previsto: <span className="font-semibold">{form.faixa_salarial}</span>
+                          <span className="mx-1.5 text-gray-300">→</span>
+                          Real: <span className="font-semibold text-green-700">{form.salario_real}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

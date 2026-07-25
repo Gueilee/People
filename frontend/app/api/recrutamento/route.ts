@@ -26,6 +26,7 @@ type Vaga = {
   modelo_contratacao: string | null;
   num_convocados: number | null;
   num_compareceu: number | null;
+  salario_real: string | null;
   criado_em: string | null;
 };
 
@@ -75,6 +76,7 @@ async function ensureTable(db: Awaited<ReturnType<typeof getDb>>) {
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS num_compareceu     INTEGER`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS sla_meta_dias      INTEGER`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS gestor_email       TEXT`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS salario_real       TEXT`);
   _tableReady = true;
 }
 
@@ -306,8 +308,8 @@ export async function PATCH(request: Request) {
         status=$7, motivo=$8, tipo_substituicao=$9, colaborador_substituido=$10,
         centro_custo=$11, unidade=$12, gestor=$13, data_inicio=$14, fonte=$15, observacoes=$16,
         quantidade_vagas=$17, faixa_salarial=$18, modelo_contratacao=$19,
-        num_convocados=$20, num_compareceu=$21, sla_meta_dias=$22
-       WHERE id=$23`,
+        num_convocados=$20, num_compareceu=$21, sla_meta_dias=$22, salario_real=$23
+       WHERE id=$24`,
       [merged.responsavel, merged.data_abertura, fechamento, sla,
        merged.cargo, merged.novo_colaborador, merged.status, merged.motivo,
        merged.tipo_substituicao, merged.colaborador_substituido,
@@ -315,7 +317,7 @@ export async function PATCH(request: Request) {
        merged.data_inicio, merged.fonte, merged.observacoes,
        merged.quantidade_vagas ?? 1, merged.faixa_salarial, merged.modelo_contratacao,
        merged.num_convocados ?? null, merged.num_compareceu ?? null,
-       sla_meta_dias, id]
+       sla_meta_dias, merged.salario_real || null, id]
     );
 
     return NextResponse.json({ ok: true });
