@@ -26,6 +26,7 @@ type Vaga = {
   modelo_contratacao: string | null;
   num_convocados: number | null;
   num_compareceu: number | null;
+  sla_meta_dias: number | null;
 };
 
 type KPIs = {
@@ -40,6 +41,7 @@ type PorMotivo  = { motivo: string; count: number };
 type SlaMes     = { mes: string; slaMedia: number | null; count: number };
 type Opcoes     = { responsaveis: string[]; unidades: string[]; centrosCusto: string[]; gestores: string[]; fontes: string[] };
 
+type SlaPerf = { eficienciaSLA: number | null; abertasAtrasadas: number; totalFechadas: number; dentroPrazo: number };
 type RecrutData = {
   vagas: Vaga[];
   kpis: KPIs;
@@ -49,6 +51,7 @@ type RecrutData = {
   porMotivo: PorMotivo[];
   slaPorMes: SlaMes[];
   opcoes: Opcoes;
+  slaPerf: SlaPerf;
 };
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -227,6 +230,62 @@ function SlaChart({ data }: { data: SlaMes[] }) {
       ))}
     </svg>
   );
+}
+
+// ─── SLA Cell ─────────────────────────────────────────────────────────────────
+const HOJE_MS = () => Date.now();
+
+function SlaCell({ v }: { v: Vaga }) {
+  const meta = v.sla_meta_dias;
+  if (!meta || !v.data_abertura) return <span className="text-gray-300 text-xs">—</span>;
+
+  const abertura      = new Date(v.data_abertura).getTime();
+  const diasDecorridos = Math.round((HOJE_MS() - abertura) / 86400000);
+  const restantes      = meta - diasDecorridos;
+  const progress       = Math.min(Math.max(diasDecorridos / meta, 0), 1);
+
+  if (v.status === 'Fechada' && v.sla_dias != null) {
+    const dentro  = v.sla_dias <= meta;
+    const diff    = Math.abs(v.sla_dias - meta);
+    const barPct  = Math.min(v.sla_dias / meta, 1.5);
+    return (
+      <div className="space-y-1" style={{ minWidth: 80 }}>
+        <div className="w-full bg-gray-100 rounded-full h-1.5">
+          <div className="h-1.5 rounded-full"
+               style={{ width: `${barPct * 100}%`, backgroundColor: dentro ? '#16A34A' : '#DC2626' }} />
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-black" style={{ color: dentro ? '#16A34A' : '#DC2626' }}>
+            {dentro ? '✓' : '✗'}
+          </span>
+          <span className="text-[10px] font-bold tabular-nums" style={{ color: dentro ? '#16A34A' : '#DC2626' }}>
+            {v.sla_dias}d
+          </span>
+          <span className="text-[9px] text-gray-400">/{meta}d</span>
+        </div>
+        <div className="text-[9px] leading-none" style={{ color: dentro ? '#16A34A' : '#DC2626' }}>
+          {dentro ? `${diff}d adiantado` : `${diff}d de atraso`}
+        </div>
+      </div>
+    );
+  }
+
+  if (v.status === 'Aberta') {
+    const cor = restantes > meta * 0.25 ? '#16A34A' : restantes >= 0 ? '#F59E0B' : '#DC2626';
+    return (
+      <div className="space-y-1" style={{ minWidth: 80 }}>
+        <div className="w-full bg-gray-100 rounded-full h-1.5">
+          <div className="h-1.5 rounded-full" style={{ width: `${progress * 100}%`, backgroundColor: cor }} />
+        </div>
+        <div className="text-[10px] font-bold leading-none" style={{ color: cor }}>
+          {restantes >= 0 ? `${restantes}d restantes` : `${Math.abs(restantes)}d em atraso`}
+        </div>
+        <div className="text-[9px] text-gray-400 leading-none">meta: {meta}d</div>
+      </div>
+    );
+  }
+
+  return <span className="text-[10px] text-gray-400">Meta: {meta}d</span>;
 }
 
 // ─── Helpers de formulário ────────────────────────────────────────────────────
@@ -534,9 +593,10 @@ export default function RecrutamentoPage() {
   const [data, setData]           = useState<RecrutData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [busca, setBusca]         = useState('');
-  const [filtroStatus, setFiltroStatus] = useState<string[]>([]);
+  const [filtroStatus, setFiltroStatus]   = useState<string[]>([]);
+  const [filtroStatusSel, setFiltroStatusSel] = useState('');
   const [filtroUnidade, setFiltroUnidade] = useState('');
-  const [filtroResp, setFiltroResp] = useState('');
+  const [filtroResp, setFiltroResp]       = useState('');
   const [showModal, setShowModal]   = useState(false);
   const [editVaga, setEditVaga]     = useState<Vaga | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
@@ -561,7 +621,8 @@ export default function RecrutamentoPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (filtroStatus.length) params.set('status', filtroStatus.join(','));
+    const statusAtivo = filtroStatusSel || filtroStatus.join(',');
+  if (statusAtivo) params.set('status', statusAtivo);
     if (filtroUnidade) params.set('unidade', filtroUnidade);
     if (filtroResp)    params.set('responsavel', filtroResp);
     if (busca)         params.set('busca', busca);
@@ -579,6 +640,7 @@ export default function RecrutamentoPage() {
   const kpis    = data?.kpis;
   const opcoes  = data?.opcoes ?? { responsaveis: [], unidades: [], centrosCusto: [], gestores: [], fontes: [] };
   const vagas   = data?.vagas ?? [];
+  const slaPerf = data?.slaPerf;
 
   function openEdit(v: Vaga) { setEditVaga(v); setShowModal(true); }
   function closeModal() { setShowModal(false); setEditVaga(null); }
@@ -676,20 +738,28 @@ export default function RecrutamentoPage() {
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2"
               style={{ '--tw-ring-color': C.pink } as React.CSSProperties} />
             <select
+              value={filtroStatusSel}
+              onChange={e => { setFiltroStatusSel(e.target.value); setFiltroStatus([]); }}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none"
+              style={{ color: filtroStatusSel ? STATUS_CFG[filtroStatusSel]?.color : undefined }}>
+              <option value="">Todos os status</option>
+              {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select
               value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
               <option value="">Todas as unidades</option>
-              {opcoes.unidades.map(u => <option key={u} value={u}>{u}</option>)}
+              {OPCOES_FILIAIS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
             <select
               value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
               <option value="">Todos os responsáveis</option>
-              {opcoes.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
+              {RESPONSAVEIS_RH.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            {(filtroStatus.length > 0 || filtroUnidade || filtroResp || busca) && (
+            {(filtroStatus.length > 0 || filtroStatusSel || filtroUnidade || filtroResp || busca) && (
               <button
-                onClick={() => { setFiltroStatus([]); setFiltroUnidade(''); setFiltroResp(''); setBusca(''); }}
+                onClick={() => { setFiltroStatus([]); setFiltroStatusSel(''); setFiltroUnidade(''); setFiltroResp(''); setBusca(''); }}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
                 Limpar filtros
               </button>
@@ -706,7 +776,7 @@ export default function RecrutamentoPage() {
                   <table className="w-full text-xs min-w-[800px]">
                     <thead>
                       <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
-                        {['Status', 'Cargo', 'Resp. RH', 'Unidade', 'Gestor', 'Abertura', 'SLA', 'Fonte', 'Contratado', 'Acomp. RH'].map(h => (
+                        {['Status', 'Cargo', 'Resp. RH', 'Unidade', 'Gestor', 'Abertura', 'SLA / Prazo', 'Fonte', 'Contratado', 'Acomp. RH'].map(h => (
                           <th key={h} className="pb-2 pr-3 text-left font-bold">{h}</th>
                         ))}
                       </tr>
@@ -720,9 +790,7 @@ export default function RecrutamentoPage() {
                           <td className="py-2 pr-3 text-gray-600">{v.unidade || '—'}</td>
                           <td className="py-2 pr-3 text-gray-500 max-w-[120px] truncate">{v.gestor || '—'}</td>
                           <td className="py-2 pr-3 text-gray-500 whitespace-nowrap">{fmtData(v.data_abertura)}</td>
-                          <td className="py-2 pr-3 font-bold tabular-nums" style={{ color: v.sla_dias ? (v.sla_dias > 30 ? '#DC2626' : v.sla_dias > 15 ? C.amber : '#16A34A') : C.gray }}>
-                            {v.sla_dias ? `${v.sla_dias}d` : '—'}
-                          </td>
+                          <td className="py-2 pr-3"><SlaCell v={v} /></td>
                           <td className="py-2 pr-3 text-gray-500">{v.fonte || '—'}</td>
                           <td className="py-2 pr-3 text-gray-600 max-w-[140px] truncate" title={v.novo_colaborador || ''}>{v.novo_colaborador || '—'}</td>
                           <td className="py-2">
@@ -806,6 +874,75 @@ export default function RecrutamentoPage() {
             ? <Skeleton className="h-32 w-full" />
             : <SlaChart data={data?.slaPorMes ?? []} />
           }
+        </div>
+
+        {/* ── Desempenho de SLA ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="font-black text-sm uppercase" style={{ color: C.dark }}>Desempenho de SLA</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Prazo alvo por nível de cargo e eficiência do processo</p>
+            </div>
+            {slaPerf && (
+              <div className="flex gap-4">
+                <div className="text-right">
+                  <div className="text-2xl font-black tabular-nums"
+                       style={{ color: (slaPerf.eficienciaSLA ?? 0) >= 80 ? '#16A34A' : (slaPerf.eficienciaSLA ?? 0) >= 60 ? C.amber : C.pink }}>
+                    {slaPerf.eficienciaSLA != null ? `${slaPerf.eficienciaSLA}%` : '—'}
+                  </div>
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">eficiência SLA</div>
+                  <div className="text-[10px] text-gray-500">{slaPerf.dentroPrazo}/{slaPerf.totalFechadas} vagas</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-black tabular-nums"
+                       style={{ color: slaPerf.abertasAtrasadas > 0 ? '#DC2626' : '#16A34A' }}>
+                    {slaPerf.abertasAtrasadas}
+                  </div>
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">em atraso</div>
+                  <div className="text-[10px] text-gray-500">vagas abertas</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                  <th className="pb-2 text-left font-bold">Nível / Cargo</th>
+                  <th className="pb-2 text-center font-bold w-20">Meta (dias)</th>
+                  <th className="pb-2 text-left font-bold pl-4">Referência</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { nivel: 'Operacional',              dias: 15, ref: 'Estagiário, Jovem Aprendiz, Assistente',              cor: '#8B5CF6' },
+                  { nivel: 'Motoristas',               dias: 20, ref: 'Motoristas',                                          cor: '#3B82F6' },
+                  { nivel: 'Aux. Logística / Conferentes', dias: 20, ref: 'Auxiliares de Logística, Conferentes',            cor: '#0D9488' },
+                  { nivel: 'Operadores de Empilhadeira', dias: 25, ref: 'Operadores de Empilhadeira',                        cor: '#F59E0B' },
+                  { nivel: 'Analistas / Técnicos',     dias: 30, ref: 'Analistas (Jr, Pl, Sr), Engenheiros, Desenvolvedores, SDR', cor: '#ff2f69' },
+                  { nivel: 'Especialistas / Coordenadores', dias: 60, ref: 'Especialistas, Coordenadores',                  cor: '#DC2626' },
+                  { nivel: 'Gerentes / Traders',       dias: 90, ref: 'Gerentes, Traders',                                   cor: '#422c76' },
+                ].map((row) => (
+                  <tr key={row.nivel} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="py-2.5 pr-4">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: row.cor }} />
+                        <span className="font-semibold text-gray-800">{row.nivel}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-center">
+                      <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black text-white"
+                            style={{ backgroundColor: row.cor }}>
+                        {row.dias}d
+                      </span>
+                    </td>
+                    <td className="py-2.5 pl-4 text-gray-500 text-[11px]">{row.ref}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <footer className="text-center text-[10px] text-gray-400 pb-6">
