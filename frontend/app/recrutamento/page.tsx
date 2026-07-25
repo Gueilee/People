@@ -740,87 +740,6 @@ export default function RecrutamentoPage() {
           </div>
         )}
 
-        {/* ── Filtros + Tabela ───────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <div className="flex flex-wrap gap-3 mb-4 items-center">
-            <input
-              type="text" placeholder="Buscar cargo, colaborador, gestor..."
-              value={busca} onChange={e => setBusca(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2"
-              style={{ '--tw-ring-color': C.pink } as React.CSSProperties} />
-            <select
-              value={filtroStatusSel}
-              onChange={e => { setFiltroStatusSel(e.target.value); setFiltroStatus([]); }}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none"
-              style={{ color: filtroStatusSel ? STATUS_CFG[filtroStatusSel]?.color : undefined }}>
-              <option value="">Todos os status</option>
-              {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select
-              value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
-              <option value="">Todas as unidades</option>
-              {OPCOES_FILIAIS.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-            <select
-              value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
-              <option value="">Todos os responsáveis</option>
-              {RESPONSAVEIS_RH.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            {(filtroStatus.length > 0 || filtroStatusSel || filtroUnidade || filtroResp || busca) && (
-              <button
-                onClick={() => { setFiltroStatus([]); setFiltroStatusSel(''); setFiltroUnidade(''); setFiltroResp(''); setBusca(''); }}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
-                Limpar filtros
-              </button>
-            )}
-            <span className="text-xs text-gray-400 ml-auto">{vagas.length} vagas</span>
-          </div>
-
-          {loading
-            ? <Skeleton className="h-48 w-full" />
-            : vagas.length === 0
-              ? <p className="text-sm text-gray-400 text-center py-10">Nenhuma vaga encontrada.</p>
-              : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs min-w-[800px]">
-                    <thead>
-                      <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
-                        {['Status', 'Cargo', 'Resp. RH', 'Unidade', 'Gestor', 'Abertura', 'SLA / Prazo', 'Fonte', 'Contratado', 'Acomp. RH'].map(h => (
-                          <th key={h} className="pb-2 pr-3 text-left font-bold">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vagas.map(v => (
-                        <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                          <td className="py-2 pr-3"><StatusBadge status={v.status} /></td>
-                          <td className="py-2 pr-3 font-semibold text-gray-800 max-w-[160px] truncate" title={v.cargo || ''}>{v.cargo || '—'}</td>
-                          <td className="py-2 pr-3 text-gray-600">{v.responsavel || '—'}</td>
-                          <td className="py-2 pr-3 text-gray-600">{v.unidade || '—'}</td>
-                          <td className="py-2 pr-3 text-gray-500 max-w-[120px] truncate">{v.gestor || '—'}</td>
-                          <td className="py-2 pr-3 text-gray-500 whitespace-nowrap">{fmtData(v.data_abertura)}</td>
-                          <td className="py-2 pr-3"><SlaCell v={v} /></td>
-                          <td className="py-2 pr-3 text-gray-500">{v.fonte || '—'}</td>
-                          <td className="py-2 pr-3 text-gray-600 max-w-[140px] truncate" title={v.novo_colaborador || ''}>{v.novo_colaborador || '—'}</td>
-                          <td className="py-2">
-                            <button
-                              onClick={() => openEdit(v)}
-                              className="text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors hover:bg-purple-50 whitespace-nowrap"
-                              style={{ color: C.purple, borderColor: '#C4B5FD' }}>
-                              Preencher RH
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
-          }
-        </div>
-
         {/* ── Analytics ─────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -954,6 +873,87 @@ export default function RecrutamentoPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* ── Filtros + Tabela ───────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <div className="flex flex-wrap gap-3 mb-4 items-center">
+            <input
+              type="text" placeholder="Buscar cargo, colaborador, gestor..."
+              value={busca} onChange={e => setBusca(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2"
+              style={{ '--tw-ring-color': C.pink } as React.CSSProperties} />
+            <select
+              value={filtroStatusSel}
+              onChange={e => { setFiltroStatusSel(e.target.value); setFiltroStatus([]); }}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none"
+              style={{ color: filtroStatusSel ? STATUS_CFG[filtroStatusSel]?.color : undefined }}>
+              <option value="">Todos os status</option>
+              {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select
+              value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
+              <option value="">Todas as unidades</option>
+              {OPCOES_FILIAIS.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <select
+              value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
+              <option value="">Todos os responsáveis</option>
+              {RESPONSAVEIS_RH.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {(filtroStatus.length > 0 || filtroStatusSel || filtroUnidade || filtroResp || busca) && (
+              <button
+                onClick={() => { setFiltroStatus([]); setFiltroStatusSel(''); setFiltroUnidade(''); setFiltroResp(''); setBusca(''); }}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+                Limpar filtros
+              </button>
+            )}
+            <span className="text-xs text-gray-400 ml-auto">{vagas.length} vagas</span>
+          </div>
+
+          {loading
+            ? <Skeleton className="h-48 w-full" />
+            : vagas.length === 0
+              ? <p className="text-sm text-gray-400 text-center py-10">Nenhuma vaga encontrada.</p>
+              : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[800px]">
+                    <thead>
+                      <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                        {['Status', 'Cargo', 'Resp. RH', 'Unidade', 'Gestor', 'Abertura', 'SLA / Prazo', 'Fonte', 'Contratado', 'Acomp. RH'].map(h => (
+                          <th key={h} className="pb-2 pr-3 text-left font-bold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vagas.map(v => (
+                        <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <td className="py-2 pr-3"><StatusBadge status={v.status} /></td>
+                          <td className="py-2 pr-3 font-semibold text-gray-800 max-w-[160px] truncate" title={v.cargo || ''}>{v.cargo || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-600">{v.responsavel || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-600">{v.unidade || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-500 max-w-[120px] truncate">{v.gestor || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-500 whitespace-nowrap">{fmtData(v.data_abertura)}</td>
+                          <td className="py-2 pr-3"><SlaCell v={v} /></td>
+                          <td className="py-2 pr-3 text-gray-500">{v.fonte || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-600 max-w-[140px] truncate" title={v.novo_colaborador || ''}>{v.novo_colaborador || '—'}</td>
+                          <td className="py-2">
+                            <button
+                              onClick={() => openEdit(v)}
+                              className="text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors hover:bg-purple-50 whitespace-nowrap"
+                              style={{ color: C.purple, borderColor: '#C4B5FD' }}>
+                              Preencher RH
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+          }
         </div>
 
         <footer className="text-center text-[10px] text-gray-400 pb-6">
