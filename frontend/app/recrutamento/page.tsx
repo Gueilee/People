@@ -530,8 +530,26 @@ export default function RecrutamentoPage() {
   const [filtroStatus, setFiltroStatus] = useState<string[]>([]);
   const [filtroUnidade, setFiltroUnidade] = useState('');
   const [filtroResp, setFiltroResp] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [editVaga, setEditVaga]   = useState<Vaga | null>(null);
+  const [showModal, setShowModal]   = useState(false);
+  const [editVaga, setEditVaga]     = useState<Vaga | null>(null);
+  const [linkCopiado, setLinkCopiado] = useState(false);
+
+  function copiarLink() {
+    const url = 'https://people.vendemm.ia.br/solicitar-vaga';
+    const fallback = () => {
+      const el = document.createElement('textarea');
+      el.value = url;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.focus(); el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    };
+    (navigator.clipboard?.writeText(url) ?? Promise.reject()).catch(fallback);
+    setLinkCopiado(true);
+    setTimeout(() => setLinkCopiado(false), 2000);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -591,10 +609,14 @@ export default function RecrutamentoPage() {
               <p className="text-xs text-gray-500 truncate">people.vendemm.ia.br/solicitar-vaga</p>
             </div>
             <button
-              onClick={() => navigator.clipboard.writeText('https://people.vendemm.ia.br/solicitar-vaga')}
-              className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all hover:bg-purple-50 shrink-0"
-              style={{ color: C.purple, borderColor: '#C4B5FD' }}>
-              Copiar link
+              onClick={copiarLink}
+              className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all shrink-0"
+              style={{
+                color:           linkCopiado ? '#16A34A' : C.purple,
+                borderColor:     linkCopiado ? '#86EFAC' : '#C4B5FD',
+                backgroundColor: linkCopiado ? '#F0FDF4' : undefined,
+              }}>
+              {linkCopiado ? '✓ Copiado!' : 'Copiar link'}
             </button>
           </div>
         </div>
