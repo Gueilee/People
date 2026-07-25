@@ -128,6 +128,51 @@ function GestorAutocomplete({
   );
 }
 
+function fmtSalario(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return 'R$ ' + parseInt(digits, 10).toLocaleString('pt-BR');
+}
+
+function SalarioRange({ onChange }: { onChange: (v: string) => void }) {
+  const [de, setDe]   = useState('');
+  const [ate, setAte] = useState('');
+
+  function handle(raw: string, setter: (v: string) => void, other: string, isMin: boolean) {
+    const fmt = fmtSalario(raw);
+    setter(fmt);
+    const a = isMin ? fmt : other;
+    const b = isMin ? other : fmt;
+    if (a && b) onChange(`${a} – ${b}`);
+    else if (a) onChange(a);
+    else if (b) onChange(b);
+    else onChange('');
+  }
+
+  const inputCls = 'flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 bg-white';
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        className={inputCls}
+        style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
+        placeholder="R$ 2.000"
+        value={de}
+        onChange={e => handle(e.target.value, setDe, ate, true)}
+        inputMode="numeric"
+      />
+      <span className="text-gray-400 font-bold text-sm shrink-0">–</span>
+      <input
+        className={inputCls}
+        style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
+        placeholder="R$ 3.500"
+        value={ate}
+        onChange={e => handle(e.target.value, setAte, de, false)}
+        inputMode="numeric"
+      />
+    </div>
+  );
+}
+
 function Pills({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -346,9 +391,12 @@ export default function SolicitarVagaPage() {
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Faixa Salarial Aprovada</label>
-                <input className={inputCls}
-                  placeholder="Ex: R$ 2.000 – R$ 2.500 (conforme Plano de Cargos e Salários)"
-                  value={form.faixa_salarial} onChange={set('faixa_salarial')} />
+                <SalarioRange onChange={v => setForm(p => ({ ...p, faixa_salarial: v }))} />
+                {form.faixa_salarial && (
+                  <p className="mt-1.5 text-[11px] text-gray-400">
+                    Será registrado como: <span className="font-semibold text-gray-600">{form.faixa_salarial}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Modelo de Contratação *</label>
