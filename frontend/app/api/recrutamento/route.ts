@@ -302,6 +302,13 @@ export async function PATCH(request: Request) {
     const sla = calcSla(merged.data_abertura, fechamento);
 
     const sla_meta_dias = detectarSLAMeta(merged.cargo || '');
+    const toInt = (v: unknown, fb: number | null = null) => {
+      if (v === null || v === undefined || v === '') return fb;
+      const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+      return isNaN(n) ? fb : n;
+    };
+    const toDate = (v: unknown) => (v && String(v).trim() !== '' ? String(v) : null);
+
     await db.run(
       `UPDATE vagas_recrutamento SET
         responsavel=$1, data_abertura=$2, data_fechamento=$3, sla_dias=$4, cargo=$5, novo_colaborador=$6,
@@ -310,13 +317,13 @@ export async function PATCH(request: Request) {
         quantidade_vagas=$17, faixa_salarial=$18, modelo_contratacao=$19,
         num_convocados=$20, num_compareceu=$21, sla_meta_dias=$22, salario_real=$23
        WHERE id=$24`,
-      [merged.responsavel, merged.data_abertura, fechamento, sla,
-       merged.cargo, merged.novo_colaborador, merged.status, merged.motivo,
-       merged.tipo_substituicao, merged.colaborador_substituido,
-       merged.centro_custo, merged.unidade, merged.gestor,
-       merged.data_inicio, merged.fonte, merged.observacoes,
-       merged.quantidade_vagas ?? 1, merged.faixa_salarial, merged.modelo_contratacao,
-       merged.num_convocados ?? null, merged.num_compareceu ?? null,
+      [merged.responsavel || null, toDate(merged.data_abertura), toDate(fechamento), sla,
+       merged.cargo || null, merged.novo_colaborador || null, merged.status || 'Aberta', merged.motivo || null,
+       merged.tipo_substituicao || null, merged.colaborador_substituido || null,
+       merged.centro_custo || null, merged.unidade || null, merged.gestor || null,
+       toDate(merged.data_inicio), merged.fonte || null, merged.observacoes || null,
+       toInt(merged.quantidade_vagas, 1), merged.faixa_salarial || null, merged.modelo_contratacao || null,
+       toInt(merged.num_convocados), toInt(merged.num_compareceu),
        sla_meta_dias, merged.salario_real || null, id]
     );
 
