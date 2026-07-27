@@ -63,6 +63,16 @@ export async function ensureUsersTable() {
   await db.run(
     `UPDATE usuarios SET email = 'admin@vendemmia.com.br' WHERE login = 'admin' AND email IS NULL`
   );
+
+  // Recuperação de emergência: se ADMIN_RESET_PASSWORD estiver definido no ambiente,
+  // força a atualização do hash do admin. Remova a variável após o primeiro login.
+  const resetPwd = process.env.ADMIN_RESET_PASSWORD;
+  if (resetPwd) {
+    await db.run(
+      `UPDATE usuarios SET senha_hash = $1 WHERE login = 'admin'`,
+      [hashPassword(resetPwd)]
+    );
+  }
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
