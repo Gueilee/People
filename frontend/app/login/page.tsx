@@ -46,30 +46,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex overflow-hidden">
+    <div
+      className="min-h-screen flex items-center justify-center overflow-hidden relative"
+      style={{
+        backgroundImage: 'url(/titulo.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* overlay suave para o card respirar */}
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.35)' }} />
 
-      {/* ── Lado esquerdo: imagem de fundo ── */}
-      <div className="flex-1 relative hidden md:block">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: 'url(/login_v1.jpeg)' }}
-        />
-
-      </div>
-
-      {/* ── Lado direito: painel off-white ── */}
+      {/* ── Card de login centralizado ── */}
       <div
-        className="w-full md:w-[440px] flex flex-col items-center justify-center relative"
-        style={{ backgroundColor: '#faf9f5' }}
+        className="relative z-10 w-full max-w-[400px] mx-4 flex flex-col items-center justify-center rounded-2xl px-8 py-10"
+        style={{
+          background: 'rgba(250,249,245,0.97)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+        }}
       >
-        {/* Mobile: imagem de fundo faint */}
-        <div
-          className="absolute inset-0 bg-cover bg-center md:hidden"
-          style={{ backgroundImage: 'url(/login_v1.jpeg)', opacity: 0.08 }}
-        />
-
-        <div className="relative z-10 w-full max-w-[320px] px-2">
-
           {/* Logo Vendemmia PNG transparente */}
           <div className="flex justify-center mb-10">
             <img
@@ -215,7 +211,6 @@ export default function LoginPage() {
               Vendemmia People · {new Date().getFullYear()}
             </p>
           </div>
-        </div>
       </div>
 
     </div>
