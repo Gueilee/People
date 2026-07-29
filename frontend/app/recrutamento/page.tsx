@@ -86,11 +86,11 @@ const MOTIVO_CORES: Record<string, string> = {
 
 const OPCOES_MOTIVO    = ['Aumento de quadro', 'Substituição'];
 const OPCOES_TIPO_SUB  = ['Desligamento', 'Pedido de demissão', 'Transferência', 'Afastamento'];
-const OPCOES_FILIAIS   = ['Garuva', 'Itapevi', 'Navegantes – CD 1', 'Navegantes – CD 2', 'Vila Olímpia'];
+const OPCOES_FILIAIS   = ['Garuva', 'Itapevi', 'Navegantes CD 01', 'Navegantes CD 02', 'Vila Olímpia'];
 const OPCOES_MODELO    = ['CLT', 'PJ', 'Estágio', 'Temporário'];
 const OPCOES_STATUS    = ['Aberta', 'Fechada', 'Congelada', 'Cancelada'];
-const RESPONSAVEIS_RH  = ['Camile Fernandes', 'Denise Oliveira', 'Gabriela Santos', 'Hellen Gomes', 'Julia Barbosa', 'Rafaela Marques'];
-const UNIDADES_SC      = ['Garuva', 'Navegantes – CD 1', 'Navegantes – CD 2'];
+const RESPONSAVEIS_RH  = ['Camile', 'Denise Oliveira', 'Gabriela Santos', 'Hellen', 'José Netto', 'Julia Barbosa', 'Rafaela Marques'];
+const UNIDADES_SC      = ['Garuva', 'Navegantes CD 01', 'Navegantes CD 02'];
 const OPCOES_CC = [
   'OPERAÇÃO VCI', 'OPERAÇÃO ARMAZEM - NVG', 'OPERAÇÃO ARMAZEM - ITV', 'OPERAÇÃO ARMAZEM - GRV',
   'OPERAÇÃO TRANSPORTE', 'COMERCIAL', 'INFRAESTRUTURA', 'PROJETOS/QUALIDADE', 'COMPRAS',
@@ -983,13 +983,13 @@ export default function RecrutamentoPage() {
               value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
               <option value="">Todas as unidades</option>
-              {OPCOES_FILIAIS.map(u => <option key={u} value={u}>{u}</option>)}
+              {opcoes.unidades.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
             <select
               value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
               <option value="">Todos os responsáveis</option>
-              {RESPONSAVEIS_RH.map(r => <option key={r} value={r}>{r}</option>)}
+              {opcoes.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
             {(filtroStatus.length > 0 || filtroStatusSel || filtroUnidade || filtroResp || busca) && (
               <button
