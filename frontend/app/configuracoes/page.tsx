@@ -82,7 +82,7 @@ export default function ConfiguracoesPage() {
     fetch('/api/auth/me')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (!data || data.role !== 'admin') { router.replace('/dashboard'); return; }
+        if (!data || (data.role !== 'admin' && data.role !== 'rh')) { router.replace('/dashboard'); return; }
         setMe(data);
         return fetch('/api/admin/usuarios');
       })

@@ -11,7 +11,7 @@ async function requireAdmin() {
   const uid = cookieStore.get('vp_uid')?.value;
   if (!uid) return null;
   const user = await findById(parseInt(uid));
-  if (!user || user.role !== 'admin') return null;
+  if (!user || (user.role !== 'admin' && user.role !== 'rh')) return null;
   return user;
 }
 
