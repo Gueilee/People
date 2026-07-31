@@ -698,25 +698,6 @@ export default function RecrutamentoPage() {
   const [filtroResp, setFiltroResp]       = useState('');
   const [showModal, setShowModal]   = useState(false);
   const [editVaga, setEditVaga]     = useState<Vaga | null>(null);
-  const [linkCopiado, setLinkCopiado] = useState(false);
-
-  function copiarLink() {
-    const url = 'https://people.vendemm.ia.br/solicitar-vaga';
-    const fallback = () => {
-      const el = document.createElement('textarea');
-      el.value = url;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.focus(); el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    };
-    (navigator.clipboard?.writeText(url) ?? Promise.reject()).catch(fallback);
-    setLinkCopiado(true);
-    setTimeout(() => setLinkCopiado(false), 2000);
-  }
-
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -760,32 +741,6 @@ export default function RecrutamentoPage() {
           <div>
             <h1 className="text-xl font-black" style={{ color: C.pink }}>Recrutamento & Seleção</h1>
             <p className="text-sm text-gray-500 mt-0.5">Gestão de vagas e pipeline de contratação</p>
-          </div>
-          {/* Banner: link do formulário público para compartilhar com gestores */}
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border"
-               style={{ backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
-              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
-                    stroke="#422c76" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
-                    stroke="#422c76" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: C.purple }}>
-                Link para abertura de vagas — compartilhe com os gestores
-              </p>
-              <p className="text-xs text-gray-500 truncate">people.vendemm.ia.br/solicitar-vaga</p>
-            </div>
-            <button
-              onClick={copiarLink}
-              className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all shrink-0"
-              style={{
-                color:           linkCopiado ? '#16A34A' : C.purple,
-                borderColor:     linkCopiado ? '#86EFAC' : '#C4B5FD',
-                backgroundColor: linkCopiado ? '#F0FDF4' : undefined,
-              }}>
-              {linkCopiado ? '✓ Copiado!' : 'Copiar link'}
-            </button>
           </div>
         </div>
 
