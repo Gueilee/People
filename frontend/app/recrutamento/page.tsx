@@ -199,36 +199,91 @@ function BarUnidade({ data }: { data: PorUnidade[] }) {
 function SlaChart({ data }: { data: SlaMes[] }) {
   const validos = data.filter(d => d.slaMedia !== null);
   if (validos.length < 2) return <p className="text-xs text-gray-400 text-center pt-8">Dados insuficientes</p>;
-  const W = 480, H = 140, padL = 32, padR = 16, padT = 20, padB = 28;
+
+  const W = 560, H = 130, padL = 12, padR = 12, padT = 28, padB = 24;
   const n = data.length;
   const maxVal = Math.max(...validos.map(d => d.slaMedia as number), 1);
   const getX = (i: number) => padL + (i / (n - 1)) * (W - padL - padR);
   const getY = (v: number) => padT + (1 - v / maxVal) * (H - padT - padB);
-  const pts = data.map((d, i) => d.slaMedia !== null ? [getX(i), getY(d.slaMedia)] as [number, number] : null);
-  const pathD = pts.reduce((acc, pt, i) => {
+
+  const pts = data.map((d, i) =>
+    d.slaMedia !== null ? [getX(i), getY(d.slaMedia)] as [number, number] : null
+  );
+
+  // curva suave
+  const linePath = pts.reduce((acc, pt, i) => {
     if (!pt) return acc;
     const prev = pts.slice(0, i).reverse().find(p => p !== null);
-    if (!prev) return `M ${pt[0]} ${pt[1]}`;
+    if (!prev) return `M ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
     const mx = (prev[0] + pt[0]) / 2;
-    return `${acc} C ${mx} ${prev[1]} ${mx} ${pt[1]} ${pt[0]} ${pt[1]}`;
+    return `${acc} C ${mx.toFixed(1)} ${prev[1].toFixed(1)} ${mx.toFixed(1)} ${pt[1].toFixed(1)} ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
   }, '');
+
+  // área preenchida
+  const baseline = H - padB;
+  const firstPt  = pts.find(p => p !== null)!;
+  const lastPt   = [...pts].reverse().find(p => p !== null)!;
+  const areaPath = `${linePath} L ${lastPt[0].toFixed(1)} ${baseline} L ${firstPt[0].toFixed(1)} ${baseline} Z`;
+
+  // mostrar label só nos pontos com valor, skip se muitos
+  const showLabel = (i: number) => pts[i] !== null && (n <= 8 || i % 2 === 0 || i === n - 1);
+  // eixo x: skip alternados se muitos meses
+  const showAxis  = (i: number) => n <= 8 ? true : i % 2 === 0;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#E5E7EB" strokeWidth="1" />
-      <path d={pathD} fill="none" stroke={C.pink} strokeWidth="2.5" strokeLinecap="round" />
-      {data.map((d, i) => (
-        <g key={i}>
-          {(n <= 12 || i % 2 === 0) && (
-            <text x={getX(i)} y={H - padB + 14} textAnchor="middle" fontSize="8" fill={C.gray}>{d.mes}</text>
-          )}
-          {d.slaMedia !== null && (
-            <>
-              <circle cx={getX(i)} cy={getY(d.slaMedia)} r="4" fill="white" stroke={C.pink} strokeWidth="2" />
-              <text x={getX(i)} y={getY(d.slaMedia) - 8} textAnchor="middle" fontSize="9" fontWeight="700" fill={C.pink}>{d.slaMedia}d</text>
-            </>
-          )}
-        </g>
-      ))}
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id="slaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={C.pink} stopOpacity="0.12" />
+          <stop offset="100%" stopColor={C.pink} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      {/* linhas de grade horizontais */}
+      {[0.25, 0.5, 0.75, 1].map(t => {
+        const y = padT + (1 - t) * (H - padT - padB);
+        return <line key={t} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#F3F4F6" strokeWidth="1" />;
+      })}
+
+      {/* área gradiente */}
+      <path d={areaPath} fill="url(#slaGrad)" />
+
+      {/* linha principal */}
+      <path d={linePath} fill="none" stroke={C.pink} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* pontos e labels */}
+      {data.map((d, i) => {
+        const pt = pts[i];
+        return (
+          <g key={i}>
+            {/* label do eixo x */}
+            {showAxis(i) && (
+              <text
+                x={getX(i)} y={H - padB + 14}
+                textAnchor="middle" fontSize="7.5" fill="#9CA3AF"
+                fontFamily="system-ui, sans-serif"
+              >
+                {d.mes}
+              </text>
+            )}
+            {/* ponto + valor */}
+            {pt && (
+              <>
+                <circle cx={pt[0]} cy={pt[1]} r="2.5" fill={C.pink} />
+                {showLabel(i) && (
+                  <text
+                    x={pt[0]} y={pt[1] - 7}
+                    textAnchor="middle" fontSize="8.5" fill={C.pink}
+                    fontWeight="600" fontFamily="system-ui, sans-serif"
+                  >
+                    {d.slaMedia}d
+                  </text>
+                )}
+              </>
+            )}
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -840,8 +895,8 @@ export default function RecrutamentoPage() {
         {/* SLA trend */}
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-black text-sm uppercase" style={{ color: C.dark }}>SLA Médio por Mês (dias para fechar)</h3>
-            {kpis && <span className="text-xs text-gray-500">Média geral: <strong style={{ color: C.pink }}>{kpis.slaMedia}d</strong></span>}
+            <h3 className="text-xs font-semibold tracking-wide uppercase text-gray-400">SLA médio por mês</h3>
+            {kpis && <span className="text-xs text-gray-400">Média geral: <span className="font-semibold" style={{ color: C.pink }}>{kpis.slaMedia}d</span></span>}
           </div>
           {loading
             ? <Skeleton className="h-32 w-full" />
