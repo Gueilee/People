@@ -139,35 +139,45 @@ function KpiCard({ label, value, sub, color, icon }: { label: string; value: str
 
 function DonutFonte({ data }: { data: PorFonte[] }) {
   const total = data.reduce((s, d) => s + d.count, 0);
-  const r = 70, cx = 80, cy = 80, stroke = 26;
+  // r=62, stroke=18 → borda externa = 62+9 = 71 < 90 (cx/cy), sem corte
+  const S = 180, cx = 90, cy = 90, r = 62, stroke = 18;
   const circ = 2 * Math.PI * r;
   let offset = 0;
   const cores = data.map((d, i) => FONTES_CORES[d.fonte] || [C.purple, C.teal, C.blue, C.amber][i % 4]);
   return (
-    <div className="flex items-center gap-6">
-      <svg width={160} height={160} viewBox="0 0 160 160" className="shrink-0">
+    <div className="flex items-center gap-5">
+      <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="shrink-0">
+        {/* trilha de fundo */}
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F3F4F6" strokeWidth={stroke} />
         {data.map((d, i) => {
           const dash = (d.count / Math.max(total, 1)) * circ;
           const seg = (
             <circle key={i} cx={cx} cy={cy} r={r} fill="none"
               stroke={cores[i]} strokeWidth={stroke}
-              strokeDasharray={`${dash} ${circ - dash}`}
-              strokeDashoffset={-offset + circ / 4} />
+              strokeLinecap="butt"
+              strokeDasharray={`${dash.toFixed(2)} ${(circ - dash).toFixed(2)}`}
+              strokeDashoffset={(circ / 4 - offset).toFixed(2)} />
           );
           offset += dash;
           return seg;
         })}
-        <text x={cx} y={cy - 6}  textAnchor="middle" fontSize="22" fontWeight="900" fill={C.dark}>{total}</text>
-        <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9"  fill={C.gray}>contratações</text>
+        {/* número central */}
+        <text x={cx} y={cy - 8} textAnchor="middle" fontSize="26" fontWeight="700"
+              fill={C.dark} fontFamily="system-ui, sans-serif">{total}</text>
+        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="8.5" fill="#9CA3AF"
+              fontFamily="system-ui, sans-serif" letterSpacing="0.5">contratações</text>
       </svg>
-      <div className="flex flex-col gap-1.5 flex-1">
+
+      {/* legenda */}
+      <div className="flex flex-col gap-2 flex-1 min-w-0">
         {data.map((d, i) => (
           <div key={d.fonte} className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cores[i] }} />
-            <span className="text-xs text-gray-600 flex-1 truncate">{d.fonte}</span>
-            <span className="text-xs font-bold tabular-nums" style={{ color: cores[i] }}>{d.count}</span>
-            <span className="text-[10px] text-gray-400 w-8 text-right">{total > 0 ? ((d.count / total) * 100).toFixed(0) : 0}%</span>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cores[i] }} />
+            <span className="text-[11px] text-gray-500 flex-1 truncate">{d.fonte}</span>
+            <span className="text-[11px] font-semibold tabular-nums" style={{ color: cores[i] }}>{d.count}</span>
+            <span className="text-[10px] text-gray-300 w-7 text-right tabular-nums">
+              {total > 0 ? Math.round((d.count / total) * 100) : 0}%
+            </span>
           </div>
         ))}
       </div>
@@ -225,8 +235,16 @@ function SlaChart({ data }: { data: SlaMes[] }) {
   const lastPt   = [...pts].reverse().find(p => p !== null)!;
   const areaPath = `${linePath} L ${lastPt[0].toFixed(1)} ${baseline} L ${firstPt[0].toFixed(1)} ${baseline} Z`;
 
-  // mostrar label só nos pontos com valor, skip se muitos
-  const showLabel = (i: number) => pts[i] !== null && (n <= 8 || i % 2 === 0 || i === n - 1);
+  // pico local: valor maior que os vizinhos válidos adjacentes
+  const isPeak = (i: number) => {
+    if (pts[i] === null) return false;
+    const val = data[i].slaMedia as number;
+    const prevVal = data.slice(0, i).reverse().find(d => d.slaMedia !== null)?.slaMedia ?? -Infinity;
+    const nextVal = data.slice(i + 1).find(d => d.slaMedia !== null)?.slaMedia ?? -Infinity;
+    return val > prevVal && val > nextVal;
+  };
+  // mostrar label: sempre em picos, alternado nos demais quando há muitos meses
+  const showLabel = (i: number) => pts[i] !== null && (n <= 8 || i % 2 === 0 || i === n - 1 || isPeak(i));
   // eixo x: skip alternados se muitos meses
   const showAxis  = (i: number) => n <= 8 ? true : i % 2 === 0;
 
