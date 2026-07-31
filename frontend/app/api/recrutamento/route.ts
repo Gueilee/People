@@ -95,9 +95,10 @@ function calcSla(abertura: string | null, fechamento: string | null): number | n
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const filtroStatus    = (searchParams.get('status')     || '').split(',').filter(Boolean).map(s => s.trim());
-    const filtroUnidade   = searchParams.get('unidade')     || '';
-    const filtroResponsavel = searchParams.get('responsavel') || '';
+    const filtroStatus    = (searchParams.get('status')      || '').split(',').filter(Boolean).map(s => s.trim());
+    const filtroUnidades  = (searchParams.get('unidade')     || '').split(',').filter(Boolean);
+    const filtroRespons   = (searchParams.get('responsavel') || '').split(',').filter(Boolean);
+    const filtroFontes    = (searchParams.get('fonte')       || '').split(',').filter(Boolean);
     const filtroMeses     = parseInt(searchParams.get('meses') || '12', 10);
     const busca           = (searchParams.get('busca') || '').toLowerCase();
 
@@ -118,34 +119,38 @@ export async function GET(request: Request) {
     const hoje = new Date();
     const inicioStr = new Date(hoje.getFullYear(), hoje.getMonth() - filtroMeses, 1).toISOString().split('T')[0];
 
-    let lista = all;
+    // listaBase: período + dimensões → KPIs e gráficos respondem a esses filtros
+    let listaBase = all.filter(v => !v.data_abertura || v.data_abertura >= inicioStr);
+    if (filtroUnidades.length > 0) listaBase = listaBase.filter(v => filtroUnidades.includes(v.unidade || ''));
+    if (filtroRespons.length  > 0) listaBase = listaBase.filter(v => filtroRespons.includes(v.responsavel || ''));
+    if (filtroFontes.length   > 0) listaBase = listaBase.filter(v => filtroFontes.includes(v.fonte || ''));
+
+    // lista: listaBase + status + busca → só a tabela
+    let lista = [...listaBase];
     if (filtroStatus.length > 0) lista = lista.filter(v => filtroStatus.includes(v.status || ''));
-    if (filtroUnidade)   lista = lista.filter(v => v.unidade === filtroUnidade);
-    if (filtroResponsavel) lista = lista.filter(v => v.responsavel === filtroResponsavel);
     if (busca) lista = lista.filter(v =>
       [v.cargo, v.novo_colaborador, v.gestor, v.colaborador_substituido, v.observacoes]
         .some(f => (f || '').toLowerCase().includes(busca))
     );
 
-    const periodo = all.filter(v => !v.data_abertura || v.data_abertura >= inicioStr);
-
-    const abertas    = all.filter(v => v.status === 'Aberta').length;
-    const congeladas = all.filter(v => v.status === 'Congelada').length;
-    const fechadasP  = periodo.filter(v => v.status === 'Fechada').length;
-    const canceladas = all.filter(v => v.status === 'Cancelada').length;
-    const fechadasSla = periodo.filter(v => v.status === 'Fechada' && v.sla_dias && v.sla_dias > 0);
+    const abertas    = listaBase.filter(v => v.status === 'Aberta').length;
+    const congeladas = listaBase.filter(v => v.status === 'Congelada').length;
+    const fechadasP  = listaBase.filter(v => v.status === 'Fechada').length;
+    const canceladas = listaBase.filter(v => v.status === 'Cancelada').length;
+    const fechadasSla = listaBase.filter(v => v.status === 'Fechada' && v.sla_dias && v.sla_dias > 0);
     const slaMedia   = fechadasSla.length
       ? Math.round(fechadasSla.reduce((s, v) => s + (v.sla_dias || 0), 0) / fechadasSla.length)
       : 0;
-    const totalP     = periodo.length;
+    const totalP     = listaBase.length;
     const taxaFechamento = totalP > 0 ? +((fechadasP / totalP) * 100).toFixed(1) : 0;
 
+    // porStatus de listaBase (cards de status não são afetados pelo filtro de status da tabela)
     const statusCt: Record<string, number> = {};
-    all.forEach(v => { const s = v.status || 'Sem status'; statusCt[s] = (statusCt[s] || 0) + 1; });
+    listaBase.forEach(v => { const s = v.status || 'Sem status'; statusCt[s] = (statusCt[s] || 0) + 1; });
     const porStatus = Object.entries(statusCt).map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
 
     const unidCt: Record<string, { total: number; abertas: number; fechadas: number }> = {};
-    periodo.forEach(v => {
+    listaBase.forEach(v => {
       const u = v.unidade || 'Não informado';
       if (!unidCt[u]) unidCt[u] = { total: 0, abertas: 0, fechadas: 0 };
       unidCt[u].total++;
@@ -157,7 +162,7 @@ export async function GET(request: Request) {
       .sort((a, b) => b.total - a.total);
 
     const fonteCt: Record<string, number> = {};
-    periodo.filter(v => v.status === 'Fechada').forEach(v => {
+    listaBase.filter(v => v.status === 'Fechada').forEach(v => {
       const f = v.fonte || 'Não informado';
       fonteCt[f] = (fonteCt[f] || 0) + 1;
     });
@@ -166,17 +171,18 @@ export async function GET(request: Request) {
       .sort((a, b) => b.count - a.count);
 
     const motivoCt: Record<string, number> = {};
-    periodo.forEach(v => { const m = v.motivo || 'Não informado'; motivoCt[m] = (motivoCt[m] || 0) + 1; });
+    listaBase.forEach(v => { const m = v.motivo || 'Não informado'; motivoCt[m] = (motivoCt[m] || 0) + 1; });
     const porMotivo = Object.entries(motivoCt)
       .map(([motivo, count]) => ({ motivo, count }))
       .sort((a, b) => b.count - a.count);
 
-    const slaPorMes = Array.from({ length: Math.min(filtroMeses, 12) }, (_, i) => {
-      const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(filtroMeses, 12) - 1 - i), 1);
-      const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (Math.min(filtroMeses, 12) - 1 - i) + 1, 0);
+    const mesesMostrar = Math.min(filtroMeses, 12);
+    const slaPorMes = Array.from({ length: mesesMostrar }, (_, i) => {
+      const mi = new Date(hoje.getFullYear(), hoje.getMonth() - (mesesMostrar - 1 - i), 1);
+      const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (mesesMostrar - 1 - i) + 1, 0);
       const miStr = mi.toISOString().split('T')[0];
       const mfStr = mf.toISOString().split('T')[0];
-      const fechadasMes = all.filter(v =>
+      const fechadasMes = listaBase.filter(v =>
         v.status === 'Fechada' && v.data_fechamento &&
         v.data_fechamento >= miStr && v.data_fechamento <= mfStr &&
         v.sla_dias && v.sla_dias > 0
@@ -196,13 +202,13 @@ export async function GET(request: Request) {
     };
 
     // â”€â”€ SLA Performance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const fechadasComSLA = all.filter(v => v.status === 'Fechada' && v.sla_dias != null && v.sla_meta_dias != null);
+    const fechadasComSLA = listaBase.filter(v => v.status === 'Fechada' && v.sla_dias != null && v.sla_meta_dias != null);
     const dentroPrazo    = fechadasComSLA.filter(v => (v.sla_dias ?? 0) <= (v.sla_meta_dias ?? 0));
     const eficienciaSLA  = fechadasComSLA.length > 0
       ? Math.round((dentroPrazo.length / fechadasComSLA.length) * 100)
       : null;
     const hojeMs = new Date().getTime();
-    const abertasAtrasadas = all.filter(v => {
+    const abertasAtrasadas = listaBase.filter(v => {
       if (v.status !== 'Aberta' || !v.data_abertura || !v.sla_meta_dias) return false;
       const diasDecorridos = Math.round((hojeMs - new Date(v.data_abertura).getTime()) / 86400000);
       return diasDecorridos > v.sla_meta_dias;
@@ -210,7 +216,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       vagas: lista,
-      kpis: { total: all.length, totalPeriodo: totalP, abertas, congeladas, fechadasPeriodo: fechadasP, canceladas, slaMedia, taxaFechamento },
+      kpis: { total: listaBase.length, totalPeriodo: totalP, abertas, congeladas, fechadasPeriodo: fechadasP, canceladas, slaMedia, taxaFechamento },
       porStatus,
       porUnidade,
       porFonte,

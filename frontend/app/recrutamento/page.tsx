@@ -1,6 +1,6 @@
 ﻿'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { NavHeader } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, FilterTag, PeriodButtons } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Vaga = {
@@ -765,28 +765,29 @@ export default function RecrutamentoPage() {
   const [data, setData]           = useState<RecrutData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [busca, setBusca]         = useState('');
-  const [filtroStatus, setFiltroStatus]   = useState<string[]>([]);
-  const [filtroStatusSel, setFiltroStatusSel] = useState('');
-  const [filtroUnidade, setFiltroUnidade] = useState('');
-  const [filtroResp, setFiltroResp]       = useState('');
+  const [filtroMeses, setFiltroMeses]             = useState(12);
+  const [filtroStatus, setFiltroStatus]           = useState<string[]>([]);
+  const [filtroUnidades, setFiltroUnidades]       = useState<string[]>([]);
+  const [filtroResponsaveis, setFiltroResponsaveis] = useState<string[]>([]);
+  const [filtroFontes, setFiltroFontes]           = useState<string[]>([]);
   const [showModal, setShowModal]   = useState(false);
   const [editVaga, setEditVaga]     = useState<Vaga | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    const statusAtivo = filtroStatusSel || filtroStatus.join(',');
-  if (statusAtivo) params.set('status', statusAtivo);
-    if (filtroUnidade) params.set('unidade', filtroUnidade);
-    if (filtroResp)    params.set('responsavel', filtroResp);
-    if (busca)         params.set('busca', busca);
+    params.set('meses', String(filtroMeses));
+    if (filtroStatus.length > 0)       params.set('status',      filtroStatus.join(','));
+    if (filtroUnidades.length > 0)     params.set('unidade',     filtroUnidades.join(','));
+    if (filtroResponsaveis.length > 0) params.set('responsavel', filtroResponsaveis.join(','));
+    if (filtroFontes.length > 0)       params.set('fonte',       filtroFontes.join(','));
+    if (busca)                         params.set('busca',        busca);
     try {
       const res = await fetch(`/api/recrutamento?${params}`);
-      const json = await res.json();
-      setData(json);
+      setData(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [filtroStatus, filtroUnidade, filtroResp, busca]);
+  }, [filtroMeses, filtroStatus, filtroUnidades, filtroResponsaveis, filtroFontes, busca]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -805,7 +806,25 @@ export default function RecrutamentoPage() {
 
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
-      <NavHeader />
+      <NavHeader>
+        <PeriodButtons value={filtroMeses} onChange={setFiltroMeses} color={C.pink} />
+        <span className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
+        <MultiFilterSelect
+          values={filtroUnidades} onChange={setFiltroUnidades}
+          label="Unidade" options={opcoes.unidades} color={C.pink} />
+        <MultiFilterSelect
+          values={filtroResponsaveis} onChange={setFiltroResponsaveis}
+          label="Responsável" options={opcoes.responsaveis} color={C.pink} />
+        <MultiFilterSelect
+          values={filtroFontes} onChange={setFiltroFontes}
+          label="Fonte" options={opcoes.fontes} color={C.pink} />
+        {(filtroUnidades.length > 0 || filtroResponsaveis.length > 0 || filtroFontes.length > 0) && (
+          <FilterTag
+            label="limpar filtros"
+            onClear={() => { setFiltroUnidades([]); setFiltroResponsaveis([]); setFiltroFontes([]); }}
+          />
+        )}
+      </NavHeader>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
@@ -991,39 +1010,32 @@ export default function RecrutamentoPage() {
           </div>
         </div>
 
-        {/* ── Filtros + Tabela ───────────────────────────────────────────────── */}
+        {/* ── Tabela de vagas ────────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <div className="flex flex-wrap gap-3 mb-4 items-center">
+            {/* Filtro de status pelos cards (acima) mais busca textual */}
             <input
               type="text" placeholder="Buscar cargo, colaborador, gestor..."
               value={busca} onChange={e => setBusca(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2"
               style={{ '--tw-ring-color': C.pink } as React.CSSProperties} />
-            <select
-              value={filtroStatusSel}
-              onChange={e => { setFiltroStatusSel(e.target.value); setFiltroStatus([]); }}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none"
-              style={{ color: filtroStatusSel ? STATUS_CFG[filtroStatusSel]?.color : undefined }}>
-              <option value="">Todos os status</option>
-              {OPCOES_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select
-              value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
-              <option value="">Todas as unidades</option>
-              {opcoes.unidades.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-            <select
-              value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
-              <option value="">Todos os responsáveis</option>
-              {opcoes.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            {(filtroStatus.length > 0 || filtroStatusSel || filtroUnidade || filtroResp || busca) && (
+            {filtroStatus.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {filtroStatus.map(s => (
+                  <span key={s}
+                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer"
+                    style={{ color: STATUS_CFG[s]?.color, backgroundColor: STATUS_CFG[s]?.bg, borderColor: STATUS_CFG[s]?.border }}
+                    onClick={() => setFiltroStatus(prev => prev.filter(x => x !== s))}>
+                    {s} ✕
+                  </span>
+                ))}
+              </div>
+            )}
+            {(filtroStatus.length > 0 || busca) && (
               <button
-                onClick={() => { setFiltroStatus([]); setFiltroStatusSel(''); setFiltroUnidade(''); setFiltroResp(''); setBusca(''); }}
+                onClick={() => { setFiltroStatus([]); setBusca(''); }}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
-                Limpar filtros
+                Limpar
               </button>
             )}
             <span className="text-xs text-gray-400 ml-auto">{vagas.length} vagas</span>
