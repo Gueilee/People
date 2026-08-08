@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getDb } from '@/lib/db';
 import { findById } from '@/lib/users';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 
 const SESSION_TOKEN = process.env.SESSION_SECRET ?? 'vp-auth-ok-2025';
 
