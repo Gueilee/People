@@ -1,6 +1,6 @@
 ﻿'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { NavHeader, MultiFilterSelect, FilterTag, PeriodButtons } from '@/components/NavHeader';
+import { NavHeader, MultiFilterSelect, FilterTag, PeriodButtons, FilterSelect } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Vaga = {
@@ -832,30 +832,35 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
 export default function RecrutamentoPage() {
   const [data, setData]           = useState<RecrutData | null>(null);
   const [loading, setLoading]     = useState(true);
-  const [busca, setBusca]         = useState('');
+  // Filtros globais → afetam API (KPIs + gráficos + dados carregados)
   const [filtroMeses, setFiltroMeses]             = useState(12);
-  const [filtroStatus, setFiltroStatus]           = useState<string[]>([]);
   const [filtroUnidades, setFiltroUnidades]       = useState<string[]>([]);
   const [filtroResponsaveis, setFiltroResponsaveis] = useState<string[]>([]);
   const [filtroFontes, setFiltroFontes]           = useState<string[]>([]);
+  // Filtros locais da tabela → client-side, sem API call
+  const [busca,        setBusca]        = useState('');
+  const [localStatus,  setLocalStatus]  = useState('');
+  const [localUnidade, setLocalUnidade] = useState('');
+  const [localResp,    setLocalResp]    = useState('');
+  const [localCargo,   setLocalCargo]   = useState('');
+  const [localGestor,  setLocalGestor]  = useState('');
+  const [localFonte,   setLocalFonte]   = useState('');
   const [showModal, setShowModal]   = useState(false);
   const [editVaga, setEditVaga]     = useState<Vaga | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     params.set('meses', String(filtroMeses));
-    if (filtroStatus.length > 0)       params.set('status',      filtroStatus.join(','));
     if (filtroUnidades.length > 0)     params.set('unidade',     filtroUnidades.join(','));
     if (filtroResponsaveis.length > 0) params.set('responsavel', filtroResponsaveis.join(','));
     if (filtroFontes.length > 0)       params.set('fonte',       filtroFontes.join(','));
-    if (busca)                         params.set('busca',        busca);
     try {
       const res = await fetch(`/api/recrutamento?${params}`);
       setData(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [filtroMeses, filtroStatus, filtroUnidades, filtroResponsaveis, filtroFontes, busca]);
+  }, [filtroMeses, filtroUnidades, filtroResponsaveis, filtroFontes]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -864,13 +869,41 @@ export default function RecrutamentoPage() {
   const vagas   = data?.vagas ?? [];
   const slaPerf = data?.slaPerf;
 
+  // Opções derivadas dos dados carregados (para os selects locais)
+  const vagasOpts = {
+    status:   OPCOES_STATUS,
+    unidades: [...new Set(vagas.map(v => v.unidade).filter(Boolean) as string[])].sort(),
+    resps:    [...new Set(vagas.map(v => v.responsavel).filter(Boolean) as string[])].sort(),
+    cargos:   [...new Set(vagas.map(v => v.cargo).filter(Boolean) as string[])].sort(),
+    gestores: [...new Set(vagas.map(v => v.gestor).filter(Boolean) as string[])].sort(),
+    fontes:   [...new Set(vagas.map(v => v.fonte).filter(Boolean) as string[])].sort(),
+  };
+
+  // Filtro local client-side aplicado sobre o array já carregado
+  const vagasFiltradas = vagas.filter(v => {
+    if (busca) {
+      const q = busca.toLowerCase();
+      const hit = [v.cargo, v.novo_colaborador, v.gestor, v.colaborador_substituido]
+        .some(f => (f || '').toLowerCase().includes(q));
+      if (!hit) return false;
+    }
+    if (localStatus  && v.status      !== localStatus)  return false;
+    if (localUnidade && v.unidade     !== localUnidade)  return false;
+    if (localResp    && v.responsavel !== localResp)     return false;
+    if (localCargo   && v.cargo       !== localCargo)    return false;
+    if (localGestor  && v.gestor      !== localGestor)   return false;
+    if (localFonte   && v.fonte       !== localFonte)    return false;
+    return true;
+  });
+  const anyLocal = !!(busca || localStatus || localUnidade || localResp || localCargo || localGestor || localFonte);
+  function limparFiltrosLocais() {
+    setBusca(''); setLocalStatus(''); setLocalUnidade('');
+    setLocalResp(''); setLocalCargo(''); setLocalGestor(''); setLocalFonte('');
+  }
+
   function openEdit(v: Vaga) { setEditVaga(v); setShowModal(true); }
   function closeModal() { setShowModal(false); setEditVaga(null); }
   function onSaved() { closeModal(); load(); }
-
-  const toggleStatus = (s: string) => setFiltroStatus(prev =>
-    prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
-  );
 
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
@@ -923,11 +956,11 @@ export default function RecrutamentoPage() {
             {Object.entries(STATUS_CFG).map(([key, cfg]) => {
               const count = data.porStatus.find(s => s.status === key)?.count ?? 0;
               const total = data.kpis.total;
-              const ativo = filtroStatus.includes(key);
+              const ativo = localStatus === key;
               return (
                 <button
                   key={key}
-                  onClick={() => toggleStatus(key)}
+                  onClick={() => setLocalStatus(prev => prev === key ? '' : key)}
                   className="rounded-xl p-3 text-left border-2 transition-all hover:shadow-md"
                   style={{
                     backgroundColor: cfg.bg,
@@ -1080,39 +1113,51 @@ export default function RecrutamentoPage() {
 
         {/* ── Tabela de vagas ────────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <div className="flex flex-wrap gap-3 mb-4 items-center">
-            {/* Filtro de status pelos cards (acima) mais busca textual */}
-            <input
-              type="text" placeholder="Buscar cargo, colaborador, gestor..."
-              value={busca} onChange={e => setBusca(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2"
-              style={{ '--tw-ring-color': C.pink } as React.CSSProperties} />
-            {filtroStatus.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {filtroStatus.map(s => (
-                  <span key={s}
-                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer"
-                    style={{ color: STATUS_CFG[s]?.color, backgroundColor: STATUS_CFG[s]?.bg, borderColor: STATUS_CFG[s]?.border }}
-                    onClick={() => setFiltroStatus(prev => prev.filter(x => x !== s))}>
-                    {s} ✕
-                  </span>
-                ))}
+
+          {/* Barra de filtros locais */}
+          <div className="space-y-2.5 mb-4">
+            {/* Linha 1: busca + contador + limpar */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 min-w-48">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input
+                  type="text" placeholder="Buscar cargo, colaborador, gestor..."
+                  value={busca} onChange={e => setBusca(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': C.pink } as React.CSSProperties} />
               </div>
-            )}
-            {(filtroStatus.length > 0 || busca) && (
-              <button
-                onClick={() => { setFiltroStatus([]); setBusca(''); }}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
-                Limpar
-              </button>
-            )}
-            <span className="text-xs text-gray-400 ml-auto">{vagas.length} vagas</span>
+              <span className="text-xs text-gray-400 whitespace-nowrap">
+                {vagasFiltradas.length !== vagas.length
+                  ? <><span className="font-semibold" style={{ color: C.pink }}>{vagasFiltradas.length}</span> de {vagas.length} vagas</>
+                  : <>{vagas.length} vagas</>}
+              </span>
+              {anyLocal && (
+                <button onClick={limparFiltrosLocais}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 whitespace-nowrap transition-colors">
+                  ✕ Limpar
+                </button>
+              )}
+            </div>
+
+            {/* Linha 2: selects de filtro */}
+            <div className="flex flex-wrap gap-2">
+              <FilterSelect value={localStatus}  onChange={setLocalStatus}  label="Status"     options={vagasOpts.status}   color={localStatus ? (STATUS_CFG[localStatus]?.color || C.pink) : C.pink} />
+              <FilterSelect value={localResp}    onChange={setLocalResp}    label="Resp. RH"   options={vagasOpts.resps}    color={C.pink} />
+              <FilterSelect value={localUnidade} onChange={setLocalUnidade} label="Unidade"    options={vagasOpts.unidades} color={C.pink} />
+              <FilterSelect value={localCargo}   onChange={setLocalCargo}   label="Cargo"      options={vagasOpts.cargos}   color={C.pink} />
+              <FilterSelect value={localGestor}  onChange={setLocalGestor}  label="Gestor"     options={vagasOpts.gestores} color={C.pink} />
+              <FilterSelect value={localFonte}   onChange={setLocalFonte}   label="Fonte"      options={vagasOpts.fontes}   color={C.pink} />
+            </div>
           </div>
 
           {loading
             ? <Skeleton className="h-48 w-full" />
-            : vagas.length === 0
-              ? <p className="text-sm text-gray-400 text-center py-10">Nenhuma vaga encontrada.</p>
+            : vagasFiltradas.length === 0
+              ? <p className="text-sm text-gray-400 text-center py-10">
+                  {anyLocal ? 'Nenhuma vaga com esses filtros.' : 'Nenhuma vaga encontrada.'}
+                </p>
               : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs min-w-[800px]">
@@ -1124,7 +1169,7 @@ export default function RecrutamentoPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {vagas.map(v => (
+                      {vagasFiltradas.map(v => (
                         <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                           <td className="py-2 pr-3"><StatusBadge status={v.status} /></td>
                           <td className="py-2 pr-3 font-semibold text-gray-800 max-w-[160px] truncate" title={v.cargo || ''}>{v.cargo || '—'}</td>
