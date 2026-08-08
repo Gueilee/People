@@ -656,7 +656,39 @@ export default function DashboardRH() {
           ))}
         </section>
 
-        {/* ── Últimas Contratações + Últimos Desligamentos ── */}
+        {/* ── Tendência + Donut ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Tendência Mensal */}
+          <div className="bg-white rounded-2xl shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Tendência Mensal ({periodoLabel})</h2>
+              <div className="flex gap-4 text-xs">
+                <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.green }} /> Admissões</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.pink }} /> Desligamentos</span>
+              </div>
+            </div>
+            {loading
+              ? <Skeleton className="h-36 w-full" />
+              : data?.tendenciaMensal.length
+                ? <LineChart data={data.tendenciaMensal} />
+                : <p className="text-xs text-gray-400 text-center pt-8">Sem dados</p>
+            }
+          </div>
+
+          {/* Tipos de Desligamento */}
+          <div className="bg-white rounded-2xl shadow-sm p-5">
+            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Tipos de Desligamento ({periodoLabel})</h2>
+            {loading
+              ? <Skeleton className="h-36 w-full" />
+              : data?.tiposDesligamento.length
+                ? <DonutChart data={data.tiposDesligamento} total={kpis?.desligamentosPeriodo ?? 0} />
+                : <p className="text-xs text-gray-400 text-center pt-8">Sem desligamentos no período</p>
+            }
+          </div>
+        </section>
+
+        {/* ── Admissões + Desligamentos no Período ── */}
         {!loading && data && (
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
@@ -789,38 +821,6 @@ export default function DashboardRH() {
 
           </section>
         )}
-
-        {/* ── Tendência + Donut ── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Tendência Mensal */}
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Tendência Mensal ({periodoLabel})</h2>
-              <div className="flex gap-4 text-xs">
-                <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.green }} /> Admissões</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ backgroundColor: C.pink }} /> Desligamentos</span>
-              </div>
-            </div>
-            {loading
-              ? <Skeleton className="h-36 w-full" />
-              : data?.tendenciaMensal.length
-                ? <LineChart data={data.tendenciaMensal} />
-                : <p className="text-xs text-gray-400 text-center pt-8">Sem dados</p>
-            }
-          </div>
-
-          {/* Tipos de Desligamento */}
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Tipos de Desligamento ({periodoLabel})</h2>
-            {loading
-              ? <Skeleton className="h-36 w-full" />
-              : data?.tiposDesligamento.length
-                ? <DonutChart data={data.tiposDesligamento} total={kpis?.desligamentosPeriodo ?? 0} />
-                : <p className="text-xs text-gray-400 text-center pt-8">Sem desligamentos no período</p>
-            }
-          </div>
-        </section>
 
         {/* ── Tendência Headcount + Turnover por Unidade ── */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
