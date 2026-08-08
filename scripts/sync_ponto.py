@@ -257,5 +257,19 @@ def main():
     conn.close()
     print(f"\n🎉 Sync concluído! {total} registros salvos no PostgreSQL")
 
+    try:
+        conn_log = psycopg2.connect(**PG_CONN)
+        cur = conn_log.cursor()
+        cur.execute(
+            "INSERT INTO sync_log (tipo, registros, status, detalhe) VALUES (%s, %s, %s, %s)",
+            ("tiquetaque", total, "ok", f"{len(meses)} mês(es): {meses[0]} → {meses[-1]}")
+        )
+        conn_log.commit()
+        cur.close()
+        conn_log.close()
+        print("✅ sync_log registrado (tiquetaque)")
+    except Exception as e:
+        print(f"⚠️  Nao foi possivel gravar sync_log: {e}")
+
 if __name__ == "__main__":
     main()

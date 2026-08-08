@@ -39,9 +39,15 @@ type RiscoColab = {
   fatores: string[];
 };
 
+type UltimaContratacao = {
+  nome: string; cargo: string; unidade: string; departamento: string;
+  data_admissao: string; status: string;
+};
+
 type DashData = {
   periodo: number;
   atualizadoEm: string;
+  sync: { convenia: string | null; tiquetaque: string | null };
   filtros: { unidades: string[]; areas: string[]; gestores: string[]; meses: string[] };
   opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[]; meses: string[] };
   kpis: KPIs;
@@ -71,6 +77,7 @@ type DashData = {
     idade: { media: number; faixas: IdadeFaixa[]; geracoes: Geracao[]; totalComInfo: number };
     vinculo: VinculoItem[];
   };
+  ultimasContratacoes: UltimaContratacao[];
 };
 
 // ─── Cores do sistema ─────────────────────────────────────────────────────────
@@ -543,9 +550,12 @@ export default function DashboardRH() {
       : `${filtrosMes.length} meses`
     : `${periodo}m`;
 
-  const atualizado = data?.atualizadoEm
-    ? new Date(data.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : '';
+  function fmtSync(iso: string | null | undefined) {
+    if (!iso) return null;
+    return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+  const syncConvenia   = fmtSync(data?.sync?.convenia);
+  const syncTiqueTaque = fmtSync(data?.sync?.tiquetaque);
 
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
@@ -589,7 +599,12 @@ export default function DashboardRH() {
           )}
         </button>
 
-        {atualizado && <SyncBadge label={`Sync: ${atualizado}`} />}
+        {(syncConvenia || syncTiqueTaque) && (
+          <div className="flex flex-col items-end gap-0.5">
+            {syncConvenia   && <SyncBadge label={`Convenia: ${syncConvenia}`} />}
+            {syncTiqueTaque && <SyncBadge label={`TiqueTaque: ${syncTiqueTaque}`} />}
+          </div>
+        )}
       </NavHeader>
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
@@ -642,6 +657,66 @@ export default function DashboardRH() {
             </div>
           ))}
         </section>
+
+        {/* ── Últimas Contratações ── */}
+        {!loading && data?.ultimasContratacoes && data.ultimasContratacoes.length > 0 && (
+          <section className="bg-white rounded-2xl shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Últimas Contratações</h2>
+              <span className="text-[10px] text-gray-400">{data.ultimasContratacoes.length} colaboradores mais recentes</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400 border-b text-left">
+                    <th className="pb-2 font-semibold">Nome</th>
+                    <th className="pb-2 font-semibold">Cargo</th>
+                    <th className="pb-2 font-semibold">Unidade</th>
+                    <th className="pb-2 font-semibold">Área</th>
+                    <th className="pb-2 font-semibold text-right">Admissão</th>
+                    <th className="pb-2 font-semibold text-right">Há quanto tempo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.ultimasContratacoes.map((c, i) => {
+                    const admDate = new Date(c.data_admissao + 'T12:00:00');
+                    const dias = Math.floor((Date.now() - admDate.getTime()) / 86400000);
+                    const tempo = dias <= 0 ? 'Hoje' : dias === 1 ? '1 dia' : dias < 30 ? `${dias} dias` : dias < 60 ? '~1 mês' : dias < 365 ? `${Math.round(dias / 30)} meses` : `${(dias / 365).toFixed(1).replace('.0','').replace('.',',')} anos`;
+                    const admLabel = admDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    const initials = c.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                    const isNew = dias <= 30;
+                    const COLORS = ['#422c76','#ff2f69','#F59E0B','#0D9488','#3B82F6','#F97316','#6366F1','#01E18E'];
+                    const bg = COLORS[i % COLORS.length];
+                    return (
+                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                        <td className="py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0" style={{ backgroundColor: bg }}>
+                              {initials}
+                            </span>
+                            <div>
+                              <div className="font-semibold text-gray-800 leading-tight">{c.nome}</div>
+                              {c.status === 'Desligado' && <div className="text-[9px] text-red-400">Desligado</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-gray-500">{c.cargo || '—'}</td>
+                        <td className="py-2.5 text-gray-500">{c.unidade || '—'}</td>
+                        <td className="py-2.5 text-gray-500">{c.departamento || '—'}</td>
+                        <td className="py-2.5 text-right text-gray-600 tabular-nums">{admLabel}</td>
+                        <td className="py-2.5 text-right">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isNew ? 'text-white' : 'text-gray-500 bg-gray-100'}`} style={isNew ? { backgroundColor: '#01E18E' } : {}}>
+                            {tempo}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* ── Tendência + Donut ── */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">

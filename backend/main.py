@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import datetime
 import random
 import time
@@ -442,6 +442,18 @@ def processar_e_salvar():
     com_etnia  = len(df[df["etnia"].notna()  & (df["etnia"]  != "")])
     print(f"  [OK] Banco: {len(df)} total | {ativos} ativos | {desl} desligados")
     print(f"  [OK] Diversidade: {com_gender} com genero | {com_etnia} com etnia")
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "INSERT INTO sync_log (tipo, registros, status, detalhe) "
+                "VALUES ('convenia', :reg, 'ok', :det)"
+            ), {"reg": len(df), "det": f"{ativos} ativos, {desl} desligados"})
+            conn.commit()
+        print("  [OK] sync_log registrado (convenia)")
+    except Exception as e:
+        print(f"  [AVISO] Nao foi possivel gravar sync_log: {e}")
+
     print("=" * 52)
 
 

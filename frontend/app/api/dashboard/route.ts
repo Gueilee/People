@@ -103,6 +103,13 @@ export async function GET(request: Request) {
 
     const db = await getDb();
 
+    // Último sync real de cada sistema
+    const syncRows = await db.all<{ tipo: string; executado_em: string }>(
+      `SELECT tipo, MAX(executado_em) AS executado_em FROM sync_log GROUP BY tipo`
+    ).catch(() => [] as { tipo: string; executado_em: string }[]);
+    const syncConvenia    = syncRows.find(r => r.tipo === 'convenia')?.executado_em    ?? null;
+    const syncTiqueTaque  = syncRows.find(r => r.tipo === 'tiquetaque')?.executado_em  ?? null;
+
     const todosAll: Colab[] = await db.all('SELECT * FROM colaboradores');
     todosAll.forEach(c => { c.departamento = normalizarArea(c.departamento) || c.departamento; });
     const unidadesOpcoes = [...new Set(todosAll.map(c => c.unidade))].filter(Boolean).sort();
@@ -481,9 +488,27 @@ export async function GET(request: Request) {
       .map(([vinculo, count]) => ({ vinculo, count, pct: +((count / ativos.length) * 100).toFixed(1) }))
       .sort((a, b) => b.count - a.count);
 
+    // Últimas contratações — 30 contratações mais recentes (filtros de unidade/área respeitados)
+    const ultimasContratacoes = [...todos]
+      .filter(c => c.data_admissao)
+      .sort((a, b) => new Date(b.data_admissao).getTime() - new Date(a.data_admissao).getTime())
+      .slice(0, 30)
+      .map(c => ({
+        nome:          c.nome,
+        cargo:         c.cargo,
+        unidade:       c.unidade,
+        departamento:  c.departamento,
+        data_admissao: c.data_admissao,
+        status:        c.status,
+      }));
+
     return NextResponse.json({
       periodo: meses,
       atualizadoEm: hoje.toISOString(),
+      sync: {
+        convenia:   syncConvenia,
+        tiquetaque: syncTiqueTaque,
+      },
       filtros: { unidades: filtroUnidades, areas: filtroAreas, gestores: filtroGestores, meses: filtroMeses },
       opcoesFiltro: { unidades: unidadesOpcoes, areas: areasOpcoes, gestores: gestoresOpcoes, meses: mesesDisponiveis },
       kpis: {
@@ -533,6 +558,7 @@ export async function GET(request: Request) {
         },
         vinculo: distribuicaoVinculo,
       },
+      ultimasContratacoes,
     });
 
   } catch (err) {
