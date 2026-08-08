@@ -609,9 +609,11 @@ export default function PontoPage() {
             )}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            {filtrosMes.length === 0
-              ? 'Acumulado histórico (2025–2026) · Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'
-              : 'Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'}
+            {abaMoto === 'motoristas'
+              ? 'Horas extras dos motoristas · Upload manual mensal da planilha do cartão ponto'
+              : filtrosMes.length === 0
+                ? 'Acumulado histórico (2025–2026) · Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'
+                : 'Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'}
           </p>
         </div>
 
@@ -1158,7 +1160,7 @@ export default function PontoPage() {
 
         {/* ── Footer ── */}
         <footer className="text-center text-[10px] text-gray-400 pb-6">
-          VENDEMMIA PEOPLE — Sistema de Gestão de Pessoas · Dados via API TiqueTaque · {new Date().getFullYear()}
+          VENDEMMIA PEOPLE — Sistema de Gestão de Pessoas ·{abaMoto === 'motoristas' ? ' Upload manual · Cartão Ponto Motoristas' : ' Dados via API TiqueTaque'} · {new Date().getFullYear()}
         </footer>
       </main>
     </div>
