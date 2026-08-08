@@ -13,14 +13,10 @@ type KPIs = {
   totalAusencias: number;
   taxaAbsenteismo: number;
   totalAtraso: number;
-  saldoBanco: number;
-  saldoBancoPos: number;
   totalNoturno: number;
-  impactoFinanceiro: number;
   custoHe: number;
   custoAusencias: number;
   custoNoturno: number;
-  bancoNegativo: number;
   totalAbono: number;
   totalFerias: number;
   totalAfastamento: number;
@@ -37,11 +33,9 @@ type PorFilial = {
   atestados: number;
   ausencias: number;
   atrasos: number;
-  banco_horas: number;
   adicional_noturno: number;
   hora_noturna_reduzida: number;
   dsr: number;
-  banco_negativo: number;
   custo_he: number;
   custo_ausencias: number;
   custo_noturno: number;
@@ -49,11 +43,7 @@ type PorFilial = {
 
 type TopFalta  = { nome: string; cargo: string; filial: string; departamento: string; falta_injustificada: number; atestado: number; total_ausencia: number };
 type TopExtra  = { nome: string; cargo: string; filial: string; departamento: string; extra_50: number; extra_60: number; extra_100: number; total_he: number };
-type TopBanco  = { nome: string; cargo: string; filial: string; banco_horas: number };
 type TopAtraso  = { nome: string; cargo: string; filial: string; atraso: number };
-type BhUnidade = { filial: string; saldo_pos: number; impacto_financeiro: number; count_pos: number; total_func: number };
-
-type DistBanco = { critico: number; negativo: number; equilibrado: number; positivo: number; excesso: number };
 
 type AbsGestor = { gestor: string; funcionarios: number; total_ausencia: number; media_ausencia: number };
 type AbsCargo  = { cargo: string; funcionarios: number; total_ausencia: number; media_ausencia: number; total_he: number };
@@ -64,7 +54,6 @@ type Tendencia = {
   he_total: number;
   ausencias: number;
   atrasos: number;
-  saldo_banco: number;
 };
 
 type MotoHora = {
@@ -89,11 +78,7 @@ type PontoData = {
   porFilial: PorFilial[];
   topFaltas: TopFalta[];
   topExtras: TopExtra[];
-  topBancoNeg: TopBanco[];
-  topBancoPos: TopBanco[];
   topAtrasos: TopAtraso[];
-  bhPorUnidade: BhUnidade[];
-  distBanco: DistBanco;
   absByGestor: AbsGestor[];
   absByCargo: AbsCargo[];
   tendencia: Tendencia[];
@@ -418,40 +403,6 @@ function TendenciaChart({ data }: { data: Tendencia[] }) {
   );
 }
 
-// ─── Distribuição banco de horas ──────────────────────────────────────────────
-function DistBancoBar({ dist }: { dist: DistBanco }) {
-  const segs = [
-    { label: 'Equilibrado (0‑20h)', val: dist.equilibrado, color: C.green },
-    { label: 'Positivo (20‑40h)',   val: dist.positivo,    color: C.teal },
-    { label: 'Excesso (>40h)',      val: dist.excesso,     color: C.amber },
-  ];
-  const total = segs.reduce((s, seg) => s + seg.val, 0);
-  if (total === 0) return null;
-  return (
-    <div>
-      <div className="flex rounded-xl overflow-hidden h-8 mb-3">
-        {segs.map(s => s.val > 0 && (
-          <div key={s.label}
-               className="flex items-center justify-center text-white text-[10px] font-bold transition-all"
-               style={{ width: `${(s.val / total) * 100}%`, backgroundColor: s.color }}
-               title={`${s.label}: ${s.val}`}>
-            {s.val > 0 && s.val / total > 0.08 ? s.val : ''}
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {segs.map(s => (
-          <div key={s.label} className="flex items-center gap-1 text-xs">
-            <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-            <span className="text-gray-500">{s.label}</span>
-            <span className="font-bold" style={{ color: s.color }}>{s.val}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function PontoPage() {
   const [data,      setData]      = useState<PontoData | null>(null);
@@ -462,15 +413,6 @@ export default function PontoPage() {
   const [unidades,  setUnidades]  = useState<string[]>([]);
   const [areas,     setAreas]     = useState<string[]>([]);
   const [gestores,      setGestores]      = useState<string[]>([]);
-  // Fechamento de BH por unidade (calendário fixo)
-  function fechamentoBH(filial: string): string {
-    const f = filial.toLowerCase();
-    if (f.includes('itapevi'))                                          return 'Janeiro';
-    if (f.includes('olimpia') || f.includes('olímpia'))                return 'Agosto';
-    if (f.includes('navegantes') || f.includes('garuva'))              return 'Junho · Dezembro';
-    return '—';
-  }
-
   const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[]) => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -503,7 +445,7 @@ export default function PontoPage() {
   const totalAbsCargo = (data?.absByCargo ?? []).reduce((s, c) => s + c.total_ausencia, 0);
 
   // ── Motoristas ──────────────────────────────────────────────────────────────
-  const [abaMoto,        setAbaMoto]        = useState<'jornada' | 'motoristas'>('jornada');
+  const [abaMoto,        setAbaMoto]        = useState<'jornada' | 'motoristas' | 'bh'>('jornada');
   const [motoCompetencia, setMotoCompetencia] = useState('');
   const [motoCompetencias, setMotoCompetencias] = useState<string[]>([]);
   const [motoRows,       setMotoRows]       = useState<MotoHora[]>([]);
@@ -570,6 +512,67 @@ export default function PontoPage() {
 
   const isRHouAdmin = userRole === 'rh' || userRole === 'admin';
 
+  // ── Banco de Horas ──────────────────────────────────────────────────────────
+  type BhRow = { nome: string; saldo_minutos: number; unidade: string; cargo: string; departamento: string; competencia: string; uploaded_at: string; };
+  const [bhCompetencia,   setBhCompetencia]   = useState('');
+  const [bhCompetencias,  setBhCompetencias]  = useState<string[]>([]);
+  const [bhRows,          setBhRows]          = useState<BhRow[]>([]);
+  const [bhLoading,       setBhLoading]       = useState(false);
+  const [bhUploading,     setBhUploading]     = useState(false);
+  const [bhErro,          setBhErro]          = useState('');
+  const [bhOk,            setBhOk]            = useState('');
+  const [bhMes,           setBhMes]           = useState('');
+  const bhFileRef = useRef<HTMLInputElement>(null);
+
+  const carregarBH = useCallback((comp: string) => {
+    setBhLoading(true);
+    fetch(`/api/banco-horas?competencia=${comp}`)
+      .then(r => r.json())
+      .then(d => { setBhRows(d.rows || []); setBhCompetencias(d.competencias || []); })
+      .finally(() => setBhLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (abaMoto !== 'bh') return;
+    fetch('/api/banco-horas')
+      .then(r => r.json())
+      .then(d => {
+        const comps: string[] = d.competencias || [];
+        setBhCompetencias(comps);
+        if (!bhCompetencia && comps.length > 0) setBhCompetencia(comps[0]);
+      });
+  }, [abaMoto]);
+
+  useEffect(() => {
+    if (bhCompetencia) carregarBH(bhCompetencia);
+  }, [bhCompetencia, carregarBH]);
+
+  async function handleBHUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!bhMes) { setBhErro('Selecione a competência (mês/ano) antes de carregar o arquivo.'); return; }
+    setBhUploading(true); setBhErro(''); setBhOk('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('competencia', `${bhMes}-01`);
+      const r = await fetch('/api/banco-horas', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.erro) { setBhErro(d.erro); }
+      else {
+        setBhOk(`${d.processados} colaborador${d.processados !== 1 ? 'es' : ''} importado${d.processados !== 1 ? 's' : ''} com sucesso!`);
+        const comp = `${bhMes}-01`;
+        if (!bhCompetencias.includes(comp)) setBhCompetencias(prev => [comp, ...prev]);
+        setBhCompetencia(comp);
+      }
+    } catch (err: unknown) {
+      setBhErro(err instanceof Error ? err.message : 'Erro ao enviar arquivo');
+    } finally {
+      setBhUploading(false);
+      if (bhFileRef.current) bhFileRef.current.value = '';
+    }
+  }
+
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
@@ -611,15 +614,17 @@ export default function PontoPage() {
           <p className="text-xs text-gray-400 mt-1">
             {abaMoto === 'motoristas'
               ? 'Horas extras dos motoristas · Upload manual mensal da planilha do cartão ponto'
-              : filtrosMes.length === 0
-                ? 'Acumulado histórico (2025–2026) · Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'
-                : 'Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'}
+              : abaMoto === 'bh'
+                ? 'Banco de horas dos colaboradores · Upload manual mensal · Histórico completo'
+                : filtrosMes.length === 0
+                  ? 'Acumulado histórico (2025–2026) · Horas extras, absenteísmo e pontualidade · Fonte: TiqueTaque'
+                  : 'Horas extras, absenteísmo e pontualidade · Fonte: TiqueTaque'}
           </p>
         </div>
 
-        {/* ── Abas: Jornada Geral / Motoristas ── */}
+        {/* ── Abas: Jornada Geral / Motoristas / Banco de Horas ── */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 w-fit">
-          {(['jornada', 'motoristas'] as const).map(aba => (
+          {(['jornada', 'motoristas', 'bh'] as const).map(aba => (
             <button
               key={aba}
               onClick={() => setAbaMoto(aba)}
@@ -629,7 +634,7 @@ export default function PontoPage() {
                 color: abaMoto === aba ? 'white' : '#6B7280',
               }}
             >
-              {aba === 'jornada' ? '📊 Jornada Geral' : '🚛 Motoristas'}
+              {aba === 'jornada' ? '📊 Jornada Geral' : aba === 'motoristas' ? '🚛 Motoristas' : '🏦 Banco de Horas'}
             </button>
           ))}
         </div>
@@ -647,25 +652,24 @@ export default function PontoPage() {
 
         {/* ── KPIs ── */}
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         ) : kpis && (
           <>
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             <KpiCard label="Funcionários"    value={kpis.totalFuncionarios}        sub="no período"            color={C.purple} icon="👥" />
             <KpiCard label="HE Total"        value={fmtH(kpis.totalHE)}           sub={`50%:${fmtH(kpis.he50)} 60%:${fmtH(kpis.he60)} 100%:${fmtH(kpis.he100)}`} color={C.amber}  icon="⏱" />
             <KpiCard label="Absenteísmo"     value={`${kpis.taxaAbsenteismo}%`}   sub={`${fmtH(kpis.totalAusencias)} ausentes`} color={absBadgeColor(kpis.taxaAbsenteismo)} icon="📉" />
             <KpiCard label="Faltas"          value={fmtH(kpis.totalFaltas)}       sub="injustificadas"        color={C.pink}   icon="🚫" />
             <KpiCard label="Atestados"       value={fmtH(kpis.totalAtestados)}    sub="médicos/ausências just." color={C.blue}  icon="🏥" />
             <KpiCard label="Atrasos"         value={fmtH(kpis.totalAtraso)}       sub="soma do período"       color={C.orange} icon="🕐" />
-            <KpiCard label="Banco de Horas"  value={fmtH(kpis.saldoBancoPos)}     sub="saldo positivo acumulado"              color={C.teal}   icon="🏦" />
           </div>
 
           {/* ── Faixa financeira ── */}
           {(() => {
             const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            const custoTotal = kpis.custoHe + kpis.custoAusencias + kpis.custoNoturno + kpis.impactoFinanceiro;
+            const custoTotal = kpis.custoHe + kpis.custoAusencias + kpis.custoNoturno;
             return (
               <div className="mt-3 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' }}>
                 <div className="flex items-center gap-2 mb-3">
@@ -673,7 +677,7 @@ export default function PontoPage() {
                   <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">Impacto Financeiro do Período</span>
                   <span className="ml-auto text-xs text-white/40">valor/hora individual do TiqueTaque</span>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="rounded-xl p-3 text-center" style={{ backgroundColor: `${C.amber}25` }}>
                     <div className="text-[9px] font-bold uppercase text-amber-300/80 mb-1">Custo Horas Extras</div>
                     <div className="text-lg font-black text-amber-300">{fmtBRL(kpis.custoHe)}</div>
@@ -688,11 +692,6 @@ export default function PontoPage() {
                     <div className="text-[9px] font-bold uppercase mb-1" style={{ color: '#a78bfa' }}>Adicional Noturno</div>
                     <div className="text-lg font-black" style={{ color: '#a78bfa' }}>{fmtBRL(kpis.custoNoturno)}</div>
                     <div className="text-[9px] text-white/40 mt-0.5">{fmtH(kpis.totalNoturno)} horas</div>
-                  </div>
-                  <div className="rounded-xl p-3 text-center" style={{ backgroundColor: `${C.teal}25` }}>
-                    <div className="text-[9px] font-bold uppercase text-teal-300/80 mb-1">Passivo Banco Horas</div>
-                    <div className="text-lg font-black text-teal-300">{fmtBRL(kpis.impactoFinanceiro)}</div>
-                    <div className="text-[9px] text-white/40 mt-0.5">{fmtH(kpis.saldoBancoPos)} horas</div>
                   </div>
                   <div className="rounded-xl p-3 text-center lg:col-span-1 col-span-2" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
                     <div className="text-[9px] font-bold uppercase text-white/60 mb-1">Total Impacto Estimado</div>
@@ -735,9 +734,7 @@ export default function PontoPage() {
           const fmtBRL = (v: number) => (+v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
           const filiais = data.porFilial.map(f => ({
             ...f,
-            passivo_bh: data.bhPorUnidade.find(u => u.filial === f.filial)?.impacto_financeiro ?? 0,
-            total: (+f.custo_he) + (+f.custo_ausencias) + (+f.custo_noturno) +
-                   (data.bhPorUnidade.find(u => u.filial === f.filial)?.impacto_financeiro ?? 0),
+            total: (+f.custo_he) + (+f.custo_ausencias) + (+f.custo_noturno),
           }));
           const maxTotal = Math.max(...filiais.map(f => f.total), 1);
           return (
@@ -751,7 +748,6 @@ export default function PontoPage() {
                       <th className="pb-2 font-semibold" style={{ color: C.amber }}>Custo HE</th>
                       <th className="pb-2 font-semibold" style={{ color: C.pink }}>Custo Ausências</th>
                       <th className="pb-2 font-semibold" style={{ color: '#a78bfa' }}>Adic. Noturno</th>
-                      <th className="pb-2 font-semibold" style={{ color: C.teal }}>Passivo BH</th>
                       <th className="pb-2 font-semibold text-gray-600">Total Estimado</th>
                       <th className="pb-2 w-32"></th>
                     </tr>
@@ -763,7 +759,6 @@ export default function PontoPage() {
                         <td className="py-2.5 text-right font-mono" style={{ color: C.amber }}>{fmtBRL(f.custo_he)}</td>
                         <td className="py-2.5 text-right font-mono" style={{ color: C.pink }}>{fmtBRL(f.custo_ausencias)}</td>
                         <td className="py-2.5 text-right font-mono" style={{ color: '#a78bfa' }}>{fmtBRL(f.custo_noturno)}</td>
-                        <td className="py-2.5 text-right font-mono" style={{ color: C.teal }}>{fmtBRL(f.passivo_bh)}</td>
                         <td className="py-2.5 text-right font-mono font-bold text-gray-700">{fmtBRL(f.total)}</td>
                         <td className="py-2.5 pl-3">
                           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -777,7 +772,6 @@ export default function PontoPage() {
                       <td className="pt-3 text-right font-mono" style={{ color: C.amber }}>{fmtBRL(filiais.reduce((s,f)=>s+(+f.custo_he),0))}</td>
                       <td className="pt-3 text-right font-mono" style={{ color: C.pink }}>{fmtBRL(filiais.reduce((s,f)=>s+(+f.custo_ausencias),0))}</td>
                       <td className="pt-3 text-right font-mono" style={{ color: '#a78bfa' }}>{fmtBRL(filiais.reduce((s,f)=>s+(+f.custo_noturno),0))}</td>
-                      <td className="pt-3 text-right font-mono" style={{ color: C.teal }}>{fmtBRL(filiais.reduce((s,f)=>s+f.passivo_bh,0))}</td>
                       <td className="pt-3 text-right font-mono text-gray-700">{fmtBRL(filiais.reduce((s,f)=>s+f.total,0))}</td>
                       <td></td>
                     </tr>
@@ -860,109 +854,6 @@ export default function PontoPage() {
                 )}
             </Card>
           </div>
-        )}
-
-        {/* ── Banco de Horas ── */}
-        {!loading && data && (
-          <>
-          {/* Fechamento + Impacto Financeiro — full width */}
-          <Card>
-            <div className="flex flex-col lg:flex-row gap-6">
-
-              {/* Calendário de fechamento por unidade */}
-              <div className="flex-1">
-                <SectionTitle icon="📅">Fechamento de BH por Unidade</SectionTitle>
-                <div className="space-y-2">
-                  {data.bhPorUnidade.map(u => {
-                    const mes = fechamentoBH(u.filial);
-                    return (
-                      <div key={u.filial} className="flex items-center justify-between rounded-xl px-4 py-2.5 bg-gray-50">
-                        <div>
-                          <div className="text-xs font-bold text-gray-800">{u.filial}</div>
-                          <div className="text-[10px] text-gray-400">
-                            Fecha em: <span className="font-semibold" style={{ color: C.teal }}>{mes}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-black" style={{ color: C.teal }}>+{fmtH(u.saldo_pos)}</div>
-                          <div className="text-[10px] text-gray-400">{u.count_pos} func. c/ saldo pos.</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {data.bhPorUnidade.length === 0 && (
-                    <p className="text-xs text-gray-400">Nenhum dado disponível.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Impacto Financeiro */}
-              <div className="lg:w-72 shrink-0">
-                <SectionTitle icon="💰">Impacto Financeiro do BH</SectionTitle>
-                {(() => {
-                  const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                  return (
-                    <div className="space-y-3">
-                      <div className="rounded-xl p-4" style={{ backgroundColor: `${C.teal}12`, borderLeft: `3px solid ${C.teal}` }}>
-                        <div className="text-[10px] font-bold uppercase text-gray-400 mb-1">Saldo positivo total</div>
-                        <div className="text-2xl font-black" style={{ color: C.teal }}>{fmtH(data.kpis.saldoBancoPos)}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">horas devidas aos colaboradores</div>
-                      </div>
-
-                      <div className="rounded-xl p-4 space-y-2" style={{ backgroundColor: `${C.amber}15`, borderLeft: `3px solid ${C.amber}` }}>
-                        <div className="text-[10px] font-bold uppercase" style={{ color: C.amber }}>Passivo financeiro estimado</div>
-                        <div className="text-2xl font-black" style={{ color: C.amber }}>{fmtBRL(data.kpis.impactoFinanceiro)}</div>
-                        <div className="text-[10px] text-gray-500">calculado pelo valor/hora individual de cada colaborador</div>
-                        {data.bhPorUnidade.filter(u => u.impacto_financeiro > 0).map(u => (
-                          <div key={u.filial} className="flex justify-between text-[10px] text-gray-500 border-t border-amber-100 pt-1.5">
-                            <span>{u.filial}</span>
-                            <span className="font-bold">{fmtBRL(+u.impacto_financeiro)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-1 gap-6">
-
-            <Card>
-              <SectionTitle icon="🏦">Distribuição Banco de Horas</SectionTitle>
-              <DistBancoBar dist={data.distBanco} />
-
-              <div className="mt-5">
-                <SectionTitle icon="✅">Maior Saldo Positivo</SectionTitle>
-                {data.topBancoPos.length === 0
-                  ? <p className="text-xs text-gray-400">Nenhum saldo positivo.</p>
-                  : (
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-400 border-b">
-                          <th className="text-left pb-2 font-semibold">Colaborador</th>
-                          <th className="text-right pb-2 font-semibold w-20">Saldo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.topBancoPos.map((r, i) => (
-                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                            <td className="py-1.5 leading-tight">
-                              <div className="font-semibold text-gray-800 text-[11px]">{r.nome}</div>
-                              <div className="text-gray-400 text-[10px]">{r.cargo} · {r.filial}</div>
-                            </td>
-                            <td className="py-1.5 text-right font-bold font-mono" style={{ color: C.teal }}>+{fmtH(r.banco_horas)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-              </div>
-            </Card>
-
-          </div>
-          </>
         )}
 
         {/* ── Cruzamento RH (por gestor + por cargo) ── */}
@@ -1158,9 +1049,136 @@ export default function PontoPage() {
           </div>
         )}
 
+        {/* ── Banco de Horas (nova funcionalidade) ── */}
+        {abaMoto === 'bh' && (
+          <div className="space-y-6">
+
+            {/* Upload + seleção de competência */}
+            <Card>
+              <SectionTitle icon="🏦">Banco de Horas — Upload Mensal</SectionTitle>
+              <p className="text-xs text-gray-400 mb-4">
+                Envie uma planilha com duas colunas: <strong>Colaborador</strong> e <strong>Saldo BH</strong> (formato HH:MM:SS ou HH:MM).
+                Os dados são vinculados ao cadastro de colaboradores para exibir Unidade, Cargo e Departamento.
+              </p>
+
+              {isRHouAdmin && (
+                <div className="flex flex-wrap items-end gap-3 mb-4">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Competência</label>
+                    <input
+                      type="month"
+                      value={bhMes}
+                      onChange={e => setBhMes(e.target.value)}
+                      className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
+                      style={{ '--tw-ring-color': C.teal } as React.CSSProperties}
+                    />
+                  </div>
+                  <button
+                    onClick={() => bhFileRef.current?.click()}
+                    disabled={bhUploading || !bhMes}
+                    className="text-xs font-bold px-4 py-2 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: C.teal }}
+                  >
+                    {bhUploading ? 'Enviando…' : '⬆ Carregar Excel'}
+                  </button>
+                  <input ref={bhFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleBHUpload} />
+                </div>
+              )}
+
+              {bhErro && <p className="text-xs text-red-500 mb-3">{bhErro}</p>}
+              {bhOk  && <p className="text-xs mb-3 font-semibold" style={{ color: C.teal }}>{bhOk}</p>}
+
+              {/* Botões de competências históricas */}
+              {bhCompetencias.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {bhCompetencias.map(c => {
+                    const [y, m] = c.split('-');
+                    const label = new Date(+y, +m - 1, 1).toLocaleString('pt-BR', { month: 'short', year: '2-digit' }).replace('. ', '/');
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setBhCompetencia(c)}
+                        className="text-[11px] font-bold px-3 py-1 rounded-full border transition-all"
+                        style={{
+                          backgroundColor: bhCompetencia === c ? C.teal : 'transparent',
+                          color: bhCompetencia === c ? 'white' : C.teal,
+                          borderColor: C.teal,
+                        }}
+                      >
+                        {label.toUpperCase()}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Tabela de saldos */}
+            {bhCompetencia && (
+              <Card>
+                {bhLoading
+                  ? <Skeleton className="h-48" />
+                  : bhRows.length === 0
+                    ? <p className="text-xs text-gray-400">Nenhum dado para esta competência.</p>
+                    : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-gray-400 border-b text-left">
+                              <th className="pb-2 font-semibold">Colaborador</th>
+                              <th className="pb-2 font-semibold">Unidade</th>
+                              <th className="pb-2 font-semibold">Cargo</th>
+                              <th className="pb-2 font-semibold">Departamento</th>
+                              <th className="pb-2 font-semibold text-right">Saldo BH</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bhRows.map((r, i) => {
+                              const pos = r.saldo_minutos >= 0;
+                              const h = Math.floor(Math.abs(r.saldo_minutos) / 60);
+                              const m = Math.abs(r.saldo_minutos) % 60;
+                              const label = `${pos ? '+' : '-'}${h}h${m.toString().padStart(2, '0')}`;
+                              return (
+                                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60">
+                                  <td className="py-2 font-semibold text-gray-800">{r.nome}</td>
+                                  <td className="py-2 text-gray-500">{r.unidade || '—'}</td>
+                                  <td className="py-2 text-gray-500">{r.cargo || '—'}</td>
+                                  <td className="py-2 text-gray-500">{r.departamento || '—'}</td>
+                                  <td className="py-2 text-right font-bold font-mono" style={{ color: pos ? C.teal : C.pink }}>{label}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t-2 border-gray-200 font-bold">
+                              <td colSpan={4} className="pt-3 text-gray-700">Total ({bhRows.length} colaboradores)</td>
+                              <td className="pt-3 text-right font-mono" style={{ color: bhRows.reduce((s,r)=>s+r.saldo_minutos,0)>=0?C.teal:C.pink }}>
+                                {(() => {
+                                  const tot = bhRows.reduce((s,r)=>s+r.saldo_minutos,0);
+                                  const h = Math.floor(Math.abs(tot)/60);
+                                  const m = Math.abs(tot)%60;
+                                  return `${tot>=0?'+':'-'}${h}h${m.toString().padStart(2,'0')}`;
+                                })()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                        {bhRows[0]?.uploaded_at && (
+                          <p className="text-[10px] text-gray-400 mt-3">
+                            Última atualização: {bhRows[0].uploaded_at}
+                          </p>
+                        )}
+                      </div>
+                    )}
+              </Card>
+            )}
+
+          </div>
+        )}
+
         {/* ── Footer ── */}
         <footer className="text-center text-[10px] text-gray-400 pb-6">
-          VENDEMMIA PEOPLE — Sistema de Gestão de Pessoas ·{abaMoto === 'motoristas' ? ' Upload manual · Cartão Ponto Motoristas' : ' Dados via API TiqueTaque'} · {new Date().getFullYear()}
+          VENDEMMIA PEOPLE — Sistema de Gestão de Pessoas ·{abaMoto === 'motoristas' ? ' Upload manual · Cartão Ponto Motoristas' : abaMoto === 'bh' ? ' Upload manual · Banco de Horas' : ' Dados via API TiqueTaque'} · {new Date().getFullYear()}
         </footer>
       </main>
     </div>

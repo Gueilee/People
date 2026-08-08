@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
     const where = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
 
-    // ── WHERE tendência (sem filtro de mês, mantém série histórica) ──────────
+    // ── WHERE tendência (sem filtro de mês) ──────────────────────────────────
     const whereTendParts: string[] = [];
     const whereTendParams: (string | number)[] = [];
     if (filtroUnidades.length > 0) {
@@ -106,22 +106,12 @@ export async function GET(request: Request) {
     }
     if (filtroGestores.length > 0) {
       const p = whereJoinParams.length + 1;
-      whereJoinParts.push(`c.gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')})`);
+      whereJoinParts.push(`c.gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')})`)
       whereJoinParams.push(...filtroGestores);
     }
     const whereJoin = `WHERE ${whereJoinParts.join(' AND ')}`;
 
     // ── KPIs gerais ──────────────────────────────────────────────────────────
-    const bancoNegRow = await db.get<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM (
-         SELECT nome, SUM(banco_horas) AS acum
-         FROM ponto_mensal ${where}
-         GROUP BY nome
-         HAVING SUM(banco_horas) < 0
-       ) t`,
-      params
-    );
-
     const kpiRow = await db.get<any>(
       `SELECT
         COUNT(DISTINCT nome)                               AS total_func,
@@ -134,7 +124,6 @@ export async function GET(request: Request) {
         SUM(atestado)                                      AS total_atestados,
         SUM(falta_injustificada + atestado)                AS total_ausencias,
         SUM(atraso)                                        AS total_atraso,
-        SUM(banco_horas)                                   AS saldo_banco,
         SUM(adicional_noturno)                             AS total_noturno,
         SUM(hora_noturna_reduzida)                         AS total_hora_not,
         SUM(dsr)                                           AS total_dsr,
@@ -168,11 +157,9 @@ export async function GET(request: Request) {
         SUM(atestado)                                  AS atestados,
         SUM(falta_injustificada + atestado)            AS ausencias,
         SUM(atraso)                                    AS atrasos,
-        SUM(banco_horas)                               AS banco_horas,
         SUM(adicional_noturno)                         AS adicional_noturno,
         SUM(hora_noturna_reduzida)                     AS hora_noturna_reduzida,
         SUM(dsr)                                       AS dsr,
-        COUNT(CASE WHEN banco_horas < 0 THEN 1 END)    AS banco_negativo,
         ROUND(SUM(extra_50*valor_hora*1.5 + extra_60*valor_hora*1.6 + extra_100*valor_hora*2.0)::NUMERIC,2)::FLOAT AS custo_he,
         ROUND(SUM((falta_injustificada+atestado)*valor_hora)::NUMERIC,2)::FLOAT                                    AS custo_ausencias,
         ROUND(SUM(adicional_noturno*valor_hora*0.20)::NUMERIC,2)::FLOAT                                            AS custo_noturno
@@ -209,26 +196,6 @@ export async function GET(request: Request) {
       params
     );
 
-    // ── Top banco negativo ───────────────────────────────────────────────────
-    const topBancoNeg = await db.all<any>(
-      `SELECT nome, cargo, filial, SUM(banco_horas) AS banco_horas
-       FROM ponto_mensal ${where}
-       GROUP BY nome, cargo, filial
-       HAVING SUM(banco_horas) < 0
-       ORDER BY banco_horas ASC LIMIT 15`,
-      params
-    );
-
-    // ── Top banco positivo ───────────────────────────────────────────────────
-    const topBancoPos = await db.all<any>(
-      `SELECT nome, cargo, filial, SUM(banco_horas) AS banco_horas
-       FROM ponto_mensal ${where}
-       GROUP BY nome, cargo, filial
-       HAVING SUM(banco_horas) > 0
-       ORDER BY banco_horas DESC LIMIT 15`,
-      params
-    );
-
     // ── Top atrasos ──────────────────────────────────────────────────────────
     const topAtrasos = await db.all<any>(
       `SELECT nome, cargo, filial, SUM(atraso) AS atraso
@@ -248,50 +215,6 @@ export async function GET(request: Request) {
        GROUP BY nome, cargo, filial
        HAVING SUM(adicional_noturno) > 0
        ORDER BY adicional_noturno DESC LIMIT 10`,
-      params
-    );
-
-    // ── Saldo positivo de BH por unidade ────────────────────────────────────
-    const bhPorUnidadeRows = await db.all<any>(
-      `SELECT filial,
-         ROUND(SUM(CASE WHEN acum > 0 THEN acum ELSE 0 END)::NUMERIC, 1)::FLOAT        AS saldo_pos,
-         ROUND(SUM(CASE WHEN acum > 0 THEN acum * vh ELSE 0 END)::NUMERIC, 2)::FLOAT   AS impacto_financeiro,
-         COUNT(CASE WHEN acum > 0 THEN 1 END)                                    AS count_pos,
-         COUNT(DISTINCT nome)                                                     AS total_func
-       FROM (
-         SELECT filial, nome, SUM(banco_horas) AS acum, AVG(valor_hora) AS vh
-         FROM ponto_mensal ${where}
-         GROUP BY filial, nome
-       ) t
-       GROUP BY filial ORDER BY filial`,
-      params
-    );
-
-    const saldoBancoPosRow = await db.get<{ total: number; impacto_financeiro: number }>(
-      `SELECT
-         COALESCE(SUM(acum), 0)            AS total,
-         COALESCE(SUM(acum * vh), 0)       AS impacto_financeiro
-       FROM (
-         SELECT nome, SUM(banco_horas) AS acum, AVG(valor_hora) AS vh
-         FROM ponto_mensal ${where}
-         GROUP BY nome HAVING SUM(banco_horas) > 0
-       ) t`,
-      params
-    );
-
-    // ── Distribuição banco de horas ──────────────────────────────────────────
-    const distBanco = await db.get<any>(
-      `SELECT
-        COUNT(CASE WHEN acum < -40                        THEN 1 END) AS critico,
-        COUNT(CASE WHEN acum >= -40 AND acum < 0          THEN 1 END) AS negativo,
-        COUNT(CASE WHEN acum >= 0   AND acum <= 20        THEN 1 END) AS equilibrado,
-        COUNT(CASE WHEN acum > 20   AND acum <= 40        THEN 1 END) AS positivo,
-        COUNT(CASE WHEN acum > 40                         THEN 1 END) AS excesso
-       FROM (
-         SELECT nome, SUM(banco_horas) AS acum
-         FROM ponto_mensal ${where}
-         GROUP BY nome
-       ) t`,
       params
     );
 
@@ -330,8 +253,7 @@ export async function GET(request: Request) {
         COUNT(DISTINCT nome)                               AS funcionarios,
         ROUND(SUM(extra_50+extra_60+extra_100)::NUMERIC, 2)  AS he_total,
         ROUND(SUM(falta_injustificada+atestado)::NUMERIC, 2) AS ausencias,
-        ROUND(SUM(atraso)::NUMERIC, 2)                       AS atrasos,
-        ROUND(SUM(banco_horas)::NUMERIC, 2)                  AS saldo_banco
+        ROUND(SUM(atraso)::NUMERIC, 2)                       AS atrasos
        FROM ponto_mensal ${whereTend}
        GROUP BY mes ORDER BY mes ASC`,
       whereTendParams
@@ -347,41 +269,33 @@ export async function GET(request: Request) {
         gestores: gestoresRows.map(r => r.gestor),
       },
       kpis: {
-        totalFuncionarios: kpiRow?.total_func       || 0,
-        horasNormais:      +(kpiRow?.horas_normais  || 0).toFixed(1),
-        totalHE:           +(kpiRow?.total_he       || 0).toFixed(1),
-        he50:              +(kpiRow?.he50           || 0).toFixed(1),
-        he60:              +(kpiRow?.he60           || 0).toFixed(1),
-        he100:             +(kpiRow?.he100          || 0).toFixed(1),
-        totalFaltas:       +(kpiRow?.total_faltas   || 0).toFixed(1),
+        totalFuncionarios: kpiRow?.total_func        || 0,
+        horasNormais:      +(kpiRow?.horas_normais   || 0).toFixed(1),
+        totalHE:           +(kpiRow?.total_he        || 0).toFixed(1),
+        he50:              +(kpiRow?.he50            || 0).toFixed(1),
+        he60:              +(kpiRow?.he60            || 0).toFixed(1),
+        he100:             +(kpiRow?.he100           || 0).toFixed(1),
+        totalFaltas:       +(kpiRow?.total_faltas    || 0).toFixed(1),
         totalAtestados:    +(kpiRow?.total_atestados || 0).toFixed(1),
         totalAusencias:    +(kpiRow?.total_ausencias || 0).toFixed(1),
         taxaAbsenteismo,
-        totalAtraso:       +(kpiRow?.total_atraso   || 0).toFixed(1),
-        saldoBanco:        +(kpiRow?.saldo_banco    || 0).toFixed(1),
-        saldoBancoPos:     +(saldoBancoPosRow?.total || 0).toFixed(1),
-        impactoFinanceiro: +(saldoBancoPosRow?.impacto_financeiro ?? 0),
+        totalAtraso:       +(kpiRow?.total_atraso    || 0).toFixed(1),
         custoHe:           parseFloat(kpiRow?.custo_he        || '0'),
         custoAusencias:    parseFloat(kpiRow?.custo_ausencias || '0'),
         custoNoturno:      parseFloat(kpiRow?.custo_noturno   || '0'),
-        bancoNegativo:     bancoNegRow?.n            || 0,
         totalNoturno:      +(kpiRow?.total_noturno   || 0).toFixed(1),
-        totalHoraNot:      +(kpiRow?.total_hora_not || 0).toFixed(1),
-        totalDsr:          +(kpiRow?.total_dsr      || 0).toFixed(1),
-        totalAbono:        +(kpiRow?.total_abono    || 0).toFixed(1),
-        totalFerias:       +(kpiRow?.total_ferias   || 0).toFixed(1),
+        totalHoraNot:      +(kpiRow?.total_hora_not  || 0).toFixed(1),
+        totalDsr:          +(kpiRow?.total_dsr       || 0).toFixed(1),
+        totalAbono:        +(kpiRow?.total_abono     || 0).toFixed(1),
+        totalFerias:       +(kpiRow?.total_ferias    || 0).toFixed(1),
         totalAfastamento:  +(kpiRow?.total_afastamento || 0).toFixed(1),
         syncedAt:          kpiRow?.synced_at || '',
       },
       porFilial,
       topFaltas,
       topExtras,
-      topBancoNeg,
-      topBancoPos,
-      bhPorUnidade: bhPorUnidadeRows,
       topAtrasos,
       topNoturno,
-      distBanco,
       absByGestor,
       absByCargo,
       tendencia,
