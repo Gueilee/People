@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { NavHeader, MultiFilterSelect, FilterTag, SyncBadge } from '@/components/NavHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,6 +67,19 @@ type Tendencia = {
   saldo_banco: number;
 };
 
+type MotoHora = {
+  nome: string;
+  competencia: string;
+  hora_normal_min: number;
+  hora_normal_not_min: number;
+  hora_extra_50_min: number;
+  hora_extra_50_not_min: number;
+  hora_extra_100_min: number;
+  hora_extra_100_not_min: number;
+  uploaded_at: string;
+  uploaded_by: string;
+};
+
 type PontoData = {
   filtroMeses: string[];
   filtroUnidades: string[];
@@ -126,6 +139,13 @@ function absBadgeColor(taxa: number): string {
   if (taxa < 3)  return C.green;
   if (taxa < 6)  return C.amber;
   return C.pink;
+}
+
+function fmtMin(min: number | null | undefined): string {
+  if (!min) return '—';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${h}h`;
 }
 
 // ─── Componentes visuais ──────────────────────────────────────────────────────
@@ -482,6 +502,74 @@ export default function PontoPage() {
   const maxCargo      = Math.max(...(data?.absByCargo ?? []).map(c => c.total_ausencia), 1);
   const totalAbsCargo = (data?.absByCargo ?? []).reduce((s, c) => s + c.total_ausencia, 0);
 
+  // ── Motoristas ──────────────────────────────────────────────────────────────
+  const [abaMoto,        setAbaMoto]        = useState<'jornada' | 'motoristas'>('jornada');
+  const [motoCompetencia, setMotoCompetencia] = useState('');
+  const [motoCompetencias, setMotoCompetencias] = useState<string[]>([]);
+  const [motoRows,       setMotoRows]       = useState<MotoHora[]>([]);
+  const [motoLoading,    setMotoLoading]    = useState(false);
+  const [motoUploading,  setMotoUploading]  = useState(false);
+  const [motoErro,       setMotoErro]       = useState('');
+  const [motoOk,         setMotoOk]         = useState('');
+  const [motoMes,        setMotoMes]        = useState('');
+  const [userRole,       setUserRole]       = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const carregarMoto = useCallback((comp: string) => {
+    setMotoLoading(true);
+    fetch(`/api/motoristas-horas?competencia=${comp}`)
+      .then(r => r.json())
+      .then(d => { setMotoRows(d.rows || []); setMotoCompetencias(d.competencias || []); })
+      .finally(() => setMotoLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => setUserRole(d.role || ''));
+  }, []);
+
+  useEffect(() => {
+    if (abaMoto !== 'motoristas') return;
+    fetch('/api/motoristas-horas')
+      .then(r => r.json())
+      .then(d => {
+        const comps: string[] = d.competencias || [];
+        setMotoCompetencias(comps);
+        if (!motoCompetencia && comps.length > 0) setMotoCompetencia(comps[0]);
+      });
+  }, [abaMoto]);
+
+  useEffect(() => {
+    if (motoCompetencia) carregarMoto(motoCompetencia);
+  }, [motoCompetencia, carregarMoto]);
+
+  async function handleMotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!motoMes) { setMotoErro('Selecione a competência (mês/ano) antes de carregar o arquivo.'); return; }
+    setMotoUploading(true); setMotoErro(''); setMotoOk('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('competencia', `${motoMes}-01`);
+      const r = await fetch('/api/motoristas-horas', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.erro) { setMotoErro(d.erro); }
+      else {
+        setMotoOk(`${d.processados} motorista${d.processados !== 1 ? 's' : ''} importado${d.processados !== 1 ? 's' : ''} com sucesso!`);
+        const comp = `${motoMes}-01`;
+        if (!motoCompetencias.includes(comp)) setMotoCompetencias(prev => [comp, ...prev]);
+        setMotoCompetencia(comp);
+      }
+    } catch (err: unknown) {
+      setMotoErro(err instanceof Error ? err.message : 'Erro ao enviar arquivo');
+    } finally {
+      setMotoUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  const isRHouAdmin = userRole === 'rh' || userRole === 'admin';
+
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
 
@@ -526,6 +614,25 @@ export default function PontoPage() {
               : 'Horas extras, absenteísmo, banco de horas e pontualidade · Fonte: TiqueTaque'}
           </p>
         </div>
+
+        {/* ── Abas: Jornada Geral / Motoristas ── */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 w-fit">
+          {(['jornada', 'motoristas'] as const).map(aba => (
+            <button
+              key={aba}
+              onClick={() => setAbaMoto(aba)}
+              className="text-[12px] font-bold px-4 py-1.5 rounded-full transition-all cursor-pointer"
+              style={{
+                backgroundColor: abaMoto === aba ? C.amber : 'transparent',
+                color: abaMoto === aba ? 'white' : '#6B7280',
+              }}
+            >
+              {aba === 'jornada' ? '📊 Jornada Geral' : '🚛 Motoristas'}
+            </button>
+          ))}
+        </div>
+
+        {abaMoto === 'jornada' && (<>
 
         {/* Erro */}
         {erro && (
@@ -899,6 +1006,153 @@ export default function PontoPage() {
             <div className="text-4xl mb-3">📋</div>
             <p className="font-semibold">Nenhum dado de ponto sincronizado.</p>
             <p className="text-sm mt-1">Execute: <code className="bg-gray-100 px-2 py-0.5 rounded">py scripts/sync_ponto.py --mes 2026-04</code></p>
+          </div>
+        )}
+
+        </>)}
+
+        {/* ── Motoristas ── */}
+        {abaMoto === 'motoristas' && (
+          <div className="space-y-6">
+
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black" style={{ color: C.amber }}>Horas Extras — Motoristas</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Histórico mensal por motorista · Upload da planilha do cartão ponto</p>
+              </div>
+              {isRHouAdmin && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase">Competência</label>
+                    <input
+                      type="month"
+                      value={motoMes}
+                      onChange={e => setMotoMes(e.target.value)}
+                      className="text-xs border-2 rounded-lg px-3 py-1.5 outline-none"
+                      style={{ borderColor: motoMes ? C.amber : '#E5E7EB', color: motoMes ? C.amber : '#6B7280' }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!motoMes) { setMotoErro('Selecione a competência (mês/ano) antes de carregar o arquivo.'); return; }
+                      setMotoErro(''); setMotoOk('');
+                      fileRef.current?.click();
+                    }}
+                    disabled={motoUploading}
+                    className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-full transition-all cursor-pointer mt-4"
+                    style={{ backgroundColor: C.amber, color: 'white', opacity: motoUploading ? 0.6 : 1 }}
+                  >
+                    {motoUploading ? '⏳ Enviando...' : '📁 Carregar planilha'}
+                  </button>
+                  <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleMotoUpload} />
+                </div>
+              )}
+            </div>
+
+            {motoErro && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{motoErro}</div>}
+            {motoOk  && <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">{motoOk}</div>}
+
+            {/* Seletor de competência disponível */}
+            {motoCompetencias.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 font-semibold">Histórico:</span>
+                {motoCompetencias.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setMotoCompetencia(c)}
+                    className="text-[11px] font-bold px-3 py-1 rounded-full transition-all cursor-pointer border-2"
+                    style={{
+                      backgroundColor: motoCompetencia === c ? C.amber : 'white',
+                      color: motoCompetencia === c ? 'white' : C.amber,
+                      borderColor: C.amber,
+                    }}
+                  >
+                    {fmtMes(c.substring(0, 7))}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Tabela */}
+            {motoLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+              </div>
+            ) : motoRows.length === 0 ? (
+              <div className="text-center py-16 text-gray-400">
+                <div className="text-4xl mb-3">🚛</div>
+                <p className="font-semibold">Nenhum dado de motoristas encontrado.</p>
+                <p className="text-sm mt-1">
+                  {isRHouAdmin
+                    ? 'Selecione a competência e carregue a planilha para começar.'
+                    : 'Aguarde o RH carregar a planilha do mês.'}
+                </p>
+              </div>
+            ) : (
+              <Card>
+                <div className="flex items-center justify-between mb-4">
+                  <SectionTitle icon="🚛">
+                    Motoristas — {fmtMes(motoCompetencia.substring(0, 7))}
+                  </SectionTitle>
+                  <span className="text-[11px] text-gray-400">{motoRows.length} motorista{motoRows.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs" style={{ minWidth: 720 }}>
+                    <thead>
+                      <tr className="text-gray-400 border-b">
+                        <th className="text-left pb-3 font-semibold pr-4">Motorista</th>
+                        <th className="text-right pb-3 font-semibold">H. Normal</th>
+                        <th className="text-right pb-3 font-semibold">HN Noturna</th>
+                        <th className="text-right pb-3 font-semibold" style={{ color: C.amber }}>HE 50%</th>
+                        <th className="text-right pb-3 font-semibold" style={{ color: `${C.amber}99` }}>HE 50% Not.</th>
+                        <th className="text-right pb-3 font-semibold" style={{ color: C.pink }}>HE 100%</th>
+                        <th className="text-right pb-3 font-semibold" style={{ color: `${C.pink}99` }}>HE 100% Not.</th>
+                        <th className="text-right pb-3 font-semibold" style={{ color: C.purple }}>Total HE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {motoRows.map((r, i) => {
+                        const totalHE = r.hora_extra_50_min + r.hora_extra_50_not_min + r.hora_extra_100_min + r.hora_extra_100_not_min;
+                        return (
+                          <tr key={i} className="border-b border-gray-50 hover:bg-amber-50/30 transition-colors">
+                            <td className="py-2.5 pr-4 font-semibold text-gray-800">{r.nome}</td>
+                            <td className="py-2.5 text-right tabular-nums text-gray-600">{fmtMin(r.hora_normal_min)}</td>
+                            <td className="py-2.5 text-right tabular-nums text-gray-500">{fmtMin(r.hora_normal_not_min)}</td>
+                            <td className="py-2.5 text-right tabular-nums font-medium" style={{ color: C.amber }}>{fmtMin(r.hora_extra_50_min)}</td>
+                            <td className="py-2.5 text-right tabular-nums" style={{ color: `${C.amber}99` }}>{fmtMin(r.hora_extra_50_not_min)}</td>
+                            <td className="py-2.5 text-right tabular-nums font-medium" style={{ color: C.pink }}>{fmtMin(r.hora_extra_100_min)}</td>
+                            <td className="py-2.5 text-right tabular-nums" style={{ color: `${C.pink}99` }}>{fmtMin(r.hora_extra_100_not_min)}</td>
+                            <td className="py-2.5 text-right tabular-nums font-black" style={{ color: totalHE > 0 ? C.purple : '#9CA3AF' }}>{fmtMin(totalHE)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-200">
+                        <td className="py-2.5 pr-4 font-black text-gray-700">Total</td>
+                        <td className="py-2.5 text-right tabular-nums font-bold text-gray-600">{fmtMin(motoRows.reduce((s, r) => s + r.hora_normal_min, 0))}</td>
+                        <td className="py-2.5 text-right tabular-nums font-bold text-gray-500">{fmtMin(motoRows.reduce((s, r) => s + r.hora_normal_not_min, 0))}</td>
+                        <td className="py-2.5 text-right tabular-nums font-bold" style={{ color: C.amber }}>{fmtMin(motoRows.reduce((s, r) => s + r.hora_extra_50_min, 0))}</td>
+                        <td className="py-2.5 text-right tabular-nums font-bold" style={{ color: `${C.amber}99` }}>{fmtMin(motoRows.reduce((s, r) => s + r.hora_extra_50_not_min, 0))}</td>
+                        <td className="py-2.5 text-right tabular-nums font-bold" style={{ color: C.pink }}>{fmtMin(motoRows.reduce((s, r) => s + r.hora_extra_100_min, 0))}</td>
+                        <td className="py-2.5 text-right tabular-nums font-bold" style={{ color: `${C.pink}99` }}>{fmtMin(motoRows.reduce((s, r) => s + r.hora_extra_100_not_min, 0))}</td>
+                        <td className="py-2.5 text-right tabular-nums font-black" style={{ color: C.purple }}>
+                          {fmtMin(motoRows.reduce((s, r) => s + r.hora_extra_50_min + r.hora_extra_50_not_min + r.hora_extra_100_min + r.hora_extra_100_not_min, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {motoRows[0]?.uploaded_at && (
+                  <p className="text-[10px] text-gray-400 mt-3">
+                    Última atualização: {motoRows[0].uploaded_at}
+                    {motoRows[0].uploaded_by ? ` · por ${motoRows[0].uploaded_by}` : ''}
+                  </p>
+                )}
+              </Card>
+            )}
+
           </div>
         )}
 
