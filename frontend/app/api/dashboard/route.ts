@@ -103,9 +103,9 @@ export async function GET(request: Request) {
 
     const db = await getDb();
 
-    // Último sync real — somente registros com registros != null (excluindo seeds)
+    // Último sync bem-sucedido por sistema (status='ok' e registros não nulo)
     const syncRows = await db.all<{ tipo: string; executado_em: string }>(
-      `SELECT tipo, MAX(executado_em) AS executado_em FROM sync_log WHERE registros IS NOT NULL GROUP BY tipo`
+      `SELECT tipo, MAX(executado_em) AS executado_em FROM sync_log WHERE status = 'ok' AND registros IS NOT NULL GROUP BY tipo`
     ).catch(() => [] as { tipo: string; executado_em: string }[]);
     const syncConvenia    = syncRows.find(r => r.tipo === 'convenia')?.executado_em    ?? null;
     const syncTiqueTaque  = syncRows.find(r => r.tipo === 'tiquetaque')?.executado_em  ?? null;

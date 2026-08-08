@@ -422,6 +422,16 @@ def processar_e_salvar():
             n_existing = 0
         if n_existing > 0:
             print(f"  -> Mantendo dados existentes no banco ({n_existing} registros). Execute novamente quando a API estiver disponivel.")
+            erro_msg = str(e)[:200]
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text(
+                        "INSERT INTO sync_log (tipo, registros, status, detalhe) "
+                        "VALUES ('convenia', NULL, 'rate_limited', :det)"
+                    ), {"det": erro_msg})
+                    conn.commit()
+            except Exception:
+                pass
             return
         print("  -> Banco vazio. Usando mock data...")
         dados = gerar_mock_data()
