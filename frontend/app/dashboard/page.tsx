@@ -703,51 +703,54 @@ export default function DashboardRH() {
               {data.ultimasContratacoes.length === 0
                 ? <p className="text-xs text-gray-400 text-center py-8">Nenhuma admissão no período selecionado.</p>
                 : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-400 border-b text-left">
-                          <th className="pb-2 font-semibold">Nome</th>
-                          <th className="pb-2 font-semibold">Cargo / Unidade</th>
-                          <th className="pb-2 font-semibold text-right">Admissão</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.ultimasContratacoes.map((c, i) => {
-                          const admDate = new Date(c.data_admissao + 'T12:00:00');
-                          const dias = Math.floor((Date.now() - admDate.getTime()) / 86400000);
-                          const tempo = dias <= 0 ? 'Hoje' : dias === 1 ? '1 dia' : dias < 30 ? `${dias}d` : dias < 60 ? '~1 mês' : dias < 365 ? `${Math.round(dias / 30)}m` : `${(dias / 365).toFixed(1).replace('.0','')}a`;
-                          const admLabel = admDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                          const initials = c.nome.split(' ').filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-                          const isNew = dias <= 30;
-                          const COLORS = ['#422c76','#ff2f69','#F59E0B','#0D9488','#3B82F6','#F97316','#6366F1','#01E18E'];
-                          const bg = COLORS[i % COLORS.length];
-                          return (
-                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                              <td className="py-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0" style={{ backgroundColor: bg }}>
-                                    {initials}
-                                  </span>
-                                  <span className="font-semibold text-gray-800 leading-tight truncate max-w-[130px]" title={c.nome}>{c.nome}</span>
-                                </div>
-                              </td>
-                              <td className="py-2">
-                                <div className="text-gray-600 truncate max-w-[120px]" title={c.cargo}>{c.cargo || '—'}</div>
-                                <div className="text-gray-400 text-[10px] truncate">{c.unidade || '—'}</div>
-                              </td>
-                              <td className="py-2 text-right whitespace-nowrap">
-                                <div className="text-gray-600 tabular-nums">{admLabel}</div>
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isNew ? 'text-white' : 'text-gray-400 bg-gray-100'}`} style={isNew ? { backgroundColor: '#01E18E' } : {}}>
-                                  {tempo}
+                  <table className="w-full text-xs table-fixed">
+                    <colgroup>
+                      <col style={{ width: '44%' }} />
+                      <col style={{ width: '38%' }} />
+                      <col style={{ width: '18%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr className="text-gray-400 border-b text-left">
+                        <th className="pb-2 font-semibold">Nome</th>
+                        <th className="pb-2 font-semibold">Cargo / Unidade</th>
+                        <th className="pb-2 font-semibold text-right">Admissão</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.ultimasContratacoes.map((c, i) => {
+                        const admDate = new Date(c.data_admissao + 'T12:00:00');
+                        const dias = Math.floor((Date.now() - admDate.getTime()) / 86400000);
+                        const tempo = dias <= 0 ? 'Hoje' : dias === 1 ? '1 dia' : dias < 30 ? `${dias}d` : dias < 60 ? '~1 mês' : dias < 365 ? `${Math.round(dias / 30)}m` : `${(dias / 365).toFixed(1).replace('.0','')}a`;
+                        const admLabel = admDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                        const initials = c.nome.split(' ').filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                        const isNew = dias <= 30;
+                        const COLORS = ['#422c76','#ff2f69','#F59E0B','#0D9488','#3B82F6','#F97316','#6366F1','#01E18E'];
+                        const bg = COLORS[i % COLORS.length];
+                        return (
+                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                            <td className="py-2 pr-2">
+                              <div className="flex items-start gap-2">
+                                <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0 mt-0.5" style={{ backgroundColor: bg }}>
+                                  {initials}
                                 </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                <span className="font-semibold text-gray-800 leading-snug break-words">{c.nome}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 pr-2">
+                              <div className="text-gray-700 leading-snug break-words">{c.cargo || '—'}</div>
+                              <div className="text-gray-400 text-[10px]">{c.unidade || '—'}</div>
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap">
+                              <div className="text-gray-600 tabular-nums">{admLabel}</div>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isNew ? 'text-white' : 'text-gray-400 bg-gray-100'}`} style={isNew ? { backgroundColor: '#01E18E' } : {}}>
+                                {tempo}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
             </div>
 
@@ -762,60 +765,63 @@ export default function DashboardRH() {
               {data.ultimosDesligamentos.length === 0
                 ? <p className="text-xs text-gray-400 text-center py-8">Nenhum desligamento no período selecionado.</p>
                 : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-400 border-b text-left">
-                          <th className="pb-2 font-semibold">Nome</th>
-                          <th className="pb-2 font-semibold">Cargo / Unidade</th>
-                          <th className="pb-2 font-semibold text-right">Deslig. / Motivo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.ultimosDesligamentos.map((c, i) => {
-                          const deslDate = new Date(c.data_desligamento + 'T12:00:00');
-                          const deslLabel = deslDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                          const initials = c.nome.split(' ').filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-                          const TIPO_COLOR: Record<string, string> = {
-                            'Pedido de demissao':      '#6366F1',
-                            'Demissao sem justa causa':'#F59E0B',
-                            'Demissao com justa causa':'#ff2f69',
-                            'Acordo mutuo':            '#0D9488',
-                            'Termino de contrato':     '#3B82F6',
-                            'Suspensao de contrato':   '#F97316',
-                          };
-                          const tipoColor = TIPO_COLOR[c.tipo_desligamento] || '#9CA3AF';
-                          return (
-                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                              <td className="py-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0 bg-gray-300">
-                                    {initials}
-                                  </span>
-                                  <span className="font-semibold text-gray-800 leading-tight truncate max-w-[130px]" title={c.nome}>{c.nome}</span>
-                                </div>
-                              </td>
-                              <td className="py-2">
-                                <div className="text-gray-600 truncate max-w-[120px]" title={c.cargo}>{c.cargo || '—'}</div>
-                                <div className="text-gray-400 text-[10px] truncate">{c.unidade || '—'}</div>
-                              </td>
-                              <td className="py-2 text-right whitespace-nowrap">
-                                <div className="text-gray-600 tabular-nums">{deslLabel}</div>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: tipoColor }}>
-                                  {c.tipo_desligamento === 'Pedido de demissao' ? 'Pedido' :
-                                   c.tipo_desligamento === 'Demissao sem justa causa' ? 'S/ justa causa' :
-                                   c.tipo_desligamento === 'Demissao com justa causa' ? 'C/ justa causa' :
-                                   c.tipo_desligamento === 'Acordo mutuo' ? 'Acordo mútuo' :
-                                   c.tipo_desligamento === 'Termino de contrato' ? 'Término' :
-                                   c.tipo_desligamento || 'Não informado'}
+                  <table className="w-full text-xs table-fixed">
+                    <colgroup>
+                      <col style={{ width: '44%' }} />
+                      <col style={{ width: '32%' }} />
+                      <col style={{ width: '24%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr className="text-gray-400 border-b text-left">
+                        <th className="pb-2 font-semibold">Nome</th>
+                        <th className="pb-2 font-semibold">Cargo / Unidade</th>
+                        <th className="pb-2 font-semibold text-right">Deslig. / Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.ultimosDesligamentos.map((c, i) => {
+                        const deslDate = new Date(c.data_desligamento + 'T12:00:00');
+                        const deslLabel = deslDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                        const initials = c.nome.split(' ').filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                        const TIPO_COLOR: Record<string, string> = {
+                          'Pedido de demissao':      '#6366F1',
+                          'Demissao sem justa causa':'#F59E0B',
+                          'Demissao com justa causa':'#ff2f69',
+                          'Acordo mutuo':            '#0D9488',
+                          'Termino de contrato':     '#3B82F6',
+                          'Suspensao de contrato':   '#F97316',
+                        };
+                        const tipoColor = TIPO_COLOR[c.tipo_desligamento] || '#9CA3AF';
+                        return (
+                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                            <td className="py-2 pr-2">
+                              <div className="flex items-start gap-2">
+                                <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0 mt-0.5 bg-gray-300">
+                                  {initials}
                                 </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                <span className="font-semibold text-gray-800 leading-snug break-words">{c.nome}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 pr-2">
+                              <div className="text-gray-700 leading-snug break-words">{c.cargo || '—'}</div>
+                              <div className="text-gray-400 text-[10px]">{c.unidade || '—'}</div>
+                            </td>
+                            <td className="py-2 text-right">
+                              <div className="text-gray-600 tabular-nums whitespace-nowrap">{deslLabel}</div>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white inline-block mt-0.5" style={{ backgroundColor: tipoColor }}>
+                                {c.tipo_desligamento === 'Pedido de demissao' ? 'Pedido' :
+                                 c.tipo_desligamento === 'Demissao sem justa causa' ? 'S/ justa' :
+                                 c.tipo_desligamento === 'Demissao com justa causa' ? 'C/ justa' :
+                                 c.tipo_desligamento === 'Acordo mutuo' ? 'Acordo' :
+                                 c.tipo_desligamento === 'Termino de contrato' ? 'Término' :
+                                 c.tipo_desligamento || 'Outro'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
             </div>
 
