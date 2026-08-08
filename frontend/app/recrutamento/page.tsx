@@ -101,6 +101,46 @@ const OPCOES_FONTE = [
   'Gupy', 'Indicação', 'LinkedIn', 'Processo Seletivo Interno', 'SINE', 'Terceirizada', 'WhatsApp',
 ];
 
+const OPCOES_CARGO = [
+  'ANALISTA ADM JR', 'ANALISTA ADM/FATURAMENTO', 'ANALISTA ADMINISTRATIVO',
+  'ANALISTA ADMINISTRATIVO PLENO', 'ANALISTA ADMINISTRATIVO SENIOR II', 'ANALISTA COMERCIAL',
+  'ANALISTA COMERCIAL PLENO', 'ANALISTA COMERCIAL SÊNIOR III', 'ANALISTA CONTABIL FISCAL SÊNIOR',
+  'ANALISTA CONTABIL JUNIOR', 'ANALISTA CONTABIL PLENO', 'ANALISTA DE COMPRAS',
+  'ANALISTA DE COMPRAS SENIOR I', 'ANALISTA DE DP', 'ANALISTA DE ESTOQUE JR I',
+  'ANALISTA DE FATURAMENTO JUNIOR', 'ANALISTA DE GROWTH SENIOR', 'ANALISTA DE IMPORT. JUNIOR',
+  'ANALISTA DE IMPORTAÇÃO PLENO', 'ANALISTA DE IMPORTAÇÃO SENIOR', 'ANALISTA DE PROJETO SENIOR II',
+  'ANALISTA DE PROJETOS JÚNIOR', 'ANALISTA DE PROJETOS SENIOR', 'ANALISTA DE QUALIDADE SR',
+  'ANALISTA DE RH', 'ANALISTA DE RH SENIOR', 'ANALISTA DE SISTEMA SÊNIOR III',
+  'ANALISTA DE SISTEMAS JUNIOR', 'ANALISTA DE SUPORTE JUNIOR', 'ANALISTA DE TESOURARIA JUNIOR',
+  'ANALISTA DE TESOURARIA PLENO', 'ANALISTA DE TESOURARIA SR', 'ANALISTA DE TI',
+  'ANALISTA DE TRANSPORTE JR', 'ANALISTA DE TRANSPORTE JUNIOR II', 'ANALISTA DE TRANSPORTE PLENO',
+  'ANALISTA DE TRANSPORTE SÊNIOR', 'ANALISTA FISCAL JR', 'ANALISTA FISCAL PLENO',
+  'ANALISTA FISCAL SÊNIOR', 'ANALISTA PROGRAMADOR', 'APRENDIZ', 'ASSISTENTE ADMINISTRATIVO',
+  'ASSISTENTE ADMINISTRATIVO II', 'ASSISTENTE ADMINISTRATIVO III', 'ASSISTENTE DE FATURAMENTO',
+  'ASSISTENTE DE IMPORTAÇÃO PLENO', 'ASSISTENTE DE IMPORTAÇÃO SÊNIOR', 'ASSISTENTE DE LOGISTICA',
+  'ASSISTENTE DE RH JÚNIOR', 'ASSISTENTE DE TRANSPORTE', 'AUXILIAR ADMINISTRATIVO',
+  'AUXILIAR DE COMPRAS', 'AUXILIAR DE LIMPEZA', 'AUXILIAR DE LOGISTICA', 'AUXILIAR DE RH',
+  'AUXILIAR SERVIÇOS GERAIS', 'CONFERENTE', 'CONFERENTE IV', 'CONFERENTE SÊNIOR',
+  'CONTROLLER CONTABIL', 'COORDENADOR (A) JURÍDICO (A)', 'COORDENADOR CONTABIL',
+  'COORDENADOR DE EXPERIENCIA DO CLIENTE', 'COORDENADOR DE IMPORTACAO PLENO',
+  'COORDENADOR DE IMPORTACAO SENIOR', 'COORDENADOR DE TECNOLOGIA', 'COORDENADOR DE TRANSPORTE',
+  'COORDENADOR OPERACIONAL', 'COORDENADOR OPERACIONAL III', 'COORDENADOR(A) DE IMPORTAÇÃO PLENO',
+  'COORDENADOR(A) DE RH', 'DESENVOLVEDOR', 'DESIGNER', 'DIRETOR DE RH', 'DIRETOR DE TRANSPORTES',
+  'DIRETOR DE UNIDADE DE NEGÓCIOS', 'DIRETOR EXECUTIVO', 'DIRETOR FINANCEIRO',
+  'ENGENHEIRO DE DADOS SENIOR', 'ESPECIALISTA DE IMPORTAÇÃO', 'ESPECIALISTA DE RH',
+  'ESPECIALISTA EM ADMINISTRAÇÃO DE PESSOAS', 'ESPECIALISTA EM TESOURARIA', 'ESPECIALISTA FISCAL',
+  'ESTAGIÁRIO DE MARKETING', 'ESTAGIÁRIO DE TI',
+  'ESTÁGIO LOGÍSTICA INTEGRADA (COMÉRCIO EXTERIOR)',
+  'EXECUTIVA COMERCIAL', 'EXECUTIVO DE VENDAS', 'GERENTE ADMINISTRATIVO', 'GERENTE DE LOGÍSTICA',
+  'GERENTE DE OPERAÇÕES', 'GERENTE DE PROJETOS', 'GERENTE DE TESOURARIA', 'GERENTE EXECUTIVO',
+  'HEAD DE COMUNICAÇÃO E MARKETING', 'LIDER DE LOGISTICA', 'LIDER DE LOGISTICA II',
+  'LIDER DE LOGISTICA III', 'MOTORISTA', 'OPERADOR DE EMPILHADEIRA', 'OPERADOR DE EMPILHADEIRA II',
+  'OPERADOR DE EMPILHADEIRA III', 'OPERADOR DE EMPILHADEIRA IV', 'PROGRAMADOR FULL STACK PLENO',
+  'PROGRAMADOR FULL STACK SENIOR', 'SUPERVISOR (A) COMERCIAL', 'SUPERVISOR OPERACIONAL',
+  'SUPERVISOR(A) ADMINISTRATIVO OPERACIONAL', 'SÓCIO', 'TECNICO SEGURANCA DO TRABALHO',
+  'TRADER', 'ZELADOR',
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtData = (iso: string | null) => {
   if (!iso) return '—';
@@ -563,8 +603,36 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Cargo *</label>
-                  <input className={inputCls} style={{ '--tw-ring-color': C.pink } as React.CSSProperties}
-                    placeholder="Ex: Auxiliar de Logística" value={form.cargo} onChange={set('cargo')} />
+                  {(() => {
+                    const isKnown = OPCOES_CARGO.includes(form.cargo);
+                    const selVal  = form.cargo === '' ? '' : isKnown ? form.cargo : 'Outro';
+                    return (
+                      <>
+                        <select
+                          className={inputCls}
+                          value={selVal}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setForm(p => ({ ...p, cargo: v === 'Outro' ? '' : v }));
+                          }}
+                        >
+                          <option value="">Selecione o cargo...</option>
+                          {OPCOES_CARGO.map(c => <option key={c} value={c}>{c}</option>)}
+                          <option value="Outro">Outro (digitar)</option>
+                        </select>
+                        {selVal === 'Outro' && (
+                          <input
+                            className={inputCls}
+                            style={{ '--tw-ring-color': C.pink, marginTop: 6 } as React.CSSProperties}
+                            placeholder="Digite o nome do cargo..."
+                            value={form.cargo}
+                            onChange={set('cargo')}
+                            autoFocus
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className={labelCls}>Centro de Custo</label>
