@@ -599,12 +599,10 @@ export default function DashboardRH() {
           )}
         </button>
 
-        {(syncConvenia || syncTiqueTaque) && (
-          <div className="flex flex-col items-end gap-0.5">
-            {syncConvenia   && <SyncBadge label={`Convenia: ${syncConvenia}`} />}
-            {syncTiqueTaque && <SyncBadge label={`TiqueTaque: ${syncTiqueTaque}`} />}
-          </div>
-        )}
+        <div className="flex flex-col items-end gap-0.5">
+          <SyncBadge label={`Convenia: ${syncConvenia ?? 'aguardando sync...'}`} />
+          <SyncBadge label={`TiqueTaque: ${syncTiqueTaque ?? 'aguardando sync...'}`} />
+        </div>
       </NavHeader>
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
@@ -658,63 +656,137 @@ export default function DashboardRH() {
           ))}
         </section>
 
-        {/* ── Últimas Contratações ── */}
-        {!loading && data?.ultimasContratacoes && data.ultimasContratacoes.length > 0 && (
-          <section className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Últimas Contratações</h2>
-              <span className="text-[10px] text-gray-400">{data.ultimasContratacoes.length} colaboradores mais recentes</span>
+        {/* ── Últimas Contratações + Últimos Desligamentos ── */}
+        {!loading && data && (
+          <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            {/* Contratações */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Admissões no Período</h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: C.green }}>
+                  {data.ultimasContratacoes.length}
+                </span>
+              </div>
+              {data.ultimasContratacoes.length === 0
+                ? <p className="text-xs text-gray-400 text-center py-8">Nenhuma admissão no período selecionado.</p>
+                : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-400 border-b text-left">
+                          <th className="pb-2 font-semibold">Nome</th>
+                          <th className="pb-2 font-semibold">Cargo / Unidade</th>
+                          <th className="pb-2 font-semibold text-right">Admissão</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.ultimasContratacoes.map((c, i) => {
+                          const admDate = new Date(c.data_admissao + 'T12:00:00');
+                          const dias = Math.floor((Date.now() - admDate.getTime()) / 86400000);
+                          const tempo = dias <= 0 ? 'Hoje' : dias === 1 ? '1 dia' : dias < 30 ? `${dias}d` : dias < 60 ? '~1 mês' : dias < 365 ? `${Math.round(dias / 30)}m` : `${(dias / 365).toFixed(1).replace('.0','')}a`;
+                          const admLabel = admDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                          const initials = c.nome.split(' ').filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                          const isNew = dias <= 30;
+                          const COLORS = ['#422c76','#ff2f69','#F59E0B','#0D9488','#3B82F6','#F97316','#6366F1','#01E18E'];
+                          const bg = COLORS[i % COLORS.length];
+                          return (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                              <td className="py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0" style={{ backgroundColor: bg }}>
+                                    {initials}
+                                  </span>
+                                  <span className="font-semibold text-gray-800 leading-tight truncate max-w-[130px]" title={c.nome}>{c.nome}</span>
+                                </div>
+                              </td>
+                              <td className="py-2">
+                                <div className="text-gray-600 truncate max-w-[120px]" title={c.cargo}>{c.cargo || '—'}</div>
+                                <div className="text-gray-400 text-[10px] truncate">{c.unidade || '—'}</div>
+                              </td>
+                              <td className="py-2 text-right whitespace-nowrap">
+                                <div className="text-gray-600 tabular-nums">{admLabel}</div>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isNew ? 'text-white' : 'text-gray-400 bg-gray-100'}`} style={isNew ? { backgroundColor: '#01E18E' } : {}}>
+                                  {tempo}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-gray-400 border-b text-left">
-                    <th className="pb-2 font-semibold">Nome</th>
-                    <th className="pb-2 font-semibold">Cargo</th>
-                    <th className="pb-2 font-semibold">Unidade</th>
-                    <th className="pb-2 font-semibold">Área</th>
-                    <th className="pb-2 font-semibold text-right">Admissão</th>
-                    <th className="pb-2 font-semibold text-right">Há quanto tempo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.ultimasContratacoes.map((c, i) => {
-                    const admDate = new Date(c.data_admissao + 'T12:00:00');
-                    const dias = Math.floor((Date.now() - admDate.getTime()) / 86400000);
-                    const tempo = dias <= 0 ? 'Hoje' : dias === 1 ? '1 dia' : dias < 30 ? `${dias} dias` : dias < 60 ? '~1 mês' : dias < 365 ? `${Math.round(dias / 30)} meses` : `${(dias / 365).toFixed(1).replace('.0','').replace('.',',')} anos`;
-                    const admLabel = admDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                    const initials = c.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-                    const isNew = dias <= 30;
-                    const COLORS = ['#422c76','#ff2f69','#F59E0B','#0D9488','#3B82F6','#F97316','#6366F1','#01E18E'];
-                    const bg = COLORS[i % COLORS.length];
-                    return (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                        <td className="py-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0" style={{ backgroundColor: bg }}>
-                              {initials}
-                            </span>
-                            <div>
-                              <div className="font-semibold text-gray-800 leading-tight">{c.nome}</div>
-                              {c.status === 'Desligado' && <div className="text-[9px] text-red-400">Desligado</div>}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2.5 text-gray-500">{c.cargo || '—'}</td>
-                        <td className="py-2.5 text-gray-500">{c.unidade || '—'}</td>
-                        <td className="py-2.5 text-gray-500">{c.departamento || '—'}</td>
-                        <td className="py-2.5 text-right text-gray-600 tabular-nums">{admLabel}</td>
-                        <td className="py-2.5 text-right">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isNew ? 'text-white' : 'text-gray-500 bg-gray-100'}`} style={isNew ? { backgroundColor: '#01E18E' } : {}}>
-                            {tempo}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+            {/* Desligamentos */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-black text-sm uppercase" style={{ color: C.dark }}>Desligamentos no Período</h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: C.pink }}>
+                  {data.ultimosDesligamentos.length}
+                </span>
+              </div>
+              {data.ultimosDesligamentos.length === 0
+                ? <p className="text-xs text-gray-400 text-center py-8">Nenhum desligamento no período selecionado.</p>
+                : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-400 border-b text-left">
+                          <th className="pb-2 font-semibold">Nome</th>
+                          <th className="pb-2 font-semibold">Cargo / Unidade</th>
+                          <th className="pb-2 font-semibold text-right">Deslig. / Motivo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.ultimosDesligamentos.map((c, i) => {
+                          const deslDate = new Date(c.data_desligamento + 'T12:00:00');
+                          const deslLabel = deslDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                          const initials = c.nome.split(' ').filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                          const TIPO_COLOR: Record<string, string> = {
+                            'Pedido de demissao':      '#6366F1',
+                            'Demissao sem justa causa':'#F59E0B',
+                            'Demissao com justa causa':'#ff2f69',
+                            'Acordo mutuo':            '#0D9488',
+                            'Termino de contrato':     '#3B82F6',
+                            'Suspensao de contrato':   '#F97316',
+                          };
+                          const tipoColor = TIPO_COLOR[c.tipo_desligamento] || '#9CA3AF';
+                          return (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                              <td className="py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0 bg-gray-300">
+                                    {initials}
+                                  </span>
+                                  <span className="font-semibold text-gray-800 leading-tight truncate max-w-[130px]" title={c.nome}>{c.nome}</span>
+                                </div>
+                              </td>
+                              <td className="py-2">
+                                <div className="text-gray-600 truncate max-w-[120px]" title={c.cargo}>{c.cargo || '—'}</div>
+                                <div className="text-gray-400 text-[10px] truncate">{c.unidade || '—'}</div>
+                              </td>
+                              <td className="py-2 text-right whitespace-nowrap">
+                                <div className="text-gray-600 tabular-nums">{deslLabel}</div>
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: tipoColor }}>
+                                  {c.tipo_desligamento === 'Pedido de demissao' ? 'Pedido' :
+                                   c.tipo_desligamento === 'Demissao sem justa causa' ? 'S/ justa causa' :
+                                   c.tipo_desligamento === 'Demissao com justa causa' ? 'C/ justa causa' :
+                                   c.tipo_desligamento === 'Acordo mutuo' ? 'Acordo mútuo' :
+                                   c.tipo_desligamento === 'Termino de contrato' ? 'Término' :
+                                   c.tipo_desligamento || 'Não informado'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
             </div>
+
           </section>
         )}
 

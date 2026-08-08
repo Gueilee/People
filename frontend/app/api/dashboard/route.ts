@@ -103,9 +103,9 @@ export async function GET(request: Request) {
 
     const db = await getDb();
 
-    // Último sync real de cada sistema
+    // Último sync real — somente registros com registros != null (excluindo seeds)
     const syncRows = await db.all<{ tipo: string; executado_em: string }>(
-      `SELECT tipo, MAX(executado_em) AS executado_em FROM sync_log GROUP BY tipo`
+      `SELECT tipo, MAX(executado_em) AS executado_em FROM sync_log WHERE registros IS NOT NULL GROUP BY tipo`
     ).catch(() => [] as { tipo: string; executado_em: string }[]);
     const syncConvenia    = syncRows.find(r => r.tipo === 'convenia')?.executado_em    ?? null;
     const syncTiqueTaque  = syncRows.find(r => r.tipo === 'tiquetaque')?.executado_em  ?? null;
@@ -303,10 +303,10 @@ export async function GET(request: Request) {
       return { mes: label, headcount: hc };
     });
 
-    // ── Últimos Desligamentos ─────────────────────────────────────────────────
-    const ultimosDesligamentos = todosDesl
+    // ── Últimos Desligamentos — filtrado pelo período selecionado (bate com o gráfico) ──
+    const ultimosDesligamentos = [...deslPeriodo]
       .sort((a, b) => new Date(b.data_desligamento!).getTime() - new Date(a.data_desligamento!).getTime())
-      .slice(0, 15)
+      .slice(0, 20)
       .map(c => ({ nome: c.nome, cargo: c.cargo, departamento: c.departamento, unidade: c.unidade,
                    gestor: c.gestor, data_desligamento: c.data_desligamento,
                    tipo_desligamento: c.tipo_desligamento || 'Nao informado', tenure_days: c.tenure_days }));
@@ -488,11 +488,11 @@ export async function GET(request: Request) {
       .map(([vinculo, count]) => ({ vinculo, count, pct: +((count / ativos.length) * 100).toFixed(1) }))
       .sort((a, b) => b.count - a.count);
 
-    // Últimas contratações — 30 contratações mais recentes (filtros de unidade/área respeitados)
-    const ultimasContratacoes = [...todos]
+    // Últimas contratações — do período selecionado (bate com o gráfico de tendência mensal)
+    const ultimasContratacoes = [...admPeriodo]
       .filter(c => c.data_admissao)
       .sort((a, b) => new Date(b.data_admissao).getTime() - new Date(a.data_admissao).getTime())
-      .slice(0, 30)
+      .slice(0, 20)
       .map(c => ({
         nome:          c.nome,
         cargo:         c.cargo,
