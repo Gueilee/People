@@ -220,11 +220,12 @@ export function NavHeader({ children }: { children?: React.ReactNode }) {
   }, []);
 
   const isAdmin        = userRole === 'admin';
+  const isRH           = userRole === 'rh';
   const isRequisitante = userRole === 'requisitante';
 
   const allNav = isRequisitante
     ? []
-    : isAdmin
+    : (isAdmin || isRH)
       ? [...NAV, { href: '/configuracoes', label: 'Configurações', color: '#6B7280' }]
       : NAV;
 
