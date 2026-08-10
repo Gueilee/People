@@ -24,6 +24,19 @@ services:
       retries: 5
       start_period: 90s
 
+  sync-worker:
+    image: people-sync:latest
+    container_name: people_sync
+    environment:
+      - PG_HOST=${PG_HOST:-chico-bento-lake-pg-dev.postgres.database.azure.com}
+      - PG_USER=${PG_USER:-projetos_admin}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_DB=${PG_DB:-vdm_projetos}
+      - TZ=America/Sao_Paulo
+    restart: unless-stopped
+    networks:
+      - people_net
+
 networks:
   people_net:
     driver: bridge

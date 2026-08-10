@@ -6,6 +6,8 @@ on:
     branches: [master]
     paths:
       - 'frontend/**'
+      - 'backend/**'
+      - 'scripts/**'
       - 'docker-compose.yml'
       - '.github/workflows/deploy.yml'
 
@@ -16,12 +18,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Empacotar contexto de build (frontend)
-        run: |
-          cd frontend
-          tar --exclude='.next' --exclude='node_modules' --exclude='*.db' -cf /tmp/build-context.tar .
-
-      - name: Build image na VM via Portainer API
+      - name: Autenticar no Portainer
+        id: auth
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           PORTAINER_USER: ${{ secrets.PORTAINER_USER }}
@@ -31,14 +29,22 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])")
-
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
           echo "Autenticado no Portainer"
+
+      - name: Build imagem frontend (people-app)
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          cd frontend
+          tar --exclude='.next' --exclude='node_modules' --exclude='*.db' -cf /tmp/frontend-context.tar .
 
           RESULT=$(curl -sk -X POST \
             "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/x-tar" \
-            --data-binary @/tmp/build-context.tar)
+            --data-binary @/tmp/frontend-context.tar)
 
           echo "$RESULT" | tail -3
           echo "$RESULT" | python3 -c "
@@ -51,24 +57,44 @@ jobs:
                   if 'error' in d:
                       print('BUILD ERROR:', d['error']); exit(1)
               except: pass
-          print('Build concluido com sucesso')
+          print('Build frontend concluido')
+          "
+
+      - name: Build imagem backend/sync (people-sync)
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          tar --exclude='backend/venv' --exclude='**/__pycache__' --exclude='**/*.pyc' \
+              -cf /tmp/backend-context.tar backend/ scripts/
+
+          RESULT=$(curl -sk -X POST \
+            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-sync:latest&dockerfile=backend/Dockerfile&rm=1&forcerm=1" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/x-tar" \
+            --data-binary @/tmp/backend-context.tar)
+
+          echo "$RESULT" | tail -3
+          echo "$RESULT" | python3 -c "
+          import sys
+          for line in sys.stdin:
+              line=line.strip()
+              if not line: continue
+              try:
+                  import json; d=json.loads(line)
+                  if 'error' in d:
+                      print('BUILD ERROR:', d['error']); exit(1)
+              except: pass
+          print('Build backend/sync concluido')
           "
 
       - name: Redeploiar stack no Portainer
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
-          PORTAINER_USER: ${{ secrets.PORTAINER_USER }}
-          PORTAINER_PASSWORD: ${{ secrets.PORTAINER_PASSWORD }}
+          TOKEN: ${{ steps.auth.outputs.token }}
           PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
           MAILER_URL: ${{ secrets.MAILER_URL }}
         run: |
-          TOKEN=$(curl -sk -X POST "$PORTAINER_URL/api/auth" \
-            -H "Content-Type: application/json" \
-            -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])")
-
-          COMPOSE=$(python3 -c "import sys,json; print(json.dumps(open('docker-compose.yml').read()))")
-
           PAYLOAD=$(python3 -c "
           import json, os
           payload = {
