@@ -102,6 +102,9 @@ def mapear_ativo(emp: dict, extra: dict = None) -> dict:
     """Mapeia colaborador ativo; 'extra' traz gender/etnia/vinculo da chamada individual."""
     extra = extra or {}
     dept, unidade = _base_campos(emp, emp.get("cost_center"))
+    # Usa o dado individual; se não veio (endpoint falhou), cai para o bulk como fallback
+    gender = extra.get("gender") or emp.get("gender", "")
+    etnia  = extra.get("etnia")  or (emp.get("ethnicity") or {}).get("name", "")
     return {
         "id_colaborador":    str(emp.get("id", "")),
         "nome":              f"{emp.get('name', '')} {emp.get('last_name', '')}".strip().upper(),
@@ -112,9 +115,9 @@ def mapear_ativo(emp: dict, extra: dict = None) -> dict:
         "gestor":            _supervisor_nome(emp.get("supervisor")),
         "data_admissao":     emp.get("hiring_date", ""),
         "birth_date":        emp.get("birth_date", ""),
-        "gender":            extra.get("gender", ""),
-        "etnia":             extra.get("etnia", ""),
-        "vinculo":           extra.get("vinculo", "CLT"),
+        "gender":            gender,
+        "etnia":             etnia,
+        "vinculo":           extra.get("vinculo", "") or (emp.get("relationship") or {}).get("name", "CLT"),
         "data_desligamento": None,
         "tipo_desligamento": None,
         "tenure_days":       None,
@@ -442,6 +445,26 @@ def processar_e_salvar():
     df["data_desligamento"] = pd.to_datetime(df["data_desligamento"], errors="coerce").dt.date
     df["birth_date"]        = pd.to_datetime(df["birth_date"],        errors="coerce").dt.date
     df["tenure_days"]       = pd.to_numeric(df["tenure_days"],        errors="coerce")
+
+    # Preserva gender/etnia já salvos para quem o sync não conseguiu buscar individualmente
+    diversity_backup: dict = {}
+    try:
+        df_bk = pd.read_sql(
+            "SELECT id_colaborador, gender, etnia FROM colaboradores WHERE gender != '' OR etnia != ''",
+            con=engine
+        )
+        for _, row in df_bk.iterrows():
+            diversity_backup[row["id_colaborador"]] = {"gender": row["gender"], "etnia": row["etnia"]}
+    except Exception:
+        pass
+
+    if diversity_backup:
+        for idx, row in df.iterrows():
+            saved = diversity_backup.get(row["id_colaborador"], {})
+            if not row.get("gender") and saved.get("gender"):
+                df.at[idx, "gender"] = saved["gender"]
+            if not row.get("etnia") and saved.get("etnia"):
+                df.at[idx, "etnia"] = saved["etnia"]
 
     print("  Salvando no banco...")
     df.to_sql("colaboradores", con=engine, if_exists="replace", index=False)
