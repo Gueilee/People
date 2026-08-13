@@ -62,6 +62,7 @@ export function MultiFilterSelect({
   options,
   color = '#422c76',
   labelFn,
+  searchable = false,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
@@ -69,17 +70,24 @@ export function MultiFilterSelect({
   options: string[];
   color?: string;
   labelFn?: (v: string) => string;
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) { setOpen(false); setSearch(''); }
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (open && searchable) setTimeout(() => searchRef.current?.focus(), 50);
+  }, [open, searchable]);
 
   function toggle(opt: string) {
     onChange(values.includes(opt) ? values.filter(v => v !== opt) : [...values, opt]);
@@ -92,6 +100,10 @@ export function MultiFilterSelect({
     : values.length === 1
     ? fmt(values[0])
     : `${values.length} selecionados`;
+
+  const filtered = searchable && search.trim()
+    ? options.filter(o => o.toLowerCase().includes(search.toLowerCase()))
+    : options;
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -116,11 +128,23 @@ export function MultiFilterSelect({
       {open && (
         <div
           className="absolute top-full mt-1.5 left-0 bg-white rounded-xl shadow-2xl border z-[200] overflow-hidden"
-          style={{ minWidth: 220, maxHeight: 264, display: 'flex', flexDirection: 'column', borderColor: '#E5E7EB' }}
+          style={{ minWidth: 240, maxHeight: 320, display: 'flex', flexDirection: 'column', borderColor: '#E5E7EB' }}
         >
+          {searchable && (
+            <div className="shrink-0 px-2 py-2 border-b border-gray-100">
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar..."
+                className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 outline-none"
+                style={{ color: '#374151' }}
+              />
+            </div>
+          )}
           {active && (
             <button
-              onClick={() => onChange([])}
+              onClick={() => { onChange([]); setSearch(''); }}
               className="shrink-0 w-full text-left px-3 py-2 text-[11px] font-bold hover:bg-red-50 border-b border-gray-100 transition-colors"
               style={{ color: '#EF4444' }}
             >
@@ -128,7 +152,10 @@ export function MultiFilterSelect({
             </button>
           )}
           <div style={{ overflowY: 'auto' }}>
-            {options.map(opt => {
+            {filtered.length === 0 && (
+              <p className="text-[11px] text-gray-400 px-3 py-3 text-center">Nenhum resultado</p>
+            )}
+            {filtered.map(opt => {
               const sel = values.includes(opt);
               return (
                 <button

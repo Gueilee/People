@@ -4,11 +4,12 @@ import { getDb } from '@/lib/db';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  const filtroMeses    = (searchParams.get('mes')     || '').split(',').filter(Boolean);
-  const filtroUnidades = (searchParams.get('unidade') || '').split(',').filter(Boolean);
-  const filtroAreas    = (searchParams.get('area')    || '').split(',').filter(Boolean);
-  const filtroGestores = (searchParams.get('gestor')  || '').split(',').filter(Boolean);
-  const filtroPeriodo  = parseInt(searchParams.get('meses') || '0', 10);
+  const filtroMeses         = (searchParams.get('mes')          || '').split(',').filter(Boolean);
+  const filtroUnidades      = (searchParams.get('unidade')      || '').split(',').filter(Boolean);
+  const filtroAreas         = (searchParams.get('area')         || '').split(',').filter(Boolean);
+  const filtroGestores      = (searchParams.get('gestor')       || '').split(',').filter(Boolean);
+  const filtroColaboradores = (searchParams.get('colaborador')  || '').split(',').filter(Boolean);
+  const filtroPeriodo       = parseInt(searchParams.get('meses') || '0', 10);
 
   try {
     const db = await getDb();
@@ -29,6 +30,9 @@ export async function GET(request: Request) {
       `SELECT DISTINCT c.gestor FROM colaboradores c
        INNER JOIN ponto_mensal p ON UPPER(TRIM(p.nome)) = UPPER(TRIM(c.nome))
        WHERE c.gestor IS NOT NULL AND c.gestor != '' ORDER BY c.gestor`
+    );
+    const colaboradoresRows = await db.all<{ nome: string }>(
+      `SELECT DISTINCT nome FROM ponto_mensal WHERE nome IS NOT NULL AND nome != '' ORDER BY nome`
     );
 
     // ── WHERE principal ──────────────────────────────────────────────────────
@@ -58,6 +62,11 @@ export async function GET(request: Request) {
       whereParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')}))`);
       params.push(...filtroGestores);
     }
+    if (filtroColaboradores.length > 0) {
+      const p = params.length + 1;
+      whereParts.push(`UPPER(TRIM(nome)) IN (${filtroColaboradores.map((_, i) => `UPPER(TRIM($${p + i}))`).join(',')})`);
+      params.push(...filtroColaboradores);
+    }
 
     const where = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
 
@@ -78,6 +87,11 @@ export async function GET(request: Request) {
       const p = whereTendParams.length + 1;
       whereTendParts.push(`nome IN (SELECT nome FROM colaboradores WHERE gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')}))`);
       whereTendParams.push(...filtroGestores);
+    }
+    if (filtroColaboradores.length > 0) {
+      const p = whereTendParams.length + 1;
+      whereTendParts.push(`UPPER(TRIM(nome)) IN (${filtroColaboradores.map((_, i) => `UPPER(TRIM($${p + i}))`).join(',')})`);
+      whereTendParams.push(...filtroColaboradores);
     }
     const whereTend = whereTendParts.length > 0 ? `WHERE ${whereTendParts.join(' AND ')}` : '';
 
@@ -108,6 +122,11 @@ export async function GET(request: Request) {
       const p = whereJoinParams.length + 1;
       whereJoinParts.push(`c.gestor IN (${filtroGestores.map((_, i) => `$${p + i}`).join(',')})`)
       whereJoinParams.push(...filtroGestores);
+    }
+    if (filtroColaboradores.length > 0) {
+      const p = whereJoinParams.length + 1;
+      whereJoinParts.push(`UPPER(TRIM(p.nome)) IN (${filtroColaboradores.map((_, i) => `UPPER(TRIM($${p + i}))`).join(',')})`);
+      whereJoinParams.push(...filtroColaboradores);
     }
     const whereJoin = `WHERE ${whereJoinParts.join(' AND ')}`;
 
@@ -264,9 +283,10 @@ export async function GET(request: Request) {
       filtroUnidades,
       mesesDisponiveis: mesesRows.map(r => r.mes),
       opcoesFiltro: {
-        unidades: unidadesRows.map(r => r.filial),
-        areas:    areasRows.map(r => r.area),
-        gestores: gestoresRows.map(r => r.gestor),
+        unidades:      unidadesRows.map(r => r.filial),
+        areas:         areasRows.map(r => r.area),
+        gestores:      gestoresRows.map(r => r.gestor),
+        colaboradores: colaboradoresRows.map(r => r.nome),
       },
       kpis: {
         totalFuncionarios: kpiRow?.total_func        || 0,

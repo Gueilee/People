@@ -73,7 +73,7 @@ type PontoData = {
   filtroMeses: string[];
   filtroUnidades: string[];
   mesesDisponiveis: string[];
-  opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[] };
+  opcoesFiltro: { unidades: string[]; areas: string[]; gestores: string[]; colaboradores: string[] };
   kpis: KPIs;
   porFilial: PorFilial[];
   topFaltas: TopFalta[];
@@ -408,19 +408,22 @@ export default function PontoPage() {
   const [data,      setData]      = useState<PontoData | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [erro,      setErro]      = useState('');
-  const [periodo,   setPeriodo]   = useState(12);
-  const [filtrosMes, setFiltrosMes] = useState<string[]>([]);
-  const [unidades,  setUnidades]  = useState<string[]>([]);
-  const [areas,     setAreas]     = useState<string[]>([]);
-  const [gestores,      setGestores]      = useState<string[]>([]);
-  const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[]) => {
+  const [periodo,      setPeriodo]      = useState(12);
+  const [filtrosMes,   setFiltrosMes]   = useState<string[]>([]);
+  const [unidades,     setUnidades]     = useState<string[]>([]);
+  const [areas,        setAreas]        = useState<string[]>([]);
+  const [gestores,     setGestores]     = useState<string[]>([]);
+  const [colaboradores, setColaboradores] = useState<string[]>([]);
+
+  const carregar = useCallback((per: number, mes: string[], uni: string[], ar: string[], gest: string[], colab: string[]) => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (mes.length)  params.set('mes',     mes.join(','));
-    else             params.set('meses',   String(per));
-    if (uni.length)  params.set('unidade', uni.join(','));
-    if (ar.length)   params.set('area',    ar.join(','));
-    if (gest.length) params.set('gestor',  gest.join(','));
+    if (mes.length)   params.set('mes',          mes.join(','));
+    else              params.set('meses',         String(per));
+    if (uni.length)   params.set('unidade',       uni.join(','));
+    if (ar.length)    params.set('area',          ar.join(','));
+    if (gest.length)  params.set('gestor',        gest.join(','));
+    if (colab.length) params.set('colaborador',   colab.join(','));
     fetch(`/api/ponto?${params}`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(d => {
@@ -431,7 +434,7 @@ export default function PontoPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { carregar(periodo, filtrosMes, unidades, areas, gestores); }, [periodo, filtrosMes, unidades, areas, gestores, carregar]);
+  useEffect(() => { carregar(periodo, filtrosMes, unidades, areas, gestores, colaboradores); }, [periodo, filtrosMes, unidades, areas, gestores, colaboradores, carregar]);
 
   const kpis = data?.kpis;
   const syncedAt  = kpis?.syncedAt
@@ -586,8 +589,10 @@ export default function PontoPage() {
           options={data?.opcoesFiltro.areas ?? []} color={C.amber} />
         <MultiFilterSelect values={gestores} onChange={setGestores} label="Gestor"
           options={data?.opcoesFiltro.gestores ?? []} color={C.amber} />
-        {(filtrosMes.length > 0 || unidades.length > 0 || areas.length > 0 || gestores.length > 0) && (
-          <FilterTag label="limpar filtros" onClear={() => { setFiltrosMes([]); setUnidades([]); setAreas([]); setGestores([]); }} />
+        <MultiFilterSelect values={colaboradores} onChange={setColaboradores} label="Colaborador"
+          options={data?.opcoesFiltro.colaboradores ?? []} color={C.amber} searchable />
+        {(filtrosMes.length > 0 || unidades.length > 0 || areas.length > 0 || gestores.length > 0 || colaboradores.length > 0) && (
+          <FilterTag label="limpar filtros" onClear={() => { setFiltrosMes([]); setUnidades([]); setAreas([]); setGestores([]); setColaboradores([]); }} />
         )}
         <span className="flex-1" />
         {syncedAt && <SyncBadge label={`Sync: ${syncedAt}`} />}
