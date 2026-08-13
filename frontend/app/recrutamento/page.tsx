@@ -89,7 +89,7 @@ const OPCOES_TIPO_SUB  = ['Desligamento', 'Pedido de demissão', 'Transferência
 const OPCOES_FILIAIS   = ['Garuva', 'Itapevi', 'Navegantes CD 01', 'Navegantes CD 02', 'Vila Olímpia'];
 const OPCOES_MODELO    = ['CLT', 'PJ', 'Estágio', 'Temporário'];
 const OPCOES_STATUS    = ['Aberta', 'Fechada', 'Congelada', 'Cancelada'];
-const RESPONSAVEIS_RH  = ['Camile Fernandes', 'Denise Oliveira', 'Gabriela Santos', 'Hellen', 'José Netto', 'Julia Barbosa', 'Rafaela Marques'];
+const RESPONSAVEIS_RH  = ['Camile Fernandes', 'Denise Oliveira', 'Gabriela Santos', 'Hellen Gomes', 'José Netto', 'Julia Barbosa', 'Rafaela Marques'];
 const UNIDADES_SC      = ['Garuva', 'Navegantes CD 01', 'Navegantes CD 02'];
 const OPCOES_CC = [
   'OPERAÇÃO VCI', 'OPERAÇÃO ARMAZEM - NVG', 'OPERAÇÃO ARMAZEM - ITV', 'OPERAÇÃO ARMAZEM - GRV',
