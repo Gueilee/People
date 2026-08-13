@@ -160,7 +160,6 @@ export async function sendInviteEmail(to: string, nome: string, token: string) {
 }
 
 const RH_EMAILS = [
-  'gppereira@vendemmia.com.br',
   'cfernandes@vendemmia.com.br',
   'doliveira@vendemmia.com.br',
   'glima@vendemmia.com.br',
