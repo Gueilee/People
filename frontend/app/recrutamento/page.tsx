@@ -246,47 +246,42 @@ function BarUnidade({ data }: { data: PorUnidade[] }) {
   );
 }
 
-function SlaChart({ data }: { data: SlaMes[] }) {
-  const validos = data.filter(d => d.slaMedia !== null);
-  if (validos.length < 2) return <p className="text-xs text-gray-400 text-center pt-8">Dados insuficientes</p>;
+function SlaChart({ data: rawData }: { data: SlaMes[] }) {
+  // Exclui meses sem dados — ficam só os meses com fechamentos reais no eixo X
+  const data = rawData.filter(d => d.slaMedia !== null);
+  if (data.length < 2) return <p className="text-xs text-gray-400 text-center pt-8">Dados insuficientes</p>;
 
   const W = 560, H = 130, padL = 12, padR = 12, padT = 28, padB = 24;
   const n = data.length;
-  const maxVal = Math.max(...validos.map(d => d.slaMedia as number), 1);
+  const maxVal = Math.max(...data.map(d => d.slaMedia as number), 1);
   const getX = (i: number) => padL + (i / (n - 1)) * (W - padL - padR);
   const getY = (v: number) => padT + (1 - v / maxVal) * (H - padT - padB);
 
-  const pts = data.map((d, i) =>
-    d.slaMedia !== null ? [getX(i), getY(d.slaMedia)] as [number, number] : null
-  );
+  const pts = data.map((d, i) => [getX(i), getY(d.slaMedia as number)] as [number, number]);
 
   // curva suave
   const linePath = pts.reduce((acc, pt, i) => {
-    if (!pt) return acc;
-    const prev = pts.slice(0, i).reverse().find(p => p !== null);
-    if (!prev) return `M ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
+    if (i === 0) return `M ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
+    const prev = pts[i - 1];
     const mx = (prev[0] + pt[0]) / 2;
     return `${acc} C ${mx.toFixed(1)} ${prev[1].toFixed(1)} ${mx.toFixed(1)} ${pt[1].toFixed(1)} ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
   }, '');
 
   // área preenchida
   const baseline = H - padB;
-  const firstPt  = pts.find(p => p !== null)!;
-  const lastPt   = [...pts].reverse().find(p => p !== null)!;
-  const areaPath = `${linePath} L ${lastPt[0].toFixed(1)} ${baseline} L ${firstPt[0].toFixed(1)} ${baseline} Z`;
+  const areaPath = `${linePath} L ${pts[n-1][0].toFixed(1)} ${baseline} L ${pts[0][0].toFixed(1)} ${baseline} Z`;
 
-  // pico local: valor maior que os vizinhos válidos adjacentes
+  // pico local: valor maior que os vizinhos adjacentes
   const isPeak = (i: number) => {
-    if (pts[i] === null) return false;
     const val = data[i].slaMedia as number;
-    const prevVal = data.slice(0, i).reverse().find(d => d.slaMedia !== null)?.slaMedia ?? -Infinity;
-    const nextVal = data.slice(i + 1).find(d => d.slaMedia !== null)?.slaMedia ?? -Infinity;
-    return val > prevVal && val > nextVal;
+    const prev = i > 0 ? data[i - 1].slaMedia as number : -Infinity;
+    const next = i < n - 1 ? data[i + 1].slaMedia as number : -Infinity;
+    return val > prev && val > next;
   };
-  // mostrar label: sempre em picos, alternado nos demais quando há muitos meses
-  const showLabel = (i: number) => pts[i] !== null && (n <= 8 || i % 2 === 0 || i === n - 1 || isPeak(i));
-  // eixo x: skip alternados se muitos meses
-  const showAxis  = (i: number) => n <= 8 ? true : i % 2 === 0;
+  // todos os meses com dados mostram label nos picos; nos demais, alterna se houver muitos
+  const showLabel = (i: number) => n <= 8 || i === 0 || i === n - 1 || isPeak(i) || i % 2 === 0;
+  // todos os meses com dados aparecem no eixo X
+  const showAxis  = (_i: number) => true;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
@@ -314,30 +309,22 @@ function SlaChart({ data }: { data: SlaMes[] }) {
         const pt = pts[i];
         return (
           <g key={i}>
-            {/* label do eixo x */}
-            {showAxis(i) && (
+            <text
+              x={getX(i)} y={H - padB + 14}
+              textAnchor="middle" fontSize="7.5" fill="#9CA3AF"
+              fontFamily="system-ui, sans-serif"
+            >
+              {d.mes}
+            </text>
+            <circle cx={pt[0]} cy={pt[1]} r="2.5" fill={C.pink} />
+            {showLabel(i) && (
               <text
-                x={getX(i)} y={H - padB + 14}
-                textAnchor="middle" fontSize="7.5" fill="#9CA3AF"
-                fontFamily="system-ui, sans-serif"
+                x={pt[0]} y={pt[1] - 7}
+                textAnchor="middle" fontSize="8.5" fill={C.pink}
+                fontWeight="600" fontFamily="system-ui, sans-serif"
               >
-                {d.mes}
+                {d.slaMedia}d
               </text>
-            )}
-            {/* ponto + valor */}
-            {pt && (
-              <>
-                <circle cx={pt[0]} cy={pt[1]} r="2.5" fill={C.pink} />
-                {showLabel(i) && (
-                  <text
-                    x={pt[0]} y={pt[1] - 7}
-                    textAnchor="middle" fontSize="8.5" fill={C.pink}
-                    fontWeight="600" fontFamily="system-ui, sans-serif"
-                  >
-                    {d.slaMedia}d
-                  </text>
-                )}
-              </>
             )}
           </g>
         );
