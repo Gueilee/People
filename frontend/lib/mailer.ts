@@ -183,6 +183,8 @@ type VagaEmailData = {
   quantidade_vagas?: number | string;
   centro_custo?: string | null;
   observacoes?: string | null;
+  confidencial?: boolean;
+  recrutador?: { nome: string; email: string } | null;
 };
 
 function fmtDataBR(iso: string | null) {
@@ -194,14 +196,21 @@ function fmtDataBR(iso: string | null) {
 export async function sendVagaAbertaEmail(vaga: VagaEmailData) {
   const transporter = createTransporter();
 
-  const recipients = [...RH_EMAILS];
-  if (vaga.gestor_email && !recipients.includes(vaga.gestor_email)) {
-    recipients.push(vaga.gestor_email);
+  let recipients: string[];
+  if (vaga.confidencial && vaga.recrutador?.email) {
+    recipients = [vaga.recrutador.email];
+  } else {
+    recipients = [...RH_EMAILS];
+    if (vaga.gestor_email && !recipients.includes(vaga.gestor_email)) {
+      recipients.push(vaga.gestor_email);
+    }
   }
 
   const isSub = vaga.motivo === 'Substituição';
+  const isConf = vaga.confidencial === true;
 
   const content = `
+    ${isConf ? `<p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#7c3aed;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;padding:6px 12px;display:inline-block;">🔒 Vaga Confidencial</p><br><br>` : ''}
     <p style="margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#ff2f69;">Nova solicitação de vaga</p>
     <h1 style="margin:0 0 6px;font-size:26px;font-weight:900;color:#1f2937;line-height:1.2;">${vaga.cargo}</h1>
     <p style="margin:0 0 24px;font-size:14px;color:#6b7280;">Solicitado por <strong style="color:#422c76;">${vaga.gestor}</strong> · ${fmtDataBR(vaga.data_abertura)}</p>
@@ -287,7 +296,9 @@ export async function sendVagaAbertaEmail(vaga: VagaEmailData) {
   await transporter.sendMail({
     from: fromAddress(),
     to: recipients.join(', '),
-    subject: `🚀 Nova vaga aberta: ${vaga.cargo} — ${vaga.unidade}`,
+    subject: isConf
+      ? `🔒 [CONFIDENCIAL] Nova vaga: ${vaga.cargo} — ${vaga.unidade}`
+      : `🚀 Nova vaga aberta: ${vaga.cargo} — ${vaga.unidade}`,
     html: emailShell(content),
   });
 }

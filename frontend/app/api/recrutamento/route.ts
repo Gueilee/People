@@ -1,6 +1,8 @@
 ﻿import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getDb } from '@/lib/db';
 import { sendVagaAbertaEmail } from '@/lib/mailer';
+import { findById } from '@/lib/users';
 
 type Vaga = {
   id: number;
@@ -28,6 +30,9 @@ type Vaga = {
   num_compareceu: number | null;
   salario_real: string | null;
   criado_em: string | null;
+  confidencial: boolean | null;
+  recrutador: string | null;
+  recrutador_email: string | null;
 };
 
 function detectarSLAMeta(cargo: string): number {
@@ -77,6 +82,9 @@ async function ensureTable(db: Awaited<ReturnType<typeof getDb>>) {
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS sla_meta_dias      INTEGER`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS gestor_email       TEXT`);
   await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS salario_real       TEXT`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS confidencial       BOOLEAN DEFAULT FALSE`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS recrutador         TEXT`);
+  await db.run(`ALTER TABLE vagas_recrutamento ADD COLUMN IF NOT EXISTS recrutador_email   TEXT`);
   _tableReady = true;
 }
 
@@ -106,6 +114,11 @@ export async function GET(request: Request) {
     const db   = await getDb();
     await ensureTable(db);
 
+    // Determina usuário atual para controle de visibilidade de vagas confidenciais
+    const cookieStore = await cookies();
+    const uidStr = cookieStore.get('vp_uid')?.value;
+    const currentUser = uidStr ? await findById(parseInt(uidStr)).catch(() => null) : null;
+
     // Backfill: atribui sla_meta_dias para vagas antigas que não têm o valor
     const semSla = await db.all<{ id: number; cargo: string }>(
       'SELECT id, cargo FROM vagas_recrutamento WHERE sla_meta_dias IS NULL AND cargo IS NOT NULL'
@@ -115,7 +128,16 @@ export async function GET(request: Request) {
         [detectarSLAMeta(row.cargo), row.id]);
     }
 
-    const all: Vaga[] = await db.all('SELECT * FROM vagas_recrutamento ORDER BY data_abertura DESC');
+    let all: Vaga[] = await db.all('SELECT * FROM vagas_recrutamento ORDER BY data_abertura DESC');
+
+    // Filtra vagas confidenciais: admin vê tudo; rh vê apenas as atribuídas a si; outros não veem
+    if (currentUser?.role !== 'admin') {
+      all = all.filter(v => {
+        if (!v.confidencial) return true;
+        if (currentUser?.role === 'rh') return v.recrutador_email === currentUser.email;
+        return false;
+      });
+    }
 
     const hoje = new Date();
     const inicioStr = new Date(hoje.getFullYear(), hoje.getMonth() - filtroMeses, 1).toISOString().split('T')[0];
@@ -258,6 +280,7 @@ export async function POST(request: Request) {
       centro_custo, unidade, gestor, gestor_email, data_inicio, fonte, observacoes,
       quantidade_vagas, faixa_salarial, modelo_contratacao,
       num_convocados, num_compareceu,
+      confidencial, recrutador, recrutador_email,
     } = body;
 
     const sla = calcSla(data_abertura, data_fechamento);
@@ -271,8 +294,9 @@ export async function POST(request: Request) {
          status, motivo, tipo_substituicao, colaborador_substituido,
          centro_custo, unidade, gestor, gestor_email, data_inicio, fonte, observacoes,
          quantidade_vagas, faixa_salarial, modelo_contratacao,
-         num_convocados, num_compareceu, sla_meta_dias)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+         num_convocados, num_compareceu, sla_meta_dias,
+         confidencial, recrutador, recrutador_email)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
        RETURNING id`,
       [responsavel||null, data_abertura||null, data_fechamento||null, sla,
        cargo||null, novo_colaborador||null, status||'Aberta', motivo||null,
@@ -283,7 +307,8 @@ export async function POST(request: Request) {
        faixa_salarial||null, modelo_contratacao||null,
        num_convocados ? parseInt(num_convocados) : null,
        num_compareceu ? parseInt(num_compareceu) : null,
-       sla_meta_dias]
+       sla_meta_dias,
+       confidencial ? true : false, recrutador||null, recrutador_email||null]
     );
 
     // Disparar e-mail de notificação (não bloqueia a resposta)
@@ -301,6 +326,8 @@ export async function POST(request: Request) {
       quantidade_vagas:      quantidade_vagas || 1,
       centro_custo:          centro_custo || null,
       observacoes:           observacoes  || null,
+      confidencial:          confidencial ? true : false,
+      recrutador:            recrutador_email ? { nome: recrutador || '', email: recrutador_email } : null,
     }).catch(err => console.error('[Recrutamento] Erro ao enviar e-mail:', err));
 
     return NextResponse.json({ ok: true, id: row?.id ?? 0 }, { status: 201 });

@@ -15,6 +15,16 @@ const OPCOES_CC = [
   'EXECUTIVO ARMAZEM', 'EXECUTIVO COMERCIO', 'TI - ANALYTICS',
 ];
 
+const RECRUTADORES_RH = [
+  { nome: 'Camile Fernandes',  email: 'cfernandes@vendemmia.com.br' },
+  { nome: 'Denise Oliveira',   email: 'doliveira@vendemmia.com.br'  },
+  { nome: 'Gabriela Santos',   email: 'glima@vendemmia.com.br'      },
+  { nome: 'Hellen Gomes',      email: 'hfernandes@vendemmia.com.br' },
+  { nome: 'Julia Barbosa',     email: 'jbarbosa@vendemmia.com.br'   },
+  { nome: 'Rafaela Marques',   email: 'rmarques@vendemmia.com.br'   },
+  { nome: 'José Netto',        email: 'jnetto@vendemmia.com.br'     },
+];
+
 const hoje = () => new Date().toISOString().split('T')[0];
 
 function SectionHeader({ n, title }: { n: number; title: string }) {
@@ -196,6 +206,7 @@ const EMPTY = {
   quantidade_vagas: '1', data_abertura: hoje(),
   motivo: '', colaborador_substituido: '', tipo_substituicao: '',
   faixa_salarial: '', modelo_contratacao: '',
+  confidencial: false, recrutador_nome: '', recrutador_email: '',
 };
 
 export default function SolicitarVagaPage() {
@@ -224,18 +235,24 @@ export default function SolicitarVagaPage() {
   const pick = (k: keyof typeof EMPTY) => (v: string) => setForm(p => ({ ...p, [k]: v }));
 
   async function handleSubmit() {
-    if (!form.cargo.trim())       { setErro('Cargo é obrigatório.'); return; }
-    if (!form.gestor.trim())      { setErro('Gestor responsável é obrigatório.'); return; }
-    if (!form.unidade)            { setErro('Selecione a unidade.'); return; }
-    if (!form.motivo)             { setErro('Informe o motivo de abertura.'); return; }
-    if (!form.modelo_contratacao) { setErro('Selecione o modelo de contratação.'); return; }
+    if (!form.cargo.trim())                               { setErro('Cargo é obrigatório.'); return; }
+    if (!form.gestor.trim())                              { setErro('Gestor responsável é obrigatório.'); return; }
+    if (!form.unidade)                                    { setErro('Selecione a unidade.'); return; }
+    if (!form.motivo)                                     { setErro('Informe o motivo de abertura.'); return; }
+    if (!form.modelo_contratacao)                         { setErro('Selecione o modelo de contratação.'); return; }
+    if (form.confidencial && !form.recrutador_email)      { setErro('Selecione o recrutador responsável para vaga confidencial.'); return; }
 
     setSaving(true); setErro('');
     try {
       const res = await fetch('/api/recrutamento', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ...form, status: 'Aberta' }),
+        body:    JSON.stringify({
+          ...form,
+          status: 'Aberta',
+          recrutador: form.recrutador_nome,
+          recrutador_email: form.recrutador_email,
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       setSucesso(true);
@@ -403,6 +420,57 @@ export default function SolicitarVagaPage() {
                 <Pills options={OPCOES_MODELO} value={form.modelo_contratacao}
                        onChange={pick('modelo_contratacao')} />
               </div>
+            </div>
+          </div>
+
+          {/* ── Seção 4: Confidencialidade ───────────────────────── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <SectionHeader n={4} title="Confidencialidade" />
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Esta vaga é confidencial?</label>
+                <Pills
+                  options={['Não', 'Sim']}
+                  value={form.confidencial ? 'Sim' : 'Não'}
+                  onChange={v => setForm(p => ({
+                    ...p,
+                    confidencial: v === 'Sim',
+                    recrutador_nome: '',
+                    recrutador_email: '',
+                  }))}
+                />
+                <p className="mt-2 text-[11px] text-gray-400">
+                  Vagas confidenciais são notificadas apenas para o recrutador selecionado e ficam ocultas para os demais.
+                </p>
+              </div>
+              {form.confidencial && (
+                <div>
+                  <label className={labelCls}>Recrutador Responsável *</label>
+                  <select
+                    className={inputCls}
+                    value={form.recrutador_email}
+                    onChange={e => {
+                      const email = e.target.value;
+                      const gestorOpt = form.gestor_email && !RECRUTADORES_RH.some(r => r.email === form.gestor_email)
+                        ? { nome: form.gestor, email: form.gestor_email }
+                        : null;
+                      const todos = gestorOpt ? [...RECRUTADORES_RH, gestorOpt] : RECRUTADORES_RH;
+                      const rec = todos.find(r => r.email === email);
+                      setForm(p => ({ ...p, recrutador_email: email, recrutador_nome: rec?.nome || '' }));
+                    }}
+                  >
+                    <option value="">Selecione o recrutador...</option>
+                    {[
+                      ...RECRUTADORES_RH,
+                      ...(form.gestor_email && !RECRUTADORES_RH.some(r => r.email === form.gestor_email)
+                        ? [{ nome: form.gestor || 'Gestor da área', email: form.gestor_email }]
+                        : []),
+                    ].map(r => (
+                      <option key={r.email} value={r.email}>{r.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
