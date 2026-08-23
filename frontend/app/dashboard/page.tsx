@@ -828,8 +828,8 @@ export default function DashboardRH() {
           </section>
         )}
 
-        {/* ── Tendência Headcount + Turnover por Unidade ── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Tendência Headcount ── */}
+        <section>
 
           {/* Tendência de Headcount */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
@@ -844,28 +844,6 @@ export default function DashboardRH() {
               : data?.tendenciaHeadcount.length
                 ? <HeadcountChart data={data.tendenciaHeadcount} />
                 : <p className="text-xs text-gray-400 text-center pt-8">Sem dados</p>
-            }
-          </div>
-
-          {/* Turnover por Unidade */}
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Unidade ({periodoLabel})</h2>
-            {loading
-              ? <Skeleton className="h-48 w-full" />
-              : (() => {
-                  const maxT = Math.max(...(data?.turnoverPorUnidade.map(d => d.taxa) ?? [1]));
-                  return data?.turnoverPorUnidade.map(d => (
-                    <BarHorizontal
-                      key={d.unidade}
-                      label={d.unidade}
-                      value={d.taxa}
-                      max={maxT}
-                      color={taxaColor(d.taxa)}
-                      subLabel={`${d.ativos} ativ. | ${d.desligados} desl.`}
-                      labelWidth={150}
-                    />
-                  )) ?? null;
-                })()
             }
           </div>
 
@@ -899,76 +877,11 @@ export default function DashboardRH() {
           </section>
         )}
 
-        {/* ── Turnover por Área + Ranking Gestores ── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>Turnover por Área ({periodoLabel})</h2>
-            {loading
-              ? <Skeleton className="h-48 w-full" />
-              : (() => {
-                  const maxT = Math.max(...(data?.turnoverPorArea.map(d => d.taxa) ?? [1]));
-                  return data?.turnoverPorArea.map(d => (
-                    <BarHorizontal
-                      key={d.departamento}
-                      label={d.departamento}
-                      value={d.taxa}
-                      max={maxT}
-                      color={taxaColor(d.taxa)}
-                      subLabel={`${d.ativos} ativ. | ${d.desligados} desl.`}
-                    />
-                  )) ?? null;
-                })()
-            }
-          </div>
-
-          {/* Ranking Gestores */}
-          <div className="bg-white rounded-2xl shadow-sm p-5 overflow-auto">
-            <h2 className="font-black text-sm uppercase mb-4" style={{ color: C.dark }}>
-              Ranking de Gestores — Desligamentos ({periodoLabel})
-            </h2>
-            {loading
-              ? <Skeleton className="h-48 w-full" />
-              : !data?.rankingGestores.length
-                ? <p className="text-xs text-gray-400 text-center pt-8">Nenhum desligamento no período</p>
-                : (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-left text-[10px] uppercase text-gray-400 border-b">
-                        <th className="pb-2 font-bold">#</th>
-                        <th className="pb-2 font-bold">Gestor</th>
-                        <th className="pb-2 font-bold">Depto / Unidade</th>
-                        <th className="pb-2 font-bold text-right">Desl.</th>
-                        <th className="pb-2 font-bold text-right">Taxa %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.rankingGestores.map((g, i) => (
-                        <tr key={g.gestor} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="py-2 font-black" style={{ color: i < 3 ? C.pink : C.gray }}>
-                            {i + 1}
-                          </td>
-                          <td className="py-2 font-semibold max-w-[120px] truncate">{g.gestor}</td>
-                          <td className="py-2 text-gray-500">
-                            {g.departamento}<br />
-                            <span className="text-[10px]">{g.unidade}</span>
-                          </td>
-                          <td className="py-2 text-right text-[10px] text-gray-400">{g.desligados}</td>
-                          <td className="py-2 text-right font-black" style={{ color: taxaColor(g.taxa) }}>{g.taxa}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )
-            }
-          </div>
-        </section>
+        {/* Turnover por Área + Ranking Gestores — ocultos temporariamente */}
 
 
-        {/* ══════════════════════════════════════════════════════════════ */}
-        {/*  RADAR DE RISCO DE TURNOVER                                   */}
-        {/* ══════════════════════════════════════════════════════════════ */}
-        <section className="space-y-4">
+        {/* Radar de Risco de Turnover — oculto temporariamente */}
+        {false && <section className="space-y-4">
           <h2 className="font-black text-base uppercase tracking-wide border-l-4 pl-3" style={{ color: '#DC2626', borderColor: '#DC2626' }}>
             Radar de Risco — Turnover por Colaborador
           </h2>
@@ -1089,7 +1002,7 @@ export default function DashboardRH() {
                 )
             }
           </div>
-        </section>
+        </section>}
 
         {/* ══════════════════════════════════════════════════════════════ */}
         {/*  ROTATIVIDADE — TEMPO DE PERMANÊNCIA                         */}
