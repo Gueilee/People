@@ -100,6 +100,7 @@ export async function GET(request: Request) {
     const filtroRespons   = (searchParams.get('responsavel') || '').split(',').filter(Boolean);
     const filtroFontes    = (searchParams.get('fonte')       || '').split(',').filter(Boolean);
     const filtroMeses     = parseInt(searchParams.get('meses') || '12', 10);
+    const filtroMesEsp    = (searchParams.get('mes') || '').split(',').filter(Boolean);
     const busca           = (searchParams.get('busca') || '').toLowerCase();
 
     const db   = await getDb();
@@ -120,7 +121,19 @@ export async function GET(request: Request) {
     const inicioStr = new Date(hoje.getFullYear(), hoje.getMonth() - filtroMeses, 1).toISOString().split('T')[0];
 
     // listaBase: período + dimensões → KPIs e gráficos respondem a esses filtros
-    let listaBase = all.filter(v => !v.data_abertura || v.data_abertura >= inicioStr);
+    // Mês específico (filtroMesEsp) tem prioridade sobre janela rolling (filtroMeses)
+    let listaBase: Vaga[];
+    if (filtroMesEsp.length > 0) {
+      const mesSet = new Set(filtroMesEsp);
+      listaBase = all.filter(v => {
+        const mesAb = v.data_abertura?.substring(0, 7);
+        const meFe  = v.data_fechamento?.substring(0, 7);
+        // Inclui vagas abertas no mês ou fechadas no mês
+        return (mesAb && mesSet.has(mesAb)) || (meFe && mesSet.has(meFe));
+      });
+    } else {
+      listaBase = all.filter(v => !v.data_abertura || v.data_abertura >= inicioStr);
+    }
     if (filtroUnidades.length > 0) listaBase = listaBase.filter(v => filtroUnidades.includes(v.unidade || ''));
     if (filtroRespons.length  > 0) listaBase = listaBase.filter(v => filtroRespons.includes(v.responsavel || ''));
     if (filtroFontes.length   > 0) listaBase = listaBase.filter(v => filtroFontes.includes(v.fonte || ''));
@@ -193,12 +206,17 @@ export async function GET(request: Request) {
       return { mes: fmtMes(mi.toISOString()), slaMedia: sla, count: fechadasMes.length };
     });
 
+    const todasDatasV = [
+      ...all.map(v => v.data_abertura).filter(Boolean) as string[],
+      ...all.map(v => v.data_fechamento).filter(Boolean) as string[],
+    ];
     const opcoes = {
       responsaveis: [...new Set(all.map(v => v.responsavel).filter(Boolean))].sort() as string[],
       unidades:     [...new Set(all.map(v => v.unidade).filter(Boolean))].sort() as string[],
       centrosCusto: [...new Set(all.map(v => v.centro_custo).filter(Boolean))].sort() as string[],
       gestores:     [...new Set(all.map(v => v.gestor).filter(Boolean))].sort() as string[],
       fontes:       [...new Set(all.map(v => v.fonte).filter(Boolean))].sort() as string[],
+      meses:        [...new Set(todasDatasV.map(d => d.substring(0, 7)))].sort().reverse() as string[],
     };
 
     // â”€â”€ SLA Performance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

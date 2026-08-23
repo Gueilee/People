@@ -409,7 +409,7 @@ export default function PontoPage() {
   const [loading,   setLoading]   = useState(true);
   const [erro,      setErro]      = useState('');
   const [periodo,      setPeriodo]      = useState(12);
-  const [filtrosMes,   setFiltrosMes]   = useState<string[]>([]);
+  const [filtrosMes,   setFiltrosMes]   = useState<string[]>(() => [new Date().toISOString().substring(0, 7)]);
   const [unidades,     setUnidades]     = useState<string[]>([]);
   const [areas,        setAreas]        = useState<string[]>([]);
   const [gestores,     setGestores]     = useState<string[]>([]);

@@ -821,6 +821,7 @@ export default function RecrutamentoPage() {
   const [loading, setLoading]     = useState(true);
   // Filtros globais → afetam API (KPIs + gráficos + dados carregados)
   const [filtroMeses, setFiltroMeses]             = useState(12);
+  const [filtrosMesEsp, setFiltrosMesEsp]         = useState<string[]>(() => [new Date().toISOString().substring(0, 7)]);
   const [filtroUnidades, setFiltroUnidades]       = useState<string[]>([]);
   const [filtroResponsaveis, setFiltroResponsaveis] = useState<string[]>([]);
   const [filtroFontes, setFiltroFontes]           = useState<string[]>([]);
@@ -837,6 +838,8 @@ export default function RecrutamentoPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
+    // Mês específico tem prioridade sobre janela rolling; meses sempre enviado para o gráfico de SLA
+    if (filtrosMesEsp.length > 0) params.set('mes', filtrosMesEsp.join(','));
     params.set('meses', String(filtroMeses));
     if (filtroUnidades.length > 0)     params.set('unidade',     filtroUnidades.join(','));
     if (filtroResponsaveis.length > 0) params.set('responsavel', filtroResponsaveis.join(','));
@@ -847,12 +850,17 @@ export default function RecrutamentoPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtroMeses, filtroUnidades, filtroResponsaveis, filtroFontes]);
+  }, [filtroMeses, filtrosMesEsp, filtroUnidades, filtroResponsaveis, filtroFontes]);
 
   useEffect(() => { load(); }, [load]);
 
   const kpis    = data?.kpis;
-  const opcoes  = data?.opcoes ?? { responsaveis: [], unidades: [], centrosCusto: [], gestores: [], fontes: [] };
+  const opcoes  = data?.opcoes ?? { responsaveis: [], unidades: [], centrosCusto: [], gestores: [], fontes: [], meses: [] };
+  const fmtMesLabel = (m: string) => {
+    const [y, mo] = m.split('-').map(Number);
+    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return `${nomes[mo - 1]} ${String(y).slice(2)}`;
+  };
   const vagas   = data?.vagas ?? [];
   const slaPerf = data?.slaPerf;
 
@@ -895,7 +903,15 @@ export default function RecrutamentoPage() {
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: C.white }}>
       <NavHeader>
-        <PeriodButtons value={filtroMeses} onChange={setFiltroMeses} color={C.pink} />
+        <MultiFilterSelect
+          values={filtrosMesEsp} onChange={setFiltrosMesEsp}
+          label="Mês" options={opcoes.meses} color={C.pink} labelFn={fmtMesLabel} />
+        {filtrosMesEsp.length === 0 && (
+          <>
+            <span className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
+            <PeriodButtons value={filtroMeses} onChange={setFiltroMeses} color={C.pink} />
+          </>
+        )}
         <span className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
         <MultiFilterSelect
           values={filtroUnidades} onChange={setFiltroUnidades}
@@ -906,10 +922,10 @@ export default function RecrutamentoPage() {
         <MultiFilterSelect
           values={filtroFontes} onChange={setFiltroFontes}
           label="Fonte" options={opcoes.fontes} color={C.pink} />
-        {(filtroUnidades.length > 0 || filtroResponsaveis.length > 0 || filtroFontes.length > 0) && (
+        {(filtrosMesEsp.length > 0 || filtroUnidades.length > 0 || filtroResponsaveis.length > 0 || filtroFontes.length > 0) && (
           <FilterTag
             label="limpar filtros"
-            onClear={() => { setFiltroUnidades([]); setFiltroResponsaveis([]); setFiltroFontes([]); }}
+            onClear={() => { setFiltrosMesEsp([]); setFiltroUnidades([]); setFiltroResponsaveis([]); setFiltroFontes([]); }}
           />
         )}
       </NavHeader>
