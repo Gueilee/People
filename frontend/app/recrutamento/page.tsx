@@ -40,7 +40,7 @@ type PorUnidade = { unidade: string; total: number; abertas: number; fechadas: n
 type PorFonte   = { fonte: string; count: number };
 type PorMotivo  = { motivo: string; count: number };
 type SlaMes     = { mes: string; slaMedia: number | null; count: number };
-type Opcoes     = { responsaveis: string[]; unidades: string[]; centrosCusto: string[]; gestores: string[]; fontes: string[] };
+type Opcoes     = { responsaveis: string[]; unidades: string[]; centrosCusto: string[]; gestores: string[]; fontes: string[]; meses: string[] };
 
 type SlaPerf = { eficienciaSLA: number | null; abertasAtrasadas: number; totalFechadas: number; dentroPrazo: number };
 type RecrutData = {
