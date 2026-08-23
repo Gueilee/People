@@ -198,6 +198,43 @@ export async function GET(request: Request) {
     const hMedia      = Math.max((ativosNoPeriodoInicio.length + ativosNoPeriodoFim.length) / 2, 1);
     const turnoverRate = (((deslPeriodo.length + admPeriodo.length) / 2) / hMedia) * 100;
 
+    // ── Snapshots históricos de headcount ────────────────────────────────────
+    // Acumulados diariamente pelo sync Python — nunca sobrescritos.
+    // Usado como denominador correto no turnover (evita distorção por transferências).
+    const periodoInicioStr = periodoInicio.toISOString().split('T')[0];
+    const periodoFimStr    = periodoFim.toISOString().split('T')[0];
+    type SnapRow = { snapshot_date: string; gestor: string; departamento: string; unidade: string; headcount: number };
+    const snapshotRows: SnapRow[] = await db.all<SnapRow>(
+      `SELECT snapshot_date, gestor, departamento, unidade, headcount
+       FROM headcount_snapshots
+       WHERE snapshot_date >= $1 AND snapshot_date <= $2`,
+      [periodoInicioStr, periodoFimStr]
+    ).catch(() => [] as SnapRow[]);
+
+    // Agrega por dia → key para calcular médias corretas (sem viés de over-count)
+    const _dGestor  = new Map<string, Map<string, number>>();
+    const _dUnidade = new Map<string, Map<string, number>>();
+    const _dArea    = new Map<string, Map<string, number>>();
+    const _addSnap  = (m: Map<string, Map<string, number>>, day: string, key: string, v: number) => {
+      if (!m.has(day)) m.set(day, new Map());
+      const d = m.get(day)!;
+      d.set(key, (d.get(key) || 0) + v);
+    };
+    for (const r of snapshotRows) {
+      const dept = normalizarArea(r.departamento) || r.departamento;
+      _addSnap(_dGestor,  r.snapshot_date, r.gestor,  r.headcount);
+      _addSnap(_dUnidade, r.snapshot_date, r.unidade, r.headcount);
+      _addSnap(_dArea,    r.snapshot_date, dept,      r.headcount);
+    }
+    // Retorna a média do headcount diário para uma chave; null se não há dados de snapshot
+    function snapAvg(m: Map<string, Map<string, number>>, key: string): number | null {
+      let sum = 0, dias = 0;
+      for (const dayMap of m.values()) {
+        if (dayMap.has(key)) { sum += dayMap.get(key)!; dias++; }
+      }
+      return dias > 0 ? sum / dias : null;
+    }
+
     const tempoMedioAtivos = ativos.length > 0
       ? ativos.reduce((s, c) => s + (hoje.getTime() - new Date(c.data_admissao).getTime()) / (30.44 * 86400000), 0) / ativos.length
       : 0;
@@ -206,9 +243,11 @@ export async function GET(request: Request) {
     const unidades = [...new Set(todos.map(c => c.unidade))].filter(Boolean);
     const turnoverPorUnidade = unidades.map(u => {
       const desl = deslPeriodo.filter(c => c.unidade === u).length;
-      const hcInicioU = ativosNaData(todos.filter(c => c.unidade === u), periodoInicio).length;
-      const hcFimU    = ativosNaData(todos.filter(c => c.unidade === u), periodoFim).length;
-      const hMediaU   = Math.max((hcInicioU + hcFimU) / 2, 1);
+      const snap  = snapAvg(_dUnidade, u);
+      const hMediaU = snap !== null
+        ? Math.max(snap, 1)
+        : Math.max((ativosNaData(todos.filter(c => c.unidade === u), periodoInicio).length +
+                    ativosNaData(todos.filter(c => c.unidade === u), periodoFim).length) / 2, 1);
       const taxa = (desl / hMediaU) * 100;
       return {
         unidade: u,
@@ -223,9 +262,11 @@ export async function GET(request: Request) {
     const departamentos = [...new Set(todos.map(c => c.departamento))].filter(Boolean);
     const turnoverPorArea = departamentos.map(dep => {
       const desl = deslPeriodo.filter(c => c.departamento === dep).length;
-      const hcInicioD = ativosNaData(todos.filter(c => c.departamento === dep), periodoInicio).length;
-      const hcFimD    = ativosNaData(todos.filter(c => c.departamento === dep), periodoFim).length;
-      const hMediaD   = Math.max((hcInicioD + hcFimD) / 2, 1);
+      const snap  = snapAvg(_dArea, dep);
+      const hMediaD = snap !== null
+        ? Math.max(snap, 1)
+        : Math.max((ativosNaData(todos.filter(c => c.departamento === dep), periodoInicio).length +
+                    ativosNaData(todos.filter(c => c.departamento === dep), periodoFim).length) / 2, 1);
       const taxa = (desl / hMediaD) * 100;
       return {
         departamento: dep,
@@ -245,9 +286,11 @@ export async function GET(request: Request) {
       .map(g => {
         const equipe = todos.filter(c => c.gestor === g);
         const desl   = deslPeriodo.filter(c => c.gestor === g).length;
-        const hcInicioG = ativosNaData(equipe, periodoInicio).length;
-        const hcFimG    = ativosNaData(equipe, periodoFim).length;
-        const hMediaG   = Math.max((hcInicioG + hcFimG) / 2, 1);
+        const snap    = snapAvg(_dGestor, g);
+        const hMediaG = snap !== null
+          ? Math.max(snap, 1)
+          : Math.max((ativosNaData(equipe, periodoInicio).length +
+                      ativosNaData(equipe, periodoFim).length) / 2, 1);
         const taxa = (desl / hMediaG) * 100;
         return {
           gestor: g,

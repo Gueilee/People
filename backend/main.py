@@ -401,6 +401,70 @@ def gerar_mock_data() -> list[dict]:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+#  Snapshot de headcount por gestor/departamento/unidade
+# ──────────────────────────────────────────────────────────────────────────────
+
+def salvar_snapshot_headcount(df):
+    """
+    Grava um snapshot do headcount ativo por (gestor, departamento, unidade) para
+    a data de hoje. Usa ON CONFLICT DO NOTHING — nunca sobrescreve; se o sync
+    rodar duas vezes no mesmo dia, o segundo é ignorado silenciosamente.
+    """
+    hoje = datetime.date.today().isoformat()
+    ativos_df = df[df["status"] == "Ativo"].copy()
+    ativos_df["gestor"]       = ativos_df["gestor"].fillna("").str.strip()
+    ativos_df["departamento"] = ativos_df["departamento"].fillna("").str.strip()
+    ativos_df["unidade"]      = ativos_df["unidade"].fillna("").str.strip()
+
+    snap = (
+        ativos_df[ativos_df["gestor"] != ""]
+        .groupby(["gestor", "departamento", "unidade"])
+        .size()
+        .reset_index(name="headcount")
+    )
+
+    if snap.empty:
+        print("  [AVISO] snapshot headcount: nenhum ativo com gestor informado", flush=True)
+        return
+
+    rows = [
+        {
+            "snapshot_date": hoje,
+            "gestor":        row["gestor"],
+            "departamento":  row["departamento"],
+            "unidade":       row["unidade"],
+            "headcount":     int(row["headcount"]),
+        }
+        for _, row in snap.iterrows()
+    ]
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS headcount_snapshots (
+                    snapshot_date DATE    NOT NULL,
+                    gestor        TEXT    NOT NULL,
+                    departamento  TEXT    NOT NULL DEFAULT '',
+                    unidade       TEXT    NOT NULL DEFAULT '',
+                    headcount     INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (snapshot_date, gestor, departamento, unidade)
+                )
+            """))
+            for row in rows:
+                conn.execute(text("""
+                    INSERT INTO headcount_snapshots
+                        (snapshot_date, gestor, departamento, unidade, headcount)
+                    VALUES
+                        (:snapshot_date, :gestor, :departamento, :unidade, :headcount)
+                    ON CONFLICT (snapshot_date, gestor, departamento, unidade) DO NOTHING
+                """), row)
+            conn.commit()
+        print(f"  [OK] headcount_snapshots: {len(rows)} combos gestor/depto/unidade em {hoje}", flush=True)
+    except Exception as e:
+        print(f"  [AVISO] Nao foi possivel salvar headcount_snapshots: {e}", flush=True)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 #  Pipeline
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -468,6 +532,7 @@ def processar_e_salvar():
 
     print("  Salvando no banco...")
     df.to_sql("colaboradores", con=engine, if_exists="replace", index=False)
+    salvar_snapshot_headcount(df)
 
     ativos = len(df[df["status"] == "Ativo"])
     desl   = len(df[df["status"] == "Desligado"])
