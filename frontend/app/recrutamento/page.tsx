@@ -279,7 +279,7 @@ function SlaChart({ data: rawData }: { data: SlaMes[] }) {
     return val > prev && val > next;
   };
   // todos os meses com dados mostram label nos picos; nos demais, alterna se houver muitos
-  const showLabel = (i: number) => n <= 8 || i === 0 || i === n - 1 || isPeak(i) || i % 2 === 0;
+  const showLabel = (_i: number) => true;
   // todos os meses com dados aparecem no eixo X
   const showAxis  = (_i: number) => true;
 

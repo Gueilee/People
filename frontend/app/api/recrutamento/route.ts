@@ -195,7 +195,7 @@ export async function GET(request: Request) {
       const mf = new Date(hoje.getFullYear(), hoje.getMonth() - (mesesMostrar - 1 - i) + 1, 0);
       const miStr = mi.toISOString().split('T')[0];
       const mfStr = mf.toISOString().split('T')[0];
-      const fechadasMes = listaBase.filter(v =>
+      const fechadasMes = all.filter(v =>
         v.status === 'Fechada' && v.data_fechamento &&
         v.data_fechamento >= miStr && v.data_fechamento <= mfStr &&
         v.sla_dias && v.sla_dias > 0
