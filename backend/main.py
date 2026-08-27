@@ -9,7 +9,10 @@ import os
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-API_TOKEN = "244dd481-fbbd-4f95-bb8b-b6617df75403"
+API_TOKEN = os.environ.get("CONVENIA_TOKEN")
+if not API_TOKEN:
+    raise RuntimeError("Env var CONVENIA_TOKEN não definida — configure no Portainer antes de iniciar.")
+
 BASE_URL  = "https://public-api.convenia.com.br/api/v3"
 
 HEADERS = {
@@ -18,11 +21,11 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-_pg_password = urllib.parse.quote_plus(os.getenv("PG_PASSWORD", "projetos_vdm2026#%"))
+_pg_password = urllib.parse.quote_plus(os.environ["PG_PASSWORD"])
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    f"postgresql+psycopg2://projetos_admin:{_pg_password}"
-    "@chico-bento-lake-pg-dev.postgres.database.azure.com:5432/vdm_projetos?sslmode=require"
+    f"postgresql+psycopg2://{os.environ['PG_USER']}:{_pg_password}"
+    f"@{os.environ['PG_HOST']}:5432/{os.environ.get('PG_DB', 'vdm_projetos')}?sslmode=require"
 )
 engine = create_engine(DATABASE_URL)
 

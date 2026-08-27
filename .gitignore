@@ -23,6 +23,16 @@ frontend/.env*
 /login.jpeg
 /logo.jpeg
 
+# Logs de execução — nunca versionar (podem conter dados operacionais)
+logs/
+*.log
+
+# Scripts de migração one-time — nunca versionar (requerem env vars locais)
+create_*.mjs
+import_*.mjs
+check_*.mjs
+analyze_*.mjs
+
 # OS
 .DS_Store
 Thumbs.db

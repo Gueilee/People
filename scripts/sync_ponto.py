@@ -17,15 +17,18 @@ import argparse
 import os
 from datetime import date
 
-TOKEN   = "e7d43df8-9070-4932-8da7-a779fc458290"
+TOKEN = os.environ.get("TIQUETAQUE_TOKEN")
+if not TOKEN:
+    raise RuntimeError("Env var TIQUETAQUE_TOKEN não definida — configure antes de executar.")
+
 BASE    = "https://api.tiquetaque.com/v2.1"
 DELAY   = 1.25   # segundos entre requests (seguro para 60/min)
 
 PG_CONN = {
-    "host":     os.getenv("PG_HOST",     "chico-bento-lake-pg-dev.postgres.database.azure.com"),
-    "user":     os.getenv("PG_USER",     "projetos_admin"),
-    "password": os.getenv("PG_PASSWORD", "projetos_vdm2026#%"),
-    "dbname":   os.getenv("PG_DB",       "vdm_projetos"),
+    "host":     os.environ["PG_HOST"],
+    "user":     os.environ["PG_USER"],
+    "password": os.environ["PG_PASSWORD"],
+    "dbname":   os.environ.get("PG_DB", "vdm_projetos"),
     "port":     5432,
     "sslmode":  "require",
 }

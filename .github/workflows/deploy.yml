@@ -94,6 +94,9 @@ jobs:
           TOKEN: ${{ steps.auth.outputs.token }}
           PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
           MAILER_URL: ${{ secrets.MAILER_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          CONVENIA_TOKEN: ${{ secrets.CONVENIA_TOKEN }}
+          TIQUETAQUE_TOKEN: ${{ secrets.TIQUETAQUE_TOKEN }}
         run: |
           PAYLOAD=$(python3 -c "
           import json, os
@@ -102,10 +105,15 @@ jobs:
             'prune': True,
             'pullImage': False,
             'env': [
-              {'name': 'SESSION_SECRET', 'value': 'vp-prod-vendemmia-2025'},
-              {'name': 'APP_URL',        'value': 'https://people.vendemm.ia.br'},
-              {'name': 'PG_PASSWORD',    'value': os.environ['PG_PASSWORD']},
-              {'name': 'MAILER_URL',     'value': os.environ['MAILER_URL']},
+              {'name': 'SESSION_SECRET',   'value': os.environ['SESSION_SECRET']},
+              {'name': 'APP_URL',          'value': 'https://people.vendemm.ia.br'},
+              {'name': 'PG_PASSWORD',      'value': os.environ['PG_PASSWORD']},
+              {'name': 'MAILER_URL',       'value': os.environ['MAILER_URL']},
+              {'name': 'PG_HOST',          'value': 'chico-bento-lake-pg-dev.postgres.database.azure.com'},
+              {'name': 'PG_USER',          'value': 'projetos_admin'},
+              {'name': 'PG_DB',            'value': 'vdm_projetos'},
+              {'name': 'CONVENIA_TOKEN',   'value': os.environ['CONVENIA_TOKEN']},
+              {'name': 'TIQUETAQUE_TOKEN', 'value': os.environ['TIQUETAQUE_TOKEN']},
             ]
           }
           print(json.dumps(payload))

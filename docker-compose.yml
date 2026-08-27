@@ -7,13 +7,13 @@ services:
     container_name: people_app
     environment:
       - NODE_ENV=production
-      - SESSION_SECRET=${SESSION_SECRET:-vp-prod-vendemmia-2025}
-      - MAILER_URL=${MAILER_URL:-}
-      - APP_URL=${APP_URL:-https://people.vendemm.ia.br}
-      - PG_HOST=${PG_HOST:-chico-bento-lake-pg-dev.postgres.database.azure.com}
-      - PG_USER=${PG_USER:-projetos_admin}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - MAILER_URL=${MAILER_URL}
+      - APP_URL=${APP_URL}
+      - PG_HOST=${PG_HOST}
+      - PG_USER=${PG_USER}
       - PG_PASSWORD=${PG_PASSWORD}
-      - PG_DB=${PG_DB:-vdm_projetos}
+      - PG_DB=${PG_DB}
     restart: unless-stopped
     networks:
       - people_net
@@ -28,10 +28,12 @@ services:
     image: people-sync:latest
     container_name: people_sync
     environment:
-      - PG_HOST=${PG_HOST:-chico-bento-lake-pg-dev.postgres.database.azure.com}
-      - PG_USER=${PG_USER:-projetos_admin}
+      - PG_HOST=${PG_HOST}
+      - PG_USER=${PG_USER}
       - PG_PASSWORD=${PG_PASSWORD}
-      - PG_DB=${PG_DB:-vdm_projetos}
+      - PG_DB=${PG_DB}
+      - CONVENIA_TOKEN=${CONVENIA_TOKEN}
+      - TIQUETAQUE_TOKEN=${TIQUETAQUE_TOKEN}
       - TZ=America/Sao_Paulo
     restart: unless-stopped
     networks:

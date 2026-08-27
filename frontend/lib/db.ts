@@ -8,10 +8,10 @@ types.setTypeParser(1114, (v: string) => v);  // timestamp without time zone →
 types.setTypeParser(1184, (v: string) => v);  // timestamp with time zone → ISO string
 
 const pool = new Pool({
-  host:     process.env.PG_HOST     ?? 'chico-bento-lake-pg-dev.postgres.database.azure.com',
-  user:     process.env.PG_USER     ?? 'projetos_admin',
-  password: process.env.PG_PASSWORD ?? 'projetos_vdm2026#%',
-  database: process.env.PG_DB       ?? 'vdm_projetos',
+  host:     process.env.PG_HOST,
+  user:     process.env.PG_USER,
+  password: process.env.PG_PASSWORD,
+  database: process.env.PG_DB,
   port:     5432,
   ssl:      { rejectUnauthorized: false },
   max:      10,

@@ -15,16 +15,19 @@ import unicodedata
 import datetime
 import re
 
-API_TOKEN = "244dd481-fbbd-4f95-bb8b-b6617df75403"
+API_TOKEN = os.environ.get("CONVENIA_TOKEN")
+if not API_TOKEN:
+    raise RuntimeError("Env var CONVENIA_TOKEN não definida — configure no Portainer antes de iniciar.")
+
 BASE_URL  = "https://public-api.convenia.com.br/api/v3"
 HEADERS   = {"token": API_TOKEN, "Accept": "application/json"}
 DELAY     = 1.2   # 1.2s entre requests → ~50 req/min (limite: 60/min)
 
 PG_CONN = {
-    "host":     os.getenv("PG_HOST",     "chico-bento-lake-pg-dev.postgres.database.azure.com"),
-    "user":     os.getenv("PG_USER",     "projetos_admin"),
-    "password": os.getenv("PG_PASSWORD", "projetos_vdm2026#%"),
-    "dbname":   os.getenv("PG_DB",       "vdm_projetos"),
+    "host":     os.environ["PG_HOST"],
+    "user":     os.environ["PG_USER"],
+    "password": os.environ["PG_PASSWORD"],
+    "dbname":   os.environ.get("PG_DB", "vdm_projetos"),
     "port":     5432,
     "sslmode":  "require",
 }
