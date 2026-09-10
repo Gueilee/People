@@ -815,6 +815,37 @@ function VagaModal({ vaga, opcoes, onClose, onSaved }: {
   );
 }
 
+// ─── Link de solicitação ──────────────────────────────────────────────────────
+function LinkSolicitacao() {
+  const [copiado, setCopiado] = useState(false);
+  const url = typeof window !== 'undefined'
+    ? `${window.location.origin}/solicitar-vaga`
+    : '/solicitar-vaga';
+
+  const copiar = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }).catch(() => {});
+  };
+
+  return (
+    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shrink-0">
+      <span className="text-xs text-gray-400 hidden md:block max-w-[260px] truncate">{url}</span>
+      <button
+        onClick={copiar}
+        className="text-xs font-semibold whitespace-nowrap px-3 py-1.5 rounded-lg transition-all"
+        style={{
+          backgroundColor: copiado ? '#f0fdf4' : 'rgba(66,44,118,0.08)',
+          color: copiado ? '#16a34a' : '#422c76',
+        }}
+      >
+        {copiado ? '✓ Copiado!' : '🔗 Copiar link de solicitação'}
+      </button>
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function RecrutamentoPage() {
   const [data, setData]           = useState<RecrutData | null>(null);
@@ -934,9 +965,12 @@ export default function RecrutamentoPage() {
 
         {/* ── Cabeçalho ─────────────────────────────────────────────────────── */}
         <div className="space-y-3">
-          <div>
-            <h1 className="text-xl font-black" style={{ color: C.pink }}>Recrutamento & Seleção</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Gestão de vagas e pipeline de contratação</p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-xl font-black" style={{ color: C.pink }}>Recrutamento & Seleção</h1>
+              <p className="text-sm text-gray-500 mt-0.5">Gestão de vagas e pipeline de contratação</p>
+            </div>
+            <LinkSolicitacao />
           </div>
         </div>
 
