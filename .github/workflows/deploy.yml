@@ -29,7 +29,7 @@ jobs:
           PORTAINER_PASSWORD: ${{ secrets.PORTAINER_PASSWORD }}
         run: |
           set -euo pipefail
-          RESP=$(curl -sf -X POST "$PORTAINER_URL/api/auth" \
+          RESP=$(curl -skf -X POST "$PORTAINER_URL/api/auth" \
             -H "Content-Type: application/json" \
             -d "{\"username\":\"$PORTAINER_USER\",\"password\":\"$PORTAINER_PASSWORD\"}")
           TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])")
@@ -49,7 +49,7 @@ jobs:
               -cf /tmp/frontend-context.tar .
 
           echo "Enviando build context para Portainer (tag: $BUILD_TAG)..."
-          RESULT=$(curl -sf -X POST \
+          RESULT=$(curl -skf -X POST \
             "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:$BUILD_TAG&t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1&nocache=1" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/x-tar" \
@@ -80,7 +80,7 @@ jobs:
           tar --exclude='backend/venv' --exclude='**/__pycache__' --exclude='**/*.pyc' \
               -cf /tmp/backend-context.tar backend/ scripts/
 
-          RESULT=$(curl -sf -X POST \
+          RESULT=$(curl -skf -X POST \
             "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-sync:latest&dockerfile=backend/Dockerfile&rm=1&forcerm=1" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/x-tar" \
@@ -192,7 +192,7 @@ jobs:
           print(json.dumps(payload))
           ")
 
-          RESULT=$(curl -sf -X PUT \
+          RESULT=$(curl -skf -X PUT \
             "$PORTAINER_URL/api/stacks/11?endpointId=3" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
