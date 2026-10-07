@@ -88,6 +88,31 @@ jobs:
           print('Build backend/sync concluido')
           "
 
+      - name: Remover containers antigos (força recriação com nova imagem)
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          CONTAINERS=$(curl -sk \
+            -H "Authorization: Bearer $TOKEN" \
+            "$PORTAINER_URL/api/endpoints/3/docker/containers/json?filters=%7B%22label%22%3A%5B%22com.docker.compose.project%3Dpeople%22%5D%7D" \
+            | python3 -c "
+          import sys, json
+          for c in json.load(sys.stdin):
+              print(c['Id'], c['Names'][0])
+          ")
+
+          echo "$CONTAINERS" | while IFS=' ' read -r CID NAME; do
+            [ -z "$CID" ] && continue
+            echo "Parando $NAME..."
+            curl -sk -X POST -H "Authorization: Bearer $TOKEN" \
+              "$PORTAINER_URL/api/endpoints/3/docker/containers/$CID/stop" > /dev/null
+            echo "Removendo $NAME..."
+            curl -sk -X DELETE -H "Authorization: Bearer $TOKEN" \
+              "$PORTAINER_URL/api/endpoints/3/docker/containers/$CID" > /dev/null
+          done
+          echo "Containers removidos — serão recriados no redeploy"
+
       - name: Redeploiar stack no Portainer
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
