@@ -15,7 +15,8 @@ export function middleware(request: NextRequest) {
     || pathname.startsWith('/ponto')
     || pathname.startsWith('/configuracoes')
     || pathname.startsWith('/recrutamento')
-    || pathname.startsWith('/solicitar-vaga');
+    || pathname.startsWith('/solicitar-vaga')
+    || pathname.startsWith('/dho');
   const isLogin      = pathname === '/login';
   const isPublicAuth = pathname.startsWith('/recuperar-senha') || pathname.startsWith('/definir-senha');
 
@@ -54,6 +55,8 @@ export const config = {
     '/recrutamento/:path*',
     '/recrutamento',
     '/solicitar-vaga',
+    '/dho/:path*',
+    '/dho',
     '/login',
     '/recuperar-senha',
     '/definir-senha',

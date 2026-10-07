@@ -8,6 +8,7 @@ const NAV = [
   { href: '/ponto',         label: 'Jornada & Ponto',      color: '#F59E0B' },
   { href: '/carreira',      label: 'Carreira',             color: '#0D9488' },
   { href: '/recrutamento',  label: 'Recrutamento',         color: '#ff2f69' },
+  { href: '/dho',           label: 'DHO',                  color: '#6366f1' },
 ];
 
 let _roleCache: { role: string; ts: number } | null = null;

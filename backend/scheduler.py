@@ -57,7 +57,7 @@ schedule.every().day.at("20:00").do(evening_sync)
 log("Scheduler iniciado (TZ=America/Sao_Paulo)")
 log("  Manha 09:00: Convenia + Historico + TiqueTaque")
 log("  Tarde 20:00: TiqueTaque")
-log(f"  Primeiro sync manhã sera em {schedule.next_run()}")
+log(f"  Proximo sync agendado: {schedule.next_run()}")
 
 while True:
     schedule.run_pending()
