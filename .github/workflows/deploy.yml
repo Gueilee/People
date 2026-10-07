@@ -41,7 +41,7 @@ jobs:
           tar --exclude='.next' --exclude='node_modules' --exclude='*.db' -cf /tmp/frontend-context.tar .
 
           RESULT=$(curl -sk -X POST \
-            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1" \
+            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1&nocache=1" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/x-tar" \
             --data-binary @/tmp/frontend-context.tar)
