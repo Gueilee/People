@@ -18,9 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Gerar tag de build
-        run: echo "BUILD_TAG=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
-
       - name: Autenticar no Portainer
         id: auth
         env:
@@ -41,16 +38,15 @@ jobs:
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           TOKEN: ${{ steps.auth.outputs.token }}
-          BUILD_TAG: ${{ env.BUILD_TAG }}
         run: |
           set -euo pipefail
           cd frontend
           tar --exclude='.next' --exclude='node_modules' --exclude='*.db' \
               -cf /tmp/frontend-context.tar .
+          echo "Build context: $(du -sh /tmp/frontend-context.tar | cut -f1)"
 
-          echo "Enviando build context para Portainer (tag: $BUILD_TAG)..."
           RESULT=$(curl -skf -X POST \
-            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:$BUILD_TAG&t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1&nocache=1" \
+            "$PORTAINER_URL/api/endpoints/3/docker/build?t=people-app:latest&dockerfile=Dockerfile&rm=1&forcerm=1&nocache=1" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/x-tar" \
             --data-binary @/tmp/frontend-context.tar \
@@ -105,54 +101,19 @@ jobs:
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           TOKEN: ${{ steps.auth.outputs.token }}
-          BUILD_TAG: ${{ env.BUILD_TAG }}
         run: |
-          python3 - <<'PYEOF'
-          import os, json, time, urllib.request, urllib.parse, ssl
-
-          portainer = os.environ['PORTAINER_URL']
-          token     = os.environ['TOKEN']
-          build_tag = os.environ['BUILD_TAG']
-
-          ctx = ssl._create_unverified_context()
-
-          def api(method, path, data=None):
-              url = f"{portainer}{path}"
-              body = json.dumps(data).encode() if data else None
-              req  = urllib.request.Request(url, method=method, data=body,
-                         headers={'Authorization': f'Bearer {token}',
-                                  'Content-Type': 'application/json'})
-              try:
-                  with urllib.request.urlopen(req, context=ctx, timeout=30) as r:
-                      raw = r.read()
-                      return json.loads(raw) if raw else {}
-              except urllib.error.HTTPError as e:
-                  body = e.read().decode(errors='replace')
-                  print(f"  HTTP {e.code} em {path}: {body[:200]}")
-                  return {}
-              except Exception as e:
-                  print(f"  Erro em {path}: {e}")
-                  return {}
-
-          for cname in ['people_app', 'people_sync']:
-              flt = urllib.parse.quote(json.dumps({'name': [cname]}))
-              containers = api('GET', f'/api/endpoints/3/docker/containers/json?all=1&filters={flt}')
-              if not containers:
-                  print(f'{cname}: nao encontrado (pode ja estar parado)')
-                  continue
-              for c in containers:
-                  if not any(cname in n for n in c.get('Names', [])):
-                      continue
-                  cid = c['Id']
-                  print(f'Parando {cname} ({cid[:12]})...')
-                  api('POST', f'/api/endpoints/3/docker/containers/{cid}/stop')
-                  time.sleep(2)
-                  print(f'Removendo {cname} ({cid[:12]})...')
-                  api('DELETE', f'/api/endpoints/3/docker/containers/{cid}')
-                  print(f'Removido: {cname}')
-
-          print('Containers removidos — redeploy vai recriar com imagem nova')
-          PYEOF
+          set -euo pipefail
+          for CNAME in people_app people_sync; do
+            echo "--- Removendo $CNAME ---"
+            curl -sk -X POST \
+              "$PORTAINER_URL/api/endpoints/3/docker/containers/$CNAME/stop" \
+              -H "Authorization: Bearer $TOKEN" || true
+            sleep 2
+            RESP=$(curl -sk -o /dev/null -w "%{http_code}" -X DELETE \
+              "$PORTAINER_URL/api/endpoints/3/docker/containers/$CNAME?force=1" \
+              -H "Authorization: Bearer $TOKEN")
+            echo "$CNAME: HTTP $RESP (204=removido, 404=nao existia)"
+          done
 
       - name: Redeploiar stack no Portainer
         env:
@@ -163,15 +124,12 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           CONVENIA_TOKEN: ${{ secrets.CONVENIA_TOKEN }}
           TIQUETAQUE_TOKEN: ${{ secrets.TIQUETAQUE_TOKEN }}
-          BUILD_TAG: ${{ env.BUILD_TAG }}
         run: |
           set -euo pipefail
           PAYLOAD=$(python3 -c "
           import json, os
 
-          # Substitui a tag no compose para forçar recriação do container
           compose = open('docker-compose.yml').read()
-          compose = compose.replace('people-app:latest', f'people-app:{os.environ[\"BUILD_TAG\"]}')
 
           payload = {
             'stackFileContent': compose,
